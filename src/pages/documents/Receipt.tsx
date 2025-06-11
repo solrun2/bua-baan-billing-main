@@ -29,8 +29,7 @@ const Receipt = () => {
           headers: {
             "Content-Type": "application/json",
             Accept: "application/json",
-            // ใส่ Token ของคุณแทน YOUR_TOKEN
-            Authorization: "Bearer YOUR_TOKEN",
+            Authorization: "Bearer YOUR_TOKEN", //Your API token here
           },
         });
 
