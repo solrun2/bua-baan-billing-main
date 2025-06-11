@@ -1,0 +1,107 @@
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system with accounting/financial theme */
+
+@layer base {
+  :root {
+    --background: 250 250 250;
+    --foreground: 15 23 42;
+
+    --card: 255 255 255;
+    --card-foreground: 15 23 42;
+
+    --popover: 255 255 255;
+    --popover-foreground: 15 23 42;
+
+    --primary: 102 124 53;
+    --primary-foreground: 255 255 255;
+
+    --secondary: 226 232 240;
+    --secondary-foreground: 51 65 85;
+
+    --muted: 245 245 245;
+    --muted-foreground: 100 116 139;
+
+    --accent: 133 153 74;
+    --accent-foreground: 15 23 42;
+
+    --destructive: 239 68 68;
+    --destructive-foreground: 15 23 42;
+
+    --border: 203 213 225;
+    --input: 203 213 225;
+    --ring: 102 124 53;
+
+    --radius: 0.75rem;
+
+    --sidebar-background: 248 248 248;
+    --sidebar-foreground: 15 23 42;
+    --sidebar-primary: 102 124 53;
+    --sidebar-primary-foreground: 255 255 255;
+    --sidebar-accent: 226 232 240;
+    --sidebar-accent-foreground: 51 65 85;
+    --sidebar-border: 203 213 225;
+    --sidebar-ring: 102 124 53;
+  }
+
+  .dark {
+    --background: 15 23 42;
+    --foreground: 148 163 184;
+
+    --card: 30 41 59;
+    --card-foreground: 148 163 184;
+
+    --popover: 30 41 59;
+    --popover-foreground: 148 163 184;
+
+    --primary: 133 153 74;
+    --primary-foreground: 255 255 255;
+
+    --secondary: 51 65 85;
+    --secondary-foreground: 148 163 184;
+
+    --muted: 51 65 85;
+    --muted-foreground: 100 116 139;
+
+    --accent: 102 124 53;
+    --accent-foreground: 148 163 184;
+
+    --destructive: 239 68 68;
+    --destructive-foreground: 148 163 184;
+
+    --border: 51 65 85;
+    --input: 51 65 85;
+    --ring: 133 153 74;
+
+    --sidebar-background: 30 41 59;
+    --sidebar-foreground: 148 163 184;
+    --sidebar-primary: 133 153 74;
+    --sidebar-primary-foreground: 255 255 255;
+    --sidebar-accent: 51 65 85;
+    --sidebar-accent-foreground: 148 163 184;
+    --sidebar-border: 51 65 85;
+    --sidebar-ring: 133 153 74;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sarabun;
+  }
+}
+
+/* Custom gradient backgrounds */
+.gradient-bg {
+  background: linear-gradient(135deg, #667c35 0%, #859a4a 100%);
+}
+
+.gradient-card {
+  background: linear-gradient(135deg, #f7f8f4 0%, #f9faf7 100%);
+}
