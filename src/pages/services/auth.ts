@@ -1,6 +1,3 @@
-const API_BASE_URL = "https://openapi.ketshoptest.com";
-const CLIENT_ID = "01976789-cd89-762e-b139-1df23e52c47b";
-
 interface TokenResponse {
   access_token: string;
   token_type: string;
@@ -75,33 +72,41 @@ const setTokenDirectly = (token: string) => {
 // Verify token
 const verifyToken = async (token: string): Promise<boolean> => {
   try {
+    // Use the same domain as in order.ts
     const response = await fetch(
-      "https://openapi.ketshoptest.com/auth/verify",
+      "https://openapi.ketshoptest.com/order/get/2506000042",
       {
+        method: "GET",
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
+          Accept: "application/json",
         },
       }
     );
 
     if (!response.ok) {
-      console.error("Token verification failed:", await response.text());
+      console.error(
+        "Token verification failed:",
+        response.status,
+        response.statusText
+      );
+      // Clear invalid token
+      clearAuthToken();
       return false;
     }
 
-    const data = await response.json();
-    console.log("Token is valid. User info:", data);
+    // If we get here, token is valid
     return true;
   } catch (error) {
     console.error("Error verifying token:", error);
+    clearAuthToken();
     return false;
   }
 };
 
 // Set up token and test API
 const setupToken = async () => {
-  // Use the provided token directly
   const tokenData = {
     access_token:
       "eyJhbGciOiJFZERTQSIsImtpZCI6IjAxOTc2Nzg5LWNkODktNzYyZS1iMTM5LTFkZjIzZTUyYzQ3YiJ9.eyJjbGllbnRfaWQiOiIwMTk3Njc4OS1jZDg5LTc2MmUtYjEzOS0xZGYyM2U1MmM0N2IiLCJrZXRfd2ViX2lkIjoxMzE3LCJzY29wZXMiOlsiYWxsIl0sIm5hbWUiOiJJbnRlcm5zaGlwIiwiZG9tYWluIjoidWF0LmtldHNob3B0ZXN0LmNvbSIsInN1YiI6IjAxOTc2NzhiLTQ3YmUtNzA4YS04MTFkLWEwZWNiMDg1OTdiMCIsImlhdCI6MTc0OTc4ODg3MH0.OSbUayE_yS9IqOKLFrgsAGPJepiW7Otn3vzvE1SL9ijTpJmsGydGAP1_4AZA75cTmlXy583iS81EZxZszeYaBg",
@@ -112,7 +117,6 @@ const setupToken = async () => {
   };
 
   try {
-    // 1. ตรวจสอบ Token ก่อนใช้งาน
     console.log(
       "Token ที่ใช้:",
       tokenData.access_token.substring(0, 20) + "..."
@@ -122,13 +126,13 @@ const setupToken = async () => {
       new Date(Date.now() + 3600 * 1000).toISOString()
     );
 
-    // 2. ตั้งค่า Token
+    // ตั้งค่า Token
     setAuthToken(tokenData);
     console.log("ตั้งค่า Token เรียบร้อยแล้ว");
 
-    // 3. ทดสอบเรียก API
+    // ทดสอบเรียก API
     console.log("กำลังเรียก API...");
-    const apiUrl = "https://openapi.ketshoptest.com/api/order";
+    const apiUrl = "https://openapi.ketshoptest.com/order/get/2506000042";
     console.log("URL ที่เรียก:", apiUrl);
 
     const testResponse = await fetch(apiUrl, {

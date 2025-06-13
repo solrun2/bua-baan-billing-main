@@ -3,15 +3,25 @@ import { Button } from "@/components/ui/button";
 import { CreditCard, Plus, Search, Filter } from "lucide-react";
 import { useState, useEffect } from "react";
 import ReceiptDetailsModal from "./components/ReceiptDetailsModal";
+import { getToken } from "@/pages/services/auth";
 
 interface Receipt {
   id: string;
   client: string;
-  date: string;
-  dueDate: string;
+  created_at: string;
+  order_date: string;
   amount: string;
-  status: "ชำระแล้ว" | "ส่งแล้ว" | "เกินกำหนด" | "รอดำเนินการ";
+  status: "รอชำระเงิน" | "ชำระเงินแล้ว" | "ยกเลิก" | "คืนเงิน" | "รอตรวจสอบ";
   imageUrl?: string;
+  items?: Array<{
+    title: string;
+    qty: number;
+    price: number;
+    total: number;
+  }>;
+  address?: string;
+  tel?: string;
+  paymentMethod?: string;
 }
 
 const Receipt = () => {
@@ -22,43 +32,112 @@ const Receipt = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("https://openapi.ketshoptest.com/orders")
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error("Failed to fetch receipts");
+    const fetchOrder = async () => {
+      try {
+        setIsLoading(true);
+
+        // Get the token first
+        const token = await getToken();
+
+        // Log the token for debugging (remove in production)
+        console.log("Using token:", token);
+
+        // Fetch specific order
+        const orderResponse = await fetch(
+          "https://openapi.ketshoptest.com/order/get/2506000042",
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+
+        if (!orderResponse.ok) {
+          const errorText = await orderResponse.text();
+          console.error("API Error Response:", errorText);
+          throw new Error(
+            `ไม่สามารถโหลดข้อมูลใบเสร็จ: ${orderResponse.status} ${orderResponse.statusText}`
+          );
         }
-        return response.json();
-      })
-      .then((data) => {
-        console.log("API Response:", data);
-        const transformedData = data.map((order: any) => ({
-          id: order.order_id,
-          client: order.customer_name,
-          date: new Date(order.created_at).toLocaleDateString(),
-          amount: `฿${order.total_amount.toLocaleString()}`,
-          status: mapOrderStatus(order.status),
-          dueDate: new Date(order.due_date || Date.now()).toLocaleDateString(),
-          imageUrl: order.receipt_image_url,
-        }));
-        setReceipts(transformedData);
-      })
-      .catch((error) => {
-        console.error("Error fetching receipts:", error);
-        setError(error.message);
-      })
-      .finally(() => {
+
+        const orderData = await orderResponse.json();
+        console.log("API Response Data:", orderData); // Log the response data
+
+        if (!orderData) {
+          throw new Error("ไม่พบข้อมูลใบเสร็จ");
+        }
+
+        // Transform the order data to match our Receipt interface
+        const receipt: Receipt = {
+          id: orderData.ordercode || orderData.id?.toString() || "",
+          client: orderData.name || "ไม่ระบุชื่อลูกค้า",
+          created_at: orderData.order_date
+            ? new Date(orderData.order_date).toLocaleDateString("th-TH")
+            : "ไม่ระบุวันที่",
+          order_date: orderData.due_date
+            ? new Date(orderData.due_date).toLocaleDateString("th-TH")
+            : "ไม่ระบุ",
+          amount:
+            `฿${orderData.totals?.toLocaleString("th-TH", {
+              minimumFractionDigits: 2,
+            })}` || "฿0",
+          status: mapOrderStatus(orderData.status?.toString() || "1"),
+          imageUrl: orderData.details?.[0]?.feature_img || "",
+          items:
+            orderData.details?.map((item: any) => ({
+              title: item.title,
+              qty: item.qty,
+              price: item.price,
+              total: item.qty * item.price,
+            })) || [],
+          address: [
+            orderData.address1,
+            orderData.address2,
+            orderData.subdistrict,
+            orderData.district,
+            orderData.province,
+            orderData.zipcode,
+          ]
+            .filter(Boolean)
+            .join(" "),
+          tel: orderData.tel || "",
+          paymentMethod: orderData.payment_name || "ไม่ระบุ",
+        };
+
+        console.log("Transformed Receipt:", receipt); // Log the transformed data
+        setReceipts([receipt]);
+      } catch (error) {
+        console.error("Error in fetchOrder:", error);
+        setError(
+          error instanceof Error
+            ? error.message
+            : "เกิดข้อผิดพลาดในการโหลดข้อมูล"
+        );
+      } finally {
         setIsLoading(false);
-      });
+      }
+    };
+
+    fetchOrder();
   }, []);
 
-  const mapOrderStatus = (status: string): string => {
-    const statusMap: Record<string, string> = {
-      completed: "ชำระแล้ว",
-      pending: "ส่งแล้ว",
-      overdue: "เกินกำหนด",
-      draft: "รอดำเนินการ",
+  const mapOrderStatus = (status: string | number): Receipt["status"] => {
+    const statusMap: Record<string | number, Receipt["status"]> = {
+      // Numeric status codes
+      1: "รอชำระเงิน",
+      2: "ชำระเงินแล้ว",
+      3: "ยกเลิก",
+      4: "คืนเงิน",
+      5: "รอตรวจสอบ",
+      // String status codes
+      pending: "รอชำระเงิน",
+      paid: "ชำระเงินแล้ว",
+      cancelled: "ยกเลิก",
+      refunded: "คืนเงิน",
+      review: "รอตรวจสอบ",
     };
-    return statusMap[status] || status;
+    return statusMap[status] || "รอชำระเงิน";
   };
 
   const handleOpen = (receipt: Receipt) => {
@@ -138,9 +217,6 @@ const Receipt = () => {
                       วันที่
                     </th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground">
-                      กำหนดชำระ
-                    </th>
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">
                       จำนวนเงิน
                     </th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground">
@@ -164,10 +240,7 @@ const Receipt = () => {
                         {receipt.client}
                       </td>
                       <td className="py-3 px-4 text-muted-foreground">
-                        {receipt.date}
-                      </td>
-                      <td className="py-3 px-4 text-muted-foreground">
-                        {receipt.dueDate}
+                        {receipt.created_at}
                       </td>
                       <td className="py-3 px-4 font-medium text-foreground">
                         {receipt.amount}
@@ -175,12 +248,14 @@ const Receipt = () => {
                       <td className="py-3 px-4">
                         <span
                           className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            receipt.status === "ชำระแล้ว"
-                              ? "bg-green-100 text-green-700"
-                              : receipt.status === "ส่งแล้ว"
+                            receipt.status === "รอชำระเงิน"
                               ? "bg-blue-100 text-blue-700"
-                              : receipt.status === "เกินกำหนด"
+                              : receipt.status === "ชำระเงินแล้ว"
+                              ? "bg-green-100 text-green-700"
+                              : receipt.status === "ยกเลิก"
                               ? "bg-red-100 text-red-700"
+                              : receipt.status === "คืนเงิน"
+                              ? "bg-orange-100 text-orange-700"
                               : "bg-gray-100 text-gray-700"
                           }`}
                         >
