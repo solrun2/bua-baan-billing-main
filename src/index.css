@@ -8,7 +8,7 @@
 @layer base {
   :root {
     --background: 100 100 100;
-    --foreground: 15 23 42;
+    --foreground: 15 23 42; 
 
     --card: 118 168 150; 
     --card-foreground: 15 23 42; 
@@ -31,7 +31,7 @@
     --destructive: 239 68 68;
     --destructive-foreground: 15 23 42;
 
-    --border: 203 213 225;
+    --border: 150 163 184;
     --input: 203 213 225;
     --ring: 102 124 53;
 

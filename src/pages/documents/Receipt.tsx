@@ -38,8 +38,6 @@ const Receipt = () => {
 
         // Get the token first
         const token = await getToken();
-
-        // Log the token for debugging (remove in production)
         console.log("Using token:", token);
 
         // Fetch specific order
@@ -62,7 +60,7 @@ const Receipt = () => {
         }
 
         const orderData = await orderResponse.json();
-        console.log("API Response Data:", orderData); // Log the response data
+        console.log("API Response Data:", orderData); 
 
         if (!orderData) {
           throw new Error("ไม่พบข้อมูลใบเสร็จ");
