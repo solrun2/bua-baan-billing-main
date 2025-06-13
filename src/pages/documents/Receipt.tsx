@@ -1,8 +1,26 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { fetchOrderCodes } from "../services/order";
 import { Button } from "@/components/ui/button";
-import { CreditCard, Plus, Search, Filter } from "lucide-react";
+import { CreditCard, Plus, Search, Filter, RefreshCw } from "lucide-react";
 import { useState, useEffect } from "react";
 import ReceiptDetailsModal from "./components/ReceiptDetailsModal";
+import { getToken, getAccessToken } from "@/pages/services/auth";
+
+const API_BASE_URL = 'https://openapi.ketshoptest.com';
+
+interface Order {
+  id: string;
+  orderNumber: string;
+  customerName: string;
+  createdAt: string;
+  totalAmount: number;
+  status: string;
+  items: Array<{
+    name: string;
+    quantity: number;
+    price: number;
+  }>;
+}
 
 interface Receipt {
   id: string;
@@ -21,64 +39,135 @@ const Receipt = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const fetchOrders = async () => {
+    try {
+      setIsLoading(true);
+      const token = await getToken();
+      
+      // Fetch orders from the API
+      const response = await fetch(`${API_BASE_URL}/api/orders`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const orders: Order[] = await response.json();
+      
+      // Transform orders to receipts
+      const formattedReceipts = orders.map((order) => ({
+        id: order.id,
+        client: order.customerName || 'ไม่ระบุชื่อลูกค้า',
+        date: new Date(order.createdAt).toLocaleDateString('th-TH'),
+        dueDate: new Date(order.createdAt).toLocaleDateString('th-TH'),
+        amount: `฿${order.totalAmount.toFixed(2)}`,
+        status: mapOrderStatus(order.status),
+        orderData: order, // Store full order data for details
+      }));
+
+      setReceipts(formattedReceipts);
+      setError(null);
+    } catch (err: any) {
+      console.error('Error fetching orders:', err);
+      setError(`เกิดข้อผิดพลาด: ${err.message || 'ไม่สามารถโหลดข้อมูลใบเสร็จได้'}`);
+      setReceipts([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchOrders = async () => {
+    // Initialize and fetch orders
+    const initialize = async () => {
       try {
-        const response = await fetch("https://openapi.ketshoptest.com/orders", {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-            Authorization: "Bearer YOUR_TOKEN", //Your API token here
-          },
-        });
-
-        if (!response.ok) {
-          throw new Error("Failed to fetch receipts");
-        }
-
-        const data = await response.json();
-        console.log("API Response:", data);
-
-        const transformedData = data.map((order: any) => ({
-          id: order.order_id,
-          client: order.customer_name,
-          date: new Date(order.created_at).toLocaleDateString(),
-          amount: `฿${order.total_amount.toLocaleString()}`,
-          status: mapOrderStatus(order.status),
-          dueDate: new Date(order.due_date || Date.now()).toLocaleDateString(),
-          imageUrl: order.receipt_image_url,
-        }));
-
-        setReceipts(transformedData);
-      } catch (error: any) {
-        console.error("Error fetching receipts:", error);
-        setError(error.message);
-      } finally {
-        setIsLoading(false);
+        await fetchOrders();
+      } catch (error) {
+        console.error('Initialization error:', error);
+        setError('ไม่สามารถเชื่อมต่อกับระบบได้ กรุณาลองใหม่อีกครั้ง');
       }
     };
 
-    fetchOrders();
+    initialize();
   }, []);
-  
 
-  const mapOrderStatus = (status: string): string => {
-    const statusMap: Record<string, string> = {
+  const mapOrderStatus = (status: string): Receipt["status"] => {
+    const statusMap: Record<string, Receipt["status"]> = {
       completed: "ชำระแล้ว",
       pending: "ส่งแล้ว",
       overdue: "เกินกำหนด",
       draft: "รอดำเนินการ",
     };
-    return statusMap[status] || status;
+    return statusMap[status] || "รอดำเนินการ";
   };
+
+  const fetchReceipts = async () => {
+    try {
+      console.log('Fetching token...');
+      const token = await getToken();
+      console.log('Token received, fetching orders...');
+      
+      // Fetch orders directly from the API
+      const response = await fetch('https://openapi.ketshopweb.com/api/orders', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Failed to fetch orders:', response.status, errorText);
+        throw new Error(`ไม่สามารถโหลดข้อมูล: ${response.status} ${response.statusText}`);
+      }
+
+      const orders = await response.json();
+      console.log('Orders data:', orders);
+
+      if (!Array.isArray(orders) || orders.length === 0) {
+        console.warn('No orders found');
+        setError('ไม่พบข้อมูลใบเสร็จ');
+        setReceipts([]);
+        return;
+      }
+
+      // Transform orders to receipts
+      const formattedReceipts = orders.map((order: any) => ({
+        id: order.id || order.order_id || '',
+        client: order.customer_name || order.name || 'ไม่ระบุชื่อลูกค้า',
+        date: order.order_date ? new Date(order.order_date).toLocaleDateString('th-TH') : 'ไม่ระบุวันที่',
+        dueDate: order.due_date ? new Date(order.due_date).toLocaleDateString('th-TH') : 'ไม่ระบุกำหนดชำระ',
+        amount: order.total ? `฿${Number(order.total).toLocaleString('th-TH')}` : '฿0',
+        status: mapOrderStatus(order.status || ''),
+        imageUrl: order.receipt_image_url || '',
+      }));
+
+      console.log('Formatted receipts:', formattedReceipts);
+      setReceipts(formattedReceipts);
+      setError(null);
+    } catch (err: any) {
+      console.error('Error in fetchReceipts:', err);
+      setError(err.message || 'เกิดข้อผิดพลาดในการโหลดข้อมูลใบเสร็จ');
+      setReceipts([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchReceipts();
+  }, []);
 
   const handleOpen = (receipt: Receipt) => {
     setSelectedReceipt(receipt);
     setOpen(true);
   };
 
-  const handleCreateReceipt = async () => {
+  const handleCreateReceipt = () => {
     alert("Create Receipt functionality is not yet implemented.");
   };
 
@@ -86,8 +175,15 @@ const Receipt = () => {
     alert(`Edit Receipt ${receipt.id} functionality is not yet implemented.`);
   };
 
+  const handleReload = () => {
+    setError(null);
+    setIsLoading(true);
+    fetchReceipts();
+  };
+
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 rounded-xl bg-purple-100 flex items-center justify-center">
@@ -100,16 +196,22 @@ const Receipt = () => {
             <p className="text-gray-400">จัดการใบเสร็จรับเงินทั้งหมด</p>
           </div>
         </div>
-        <Button
-          className="flex items-center gap-2"
-          onClick={handleCreateReceipt}
-        >
-          <Plus className="w-4 h-4" />
-          สร้างใบเสร็จใหม่
-        </Button>
+        <div className="flex space-x-2">
+          <Button variant="outline" onClick={handleReload} disabled={isLoading}>
+            <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+            โหลดใหม่
+          </Button>
+          <Button
+            className="flex items-center gap-2"
+            onClick={handleCreateReceipt}
+          >
+            <Plus className="w-4 h-4" />
+            สร้างใบเสร็จใหม่
+          </Button>
+        </div>
       </div>
 
-      {/* Actions */}
+      {/* Search & Filter */}
       <div className="flex items-center gap-4">
         <div className="flex-1 max-w-md">
           <div className="relative">
@@ -202,14 +304,12 @@ const Receipt = () => {
                           variant="outline"
                           size="sm"
                           onClick={() => handleOpen(receipt)}
-                          className="flex items-center"
                         >
                           ดู
                         </Button>
                         <Button
                           variant="outline"
                           size="sm"
-                          className="flex items-center"
                           onClick={() => handleEditReceipt(receipt)}
                         >
                           แก้ไข
@@ -224,8 +324,7 @@ const Receipt = () => {
         </CardContent>
       </Card>
 
-      {/* No Receipts Placeholder */}
-      {receipts.length === 0 && (
+      {receipts.length === 0 && !isLoading && (
         <Card className="border border-border/40">
           <CardContent className="p-8">
             <div className="text-center text-muted-foreground">
