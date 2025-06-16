@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -37,25 +36,34 @@ const App = () => (
         <Layout>
           <Routes>
             <Route path="/" element={<Index />} />
-            
+
             {/* Document routes */}
             <Route path="/documents/quotation" element={<Quotation />} />
             <Route path="/documents/invoice" element={<Invoice />} />
             <Route path="/documents/receipt" element={<Receipt />} />
             <Route path="/documents/tax-invoice" element={<TaxInvoice />} />
             <Route path="/documents/credit-note" element={<CreditNote />} />
-            <Route path="/documents/purchase-order" element={<PurchaseOrder />} />
+            <Route
+              path="/documents/purchase-order"
+              element={<PurchaseOrder />}
+            />
             <Route path="/documents/billing" element={<Billing />} />
-            
+
             {/* Finance routes */}
             <Route path="/finance/bank-accounts" element={<BankAccounts />} />
             <Route path="/finance/cashflow" element={<Cashflow />} />
-            
+
             {/* Settings routes */}
-            <Route path="/settings/chart-of-accounts" element={<ChartOfAccounts />} />
-            <Route path="/settings/document-numbering" element={<DocumentNumbering />} />
+            <Route
+              path="/settings/chart-of-accounts"
+              element={<ChartOfAccounts />}
+            />
+            <Route
+              path="/settings/document-numbering"
+              element={<DocumentNumbering />}
+            />
             <Route path="/settings/company-info" element={<CompanyInfo />} />
-            
+
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
