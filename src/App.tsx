@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Layout } from "./components/Layout";
+import CreateReceipt from "./pages/documents/components/CreateReceipt";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 
@@ -41,6 +42,10 @@ const App = () => (
             <Route path="/documents/quotation" element={<Quotation />} />
             <Route path="/documents/invoice" element={<Invoice />} />
             <Route path="/documents/receipt" element={<Receipt />} />
+            <Route
+              path="/documents/components/CreateReceipt"
+              element={<CreateReceipt />}
+            />
             <Route path="/documents/tax-invoice" element={<TaxInvoice />} />
             <Route path="/documents/credit-note" element={<CreditNote />} />
             <Route

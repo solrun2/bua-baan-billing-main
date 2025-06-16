@@ -5,6 +5,7 @@ import { useState, useEffect, useMemo } from "react";
 import ReceiptDetailsModal from "./components/ReceiptDetailsModal";
 import { getToken } from "@/pages/services/auth";
 import { useNavigate } from "react-router-dom";
+import CreateReceipt from "./components/CreateReceipt";
 
 interface Receipt {
   id: string;
@@ -315,7 +316,11 @@ const Receipt = () => {
         </div>
         <div className="flex space-x-2">
           <Button
-            onClick={() => navigate("/documents/receipts/new")}
+            onClick={() =>
+              navigate(
+                "/documents/components/CreateReceipt"
+              )
+            }
             className="flex items-center gap-2"
           >
             <Plus className="w-4 h-4" />
