@@ -1,10 +1,9 @@
 import { useState, useCallback, useEffect } from "react";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Loader2, Search } from "lucide-react";
+import { getToken } from "@/pages/services/auth";
 import debounce from "lodash/debounce";
+import { Item } from "./receipt/types/item";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -13,36 +12,32 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-
-interface Item {
-  id: string;
-  name: string;
-  quantity: number;
-  price: number;
-  discount: number;
-  vat: number;
-  withholdingTax: string;
-  customWithholdingTax?: string;
-  description: string;
-}
+import { Search, Loader2 } from "lucide-react";
+import ProductAutocomplete from "./receipt/components/ProductAutocomplete";
+import { calcGrandTotal, calcVatAmount, calcWithholding } from "./receipt/utils/itemCalcs";
+import { Switch } from "@/components/ui/switch";
 
 function CreateReceipt() {
-  const [reference, setReference] = useState("");
-  const [documentNumber, setDocumentNumber] = useState("");
-  const [customer, setCustomer] = useState("Tester Tomato");
-  const [useLatestContact, setUseLatestContact] = useState(false);
-  const [address, setAddress] = useState(
-    "22, แขวงสามเสนนอก, เขตห้วยขวาง, กรุงเทพมหานคร, 10310"
-  );
-  const [phone, setPhone] = useState("0813036966");
-  const [priceType, setPriceType] = useState("exclude_tax");
-  const [paymentDate, setPaymentDate] = useState(
-    new Date().toISOString().split("T")[0]
-  );
-  const [paymentMethod, setPaymentMethod] = useState("");
-  const [amountReceived, setAmountReceived] = useState(0);
-  const [customerNotes, setCustomerNotes] = useState("");
+  // --- Autocomplete state สำหรับสินค้า/บริการต่อแถว ---
+  const [useLatestContact, setUseLatestContact] = useState<boolean>(false);
+  const [productQueries, setProductQueries] = useState<{
+    [index: number]: string;
+  }>({});
+  const [productResults, setProductResults] = useState<{
+    [index: number]: any[];
+  }>({});
+  const [isProductSearching, setIsProductSearching] = useState<{
+    [index: number]: boolean;
+  }>({});
+  const [isProductDropdownOpen, setIsProductDropdownOpen] = useState<{
+    [index: number]: boolean;
+  }>({});
+  const [selectedProduct, setSelectedProduct] = useState<{
+    [index: number]: any;
+  }>({});
+
   const [items, setItems] = useState<Item[]>([
     {
       id: "1",
@@ -56,15 +51,10 @@ function CreateReceipt() {
     },
   ]);
 
-  const [showAdvancedPayment, setShowAdvancedPayment] = useState(false);
+  const [priceType, setPriceType] = useState<string>("include_tax");
+  const vatAmount = calcVatAmount(items, priceType);
 
-  const [searchQuery, setSearchQuery] = useState("");
-  const [isSearching, setIsSearching] = useState(false);
-  const [searchResults, setSearchResults] = useState([]);
-  const [selectedCustomer, setSelectedCustomer] = useState(null);
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-
-  const [showAdjustments, setShowAdjustments] = useState(false);
+  // --- Adjustments State ---
   const [adjustmentItems, setAdjustmentItems] = useState([
     {
       id: 1,
@@ -75,34 +65,144 @@ function CreateReceipt() {
     },
   ]);
 
-  const accountOptions = [
-    { value: "530501", label: "530501 - ค่าธรรมเนียมธนาคาร" },
-    { value: "530502", label: "530502 - ค่าธรรมเนียมโอนเงิน" },
-    { value: "530599", label: "530599 - ค่าธรรมเนียมอื่นๆ" },
-  ];
+  const [paymentMethod, setPaymentMethod] = useState<string>("");
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState([]);
+  const [reference, setReference] = useState<string>("");
+  const [documentNumber, setDocumentNumber] = useState<string>("");
+  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
+  const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
+  const [customer, setCustomer] = useState<string>("");
+  const [address, setAddress] = useState<string>("");
+  const [phone, setPhone] = useState<string>("");
+  const [paymentDate, setPaymentDate] = useState<string>(
+    new Date().toISOString().split("T")[0]
+  );
+  const [showAdjustments, setShowAdjustments] = useState<boolean>(false);
+  const [showAdvancedPayment, setShowAdvancedPayment] =
+    useState<boolean>(false);
+  const [documentType, setDocumentType] = useState<string>("");
+  const [adjustmentAmount, setAdjustmentAmount] = useState<number>(0);
+  const [adjustmentNote, setAdjustmentNote] = useState<string>("");
+  const [customerNotes, setCustomerNotes] = useState<string>("");
+  const [amountReceived, setAmountReceived] = useState<number>(0);
 
-  const [documentType, setDocumentType] = useState("");
-  const [adjustmentAmount, setAdjustmentAmount] = useState(0);
-  const [adjustmentNote, setAdjustmentNote] = useState("");
+  // --- ฟังก์ชัน fetchAllProducts ---
+  const fetchAllProducts = useCallback(async (query = "", index: number) => {
+    try {
+      setIsProductSearching((prev) => ({ ...prev, [index]: true }));
+      const token = await getToken();
+      const response = await fetch(
+        "https://openapi.ketshoptest.com/product/list_all",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            search: query,
+            page: 1,
+            limit: 20,
+          }),
+        }
+      );
+      const data = await response.json();
+      setProductResults((prev) => ({ ...prev, [index]: data.data || [] }));
+    } catch (error) {
+      setProductResults((prev) => ({ ...prev, [index]: [] }));
+    } finally {
+      setIsProductSearching((prev) => ({ ...prev, [index]: false }));
+    }
+  }, []);
+
+
+  const fetchAllCustomers = useCallback(async (query = "") => {
+    try {
+      const token = await getToken();
+      if (!token) {
+        console.error("No authentication token found");
+        return [];
+      }
+
+      // ถ้า query เป็นตัวเลข ให้ดึงข้อมูลช่วง id
+      if (!isNaN(Number(query)) && query !== "") {
+        let startId = Number(query);
+        let endId = startId + 10; // ตัวอย่าง: ดึง 10 ไอดีถัดไป (แก้ไขได้)
+        const customers = [];
+        for (let id = startId; id <= endId; id++) {
+          try {
+            const response = await fetch(
+              `https://openapi.ketshoptest.com/customer/overview/${id}`,
+              {
+                method: "GET",
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                  "Content-Type": "application/json",
+                },
+              }
+            );
+            if (response.ok) {
+              const data = await response.json();
+              if (data && data.id) customers.push(data);
+            }
+          } catch (error) {
+            // ข้ามไอดีที่ error
+          }
+        }
+        return customers;
+      }
+
+      // วิธีเดิม (search)
+      const response = await fetch(
+        "https://openapi.ketshoptest.com/customer/search",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            search: query
+              ? {
+                  type: query.includes("@") ? "email" : "id",
+                  value: query,
+                }
+              : undefined,
+            page: 1,
+            limit: query ? 10 : 100,
+            sort: "name",
+            order: "asc",
+          }),
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        return data.data || data.items || [];
+      } else {
+        const errorText = await response.text();
+        console.error("API Error Status:", response.status);
+        console.error("API Error Response:", errorText);
+        if (response.status === 401) {
+          console.error("Session expired. Please login again.");
+        }
+        return [];
+      }
+    } catch (error) {
+      console.error("Error fetching customers:", error);
+      return [];
+    }
+  }, []);
 
   const debouncedSearch = useCallback(
     debounce(async (query) => {
-      if (!query.trim()) {
-        setSearchResults([]);
-        return;
-      }
-
       setIsSearching(true);
       try {
-        const response = await fetch(
-          `https://openapi.ketshoptest.com/customer/overview/${query}`
-        );
-        if (response.ok) {
-          const data = await response.json();
-          setSearchResults([data]);
-        } else {
-          setSearchResults([]);
-        }
+        // Only search if there's a query, otherwise show all
+        const results = query ? await fetchAllCustomers(query) : [];
+        setSearchResults(results);
       } catch (error) {
         console.error("Error searching customers:", error);
         setSearchResults([]);
@@ -110,7 +210,7 @@ function CreateReceipt() {
         setIsSearching(false);
       }
     }, 500),
-    []
+    [fetchAllCustomers]
   );
 
   useEffect(() => {
@@ -138,15 +238,6 @@ function CreateReceipt() {
     setItems(newItems);
   };
 
-  // Helper to get withholding tax as number
-  const getWithholdingTaxValue = (item: Item) => {
-    if (item.withholdingTax === "custom" && item.customWithholdingTax) {
-      return parseFloat(item.customWithholdingTax) || 0;
-    }
-    if (item.withholdingTax === "not_specified") return 0;
-    return parseFloat(item.withholdingTax) || 0;
-  };
-
   const addItem = () => {
     setItems([
       ...items,
@@ -161,55 +252,6 @@ function CreateReceipt() {
         description: "",
       },
     ]);
-  };
-
-  const removeItem = (id: string) => {
-    if (items.length > 1) {
-      setItems(items.filter((item) => item.id !== id));
-    }
-  };
-
-  // คำนวณ subtotal (ยอดก่อน VAT) สำหรับทุกกรณี
-  const subtotal = items.reduce((sum, item) => {
-    const itemTotal = item.quantity * item.price - item.discount;
-    if (item.vat > 0) {
-      if (priceType === "include_tax") {
-        const vatRate = item.vat / 100;
-        const preTax = itemTotal / (1 + vatRate);
-        return sum + preTax;
-      }
-      return sum + itemTotal;
-    }
-    return sum + itemTotal;
-  }, 0);
-
-  // คำนวณ vatAmount จาก subtotal เสมอ (คิดแบบรวมหลาย vat)
-  const vatAmount = items.reduce((sum, item) => {
-    const itemTotal = item.quantity * item.price - item.discount;
-    let preTax = itemTotal;
-    if (item.vat > 0 && priceType === "include_tax") {
-      const vatRate = item.vat / 100;
-      preTax = itemTotal / (1 + vatRate);
-    }
-    return sum + preTax * (item.vat > 0 ? item.vat / 100 : 0);
-  }, 0);
-
-  // คำนวณยอดหัก ณ ที่จ่ายรวม (หักจากแต่ละรายการ)
-  const totalWithholding = items.reduce((sum, item) => {
-    const itemTotal = item.quantity * item.price - item.discount;
-    return sum + (itemTotal * getWithholdingTaxValue(item)) / 100;
-  }, 0);
-
-  // ยอดรวมสุทธิ (subtotal + vatAmount - withholding)
-  const grandTotal = subtotal + vatAmount - totalWithholding;
-  const remaining = Math.max(0, grandTotal - amountReceived);
-
-  const handleAdjustmentChange = (id: number, field: string, value: any) => {
-    setAdjustmentItems((prevItems) =>
-      prevItems.map((item) =>
-        item.id === id ? { ...item, [field]: value } : item
-      )
-    );
   };
 
   const addAdjustmentItem = () => {
@@ -233,10 +275,41 @@ function CreateReceipt() {
     }
   };
 
+  const removeItem = (id: string) => {
+    if (items.length > 1) {
+      const newItems = items.filter((item) => item.id !== id);
+      setItems(newItems);
+    }
+  };
+
   const totalAdjustments = adjustmentItems.reduce((sum, item) => {
     const amount = item.amount || 0;
     return item.type === "deduct" ? sum - amount : sum + amount;
   }, 0);
+
+  const totalWithholding = items.reduce((sum, item) => {
+    if (item.withholdingTax === "not_specified") return sum;
+    const amount = Number(item.price) * Number(item.quantity);
+    const taxRate =
+      item.withholdingTax === "custom"
+        ? (Number(item.customWithholdingTax) || 0) / 100
+        : 0.03; // Default 3% if not custom
+    return sum + amount * taxRate;
+  }, 0);
+
+  const subtotal = items.reduce((sum, item) => {
+    const itemTotal = Number(item.price) * Number(item.quantity);
+    const discount = Number(item.discount) || 0;
+    return sum + itemTotal - discount;
+  }, 0);
+
+  let grandTotal = 0;
+  if (priceType === "include_tax") {
+    grandTotal = subtotal; // subtotal คือยอดรวมที่รวม VAT แล้ว
+  } else {
+    grandTotal = subtotal + vatAmount;
+  }
+  grandTotal -= totalWithholding;
 
   return (
     <div className="max-w-6xl mx-auto p-6 space-y-6">
@@ -286,7 +359,13 @@ function CreateReceipt() {
                     setSearchQuery(query);
                     debouncedSearch(query);
                   }}
-                  onFocus={() => setIsDropdownOpen(true)}
+                  onFocus={() => {
+                    setIsDropdownOpen(true);
+                    // Load all customers when clicking the search field
+                    if (searchQuery === "") {
+                      debouncedSearch("");
+                    }
+                  }}
                   onBlur={() => setTimeout(() => setIsDropdownOpen(false), 200)}
                   placeholder="ค้นหาลูกค้า (รหัสหรือชื่อลูกค้า)"
                   className="pl-8"
@@ -295,8 +374,24 @@ function CreateReceipt() {
                   <Loader2 className="absolute right-2.5 top-2.5 h-4 w-4 animate-spin" />
                 )}
               </div>
-              {isDropdownOpen && searchResults.length > 0 && (
+              {isDropdownOpen && (
                 <div className="absolute z-10 mt-1 w-full bg-white shadow-lg rounded-md border max-h-60 overflow-auto">
+                  {/* ปุ่มเพิ่มผู้ติดต่อ */}
+                  <div
+                    className="p-2 bg-teal-100 hover:bg-teal-200 cursor-pointer font-medium border-b"
+                    onMouseDown={() => {
+                      // TODO: ใส่ logic เปิด modal หรือหน้าเพิ่มผู้ติดต่อใหม่
+                      alert("เพิ่มผู้ติดต่อใหม่");
+                    }}
+                  >
+                    + เพิ่มผู้ติดต่อ
+                  </div>
+                  {/* รายการลูกค้า */}
+                  {searchResults.length === 0 && (
+                    <div className="p-2 text-gray-400 text-center">
+                      ไม่พบลูกค้า
+                    </div>
+                  )}
                   {searchResults.map((customer) => (
                     <div
                       key={customer.id}
@@ -311,11 +406,15 @@ function CreateReceipt() {
                       }}
                     >
                       <div className="font-medium">{customer.name}</div>
-                      {customer.phone && (
-                        <div className="text-sm text-gray-500">
-                          {customer.phone}
-                        </div>
-                      )}
+                      {/* แสดงรหัสลูกค้า (และเบอร์โทรถ้ามี) */}
+                      <div className="text-xs text-gray-500 flex gap-2">
+                        <span>
+                          {customer.code ||
+                            customer.customerCode ||
+                            customer.id}
+                        </span>
+                        {customer.phone && <span>{customer.phone}</span>}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -410,23 +509,25 @@ function CreateReceipt() {
                 <tr key={item.id} className="border-b">
                   <td className="p-2">{index + 1}</td>
                   <td className="p-2">
-                    <Input
-                      value={item.name}
-                      onChange={(e) =>
-                        handleItemChange(index, "name", e.target.value)
-                      }
-                      placeholder="เลือกสินค้า/บริการ"
-                    />
-                    <Textarea
-                      className="mt-1 text-xs"
-                      rows={2}
-                      placeholder="คำอธิบายรายการ (ไม่เกิน 1,000 ตัวอักษร)"
-                      maxLength={1000}
-                      value={item.description}
-                      onChange={(e) =>
-                        handleItemChange(index, "description", e.target.value)
-                      }
-                    />
+                    <div className="relative">
+                      <ProductAutocomplete
+                        value={item.name}
+                        onChange={(name: string, price: number) => {
+                          handleItemChange(index, "name", name);
+                          handleItemChange(index, "price", price);
+                        }}
+                      />
+                      <Textarea
+                        className="mt-1 text-xs"
+                        rows={2}
+                        placeholder="คำอธิบายรายการ (ไม่เกิน 1,000 ตัวอักษร)"
+                        maxLength={1000}
+                        value={item.description}
+                        onChange={(e) =>
+                          handleItemChange(index, "description", e.target.value)
+                        }
+                      />
+                    </div>
                   </td>
                   <td className="p-2">
                     <Input
@@ -570,12 +671,16 @@ function CreateReceipt() {
             {priceType === "exclude_tax" && (
               <div className="flex justify-between">
                 <span>ภาษีมูลค่าเพิ่ม 7%</span>
-                <span className="text-green-600">+ {vatAmount.toFixed(2)} บาท</span>
+                <span className="text-green-600">
+                  + {vatAmount.toFixed(2)} บาท
+                </span>
               </div>
             )}
             <div className="flex justify-between">
               <span>ยอดหัก ณ ที่จ่ายรวม</span>
-              <span className="text-red-600">- {totalWithholding.toFixed(2)} บาท</span>
+              <span className="text-red-600">
+                - {totalWithholding.toFixed(2)} บาท
+              </span>
             </div>
             <div className="flex justify-between font-bold text-lg border-t pt-2">
               <span>จำนวนเงินทั้งสิ้น</span>
