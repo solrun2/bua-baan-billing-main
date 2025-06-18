@@ -1,5 +1,4 @@
-// pages/CreateReceipt.tsx
-import React, { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -24,6 +23,7 @@ interface Item {
   discount: number;
   vat: number;
   withholdingTax: string;
+  customWithholdingTax?: string;
   description: string;
 }
 
@@ -37,7 +37,6 @@ function CreateReceipt() {
   );
   const [phone, setPhone] = useState("0813036966");
   const [priceType, setPriceType] = useState("exclude_tax");
-  const [isTaxInvoice, setIsTaxInvoice] = useState(true);
   const [paymentDate, setPaymentDate] = useState(
     new Date().toISOString().split("T")[0]
   );
@@ -58,10 +57,6 @@ function CreateReceipt() {
   ]);
 
   const [showAdvancedPayment, setShowAdvancedPayment] = useState(false);
-  const [paymentNumber, setPaymentNumber] = useState("");
-  const [paymentChannel, setPaymentChannel] = useState("");
-  const [paymentStatus, setPaymentStatus] = useState("");
-  const [paymentNote, setPaymentNote] = useState("");
 
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
@@ -126,8 +121,30 @@ function CreateReceipt() {
 
   const handleItemChange = (index: number, key: keyof Item, value: any) => {
     const newItems = [...items];
-    newItems[index] = { ...newItems[index], [key]: value };
+    // If changing withholdingTax, reset customWithholdingTax if not custom
+    if (key === "withholdingTax") {
+      if (value !== "custom") {
+        newItems[index] = {
+          ...newItems[index],
+          withholdingTax: value,
+          customWithholdingTax: undefined,
+        };
+      } else {
+        newItems[index] = { ...newItems[index], withholdingTax: value };
+      }
+    } else {
+      newItems[index] = { ...newItems[index], [key]: value };
+    }
     setItems(newItems);
+  };
+
+  // Helper to get withholding tax as number
+  const getWithholdingTaxValue = (item: Item) => {
+    if (item.withholdingTax === "custom" && item.customWithholdingTax) {
+      return parseFloat(item.customWithholdingTax) || 0;
+    }
+    if (item.withholdingTax === "not_specified") return 0;
+    return parseFloat(item.withholdingTax) || 0;
   };
 
   const addItem = () => {
@@ -152,33 +169,39 @@ function CreateReceipt() {
     }
   };
 
+  // คำนวณ subtotal (ยอดก่อน VAT) สำหรับทุกกรณี
   const subtotal = items.reduce((sum, item) => {
     const itemTotal = item.quantity * item.price - item.discount;
-    if (priceType === "include_tax" && item.vat > 0) {
-      const vatRate = item.vat / 100;
-      const preTaxAmount = itemTotal / (1 + vatRate);
-      return sum + preTaxAmount;
+    if (item.vat > 0) {
+      if (priceType === "include_tax") {
+        const vatRate = item.vat / 100;
+        const preTax = itemTotal / (1 + vatRate);
+        return sum + preTax;
+      }
+      return sum + itemTotal;
     }
     return sum + itemTotal;
   }, 0);
 
-  const vatAmount = isTaxInvoice
-    ? items.reduce((sum, item) => {
-        if (priceType === "exclude_tax" && item.vat > 0) {
-          const itemTotal = item.quantity * item.price - item.discount;
-          return sum + itemTotal * (item.vat / 100);
-        }
-        return sum;
-      }, 0)
-    : 0;
+  // คำนวณ vatAmount จาก subtotal เสมอ (คิดแบบรวมหลาย vat)
+  const vatAmount = items.reduce((sum, item) => {
+    const itemTotal = item.quantity * item.price - item.discount;
+    let preTax = itemTotal;
+    if (item.vat > 0 && priceType === "include_tax") {
+      const vatRate = item.vat / 100;
+      preTax = itemTotal / (1 + vatRate);
+    }
+    return sum + preTax * (item.vat > 0 ? item.vat / 100 : 0);
+  }, 0);
 
-  const grandTotal =
-    priceType === "include_tax"
-      ? items.reduce(
-          (sum, item) => sum + (item.quantity * item.price - item.discount),
-          0
-        )
-      : subtotal + vatAmount;
+  // คำนวณยอดหัก ณ ที่จ่ายรวม (หักจากแต่ละรายการ)
+  const totalWithholding = items.reduce((sum, item) => {
+    const itemTotal = item.quantity * item.price - item.discount;
+    return sum + (itemTotal * getWithholdingTaxValue(item)) / 100;
+  }, 0);
+
+  // ยอดรวมสุทธิ (subtotal + vatAmount - withholding)
+  const grandTotal = subtotal + vatAmount - totalWithholding;
   const remaining = Math.max(0, grandTotal - amountReceived);
 
   const handleAdjustmentChange = (id: number, field: string, value: any) => {
@@ -219,9 +242,7 @@ function CreateReceipt() {
     <div className="max-w-6xl mx-auto p-6 space-y-6">
       {/* Header */}
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">
-          สร้างใบเสร็จรับเงิน{isTaxInvoice ? "/ใบกำกับภาษี" : ""}
-        </h1>
+        <h1 className="text-2xl font-bold">สร้างใบเสร็จรับเงิน</h1>
       </div>
 
       {/* Reference Section */}
@@ -343,27 +364,25 @@ function CreateReceipt() {
       {/* Price and Tax */}
       <section className="border rounded p-4 space-y-4">
         <h2 className="font-semibold">ข้อมูลราคาและภาษี</h2>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <Label>ประเภทราคา</Label>
-            <Select value={priceType} onValueChange={setPriceType}>
-              <SelectTrigger>
-                <SelectValue placeholder="เลือกประเภทราคา" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="exclude_tax">แยกภาษี</SelectItem>
-                <SelectItem value="include_tax">รวมภาษี</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex items-end">
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="tax-invoice"
-                checked={isTaxInvoice}
-                onCheckedChange={setIsTaxInvoice}
-              />
-              <Label htmlFor="tax-invoice">ออกใบกำกับภาษี</Label>
+        <div className="space-y-4">
+          <div className="flex justify-between items-end">
+            <div className="space-y-2 w-1/3">
+              <Label htmlFor="price-type">ประเภทราคา</Label>
+              <Select value={priceType} onValueChange={setPriceType}>
+                <SelectTrigger>
+                  <SelectValue placeholder="เลือกประเภทราคา" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="exclude_tax">แยกภาษี</SelectItem>
+                  <SelectItem value="include_tax">รวมภาษี</SelectItem>
+                  <SelectItem value="none">ไม่มี</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="text-sm text-gray-500">
+              {priceType === "exclude_tax" && "ราคาแยกภาษี"}
+              {priceType === "include_tax" && "ราคารวมภาษีแล้ว"}
+              {priceType === "none" && "ไม่คิดภาษี"}
             </div>
           </div>
         </div>
@@ -485,14 +504,34 @@ function CreateReceipt() {
                         <SelectItem value="not_specified">
                           ยังไม่ระบุ
                         </SelectItem>
-                        <SelectItem value="withholding">
-                          หัก ณ ที่จ่าย
-                        </SelectItem>
-                        <SelectItem value="no_withholding">
-                          ไม่หัก ณ ที่จ่าย
-                        </SelectItem>
+                        <SelectItem value="0.75">0.75%</SelectItem>
+                        <SelectItem value="1">1%</SelectItem>
+                        <SelectItem value="1.5">1.5%</SelectItem>
+                        <SelectItem value="2">2%</SelectItem>
+                        <SelectItem value="3">3%</SelectItem>
+                        <SelectItem value="5">5%</SelectItem>
+                        <SelectItem value="10">10%</SelectItem>
+                        <SelectItem value="custom">กำหนดเอง</SelectItem>
                       </SelectContent>
                     </Select>
+                    {item.withholdingTax === "custom" && (
+                      <Input
+                        type="number"
+                        min={0}
+                        max={100}
+                        step={0.01}
+                        value={item.customWithholdingTax ?? ""}
+                        onChange={(e) =>
+                          handleItemChange(
+                            index,
+                            "customWithholdingTax",
+                            e.target.value
+                          )
+                        }
+                        className="text-right w-20 mt-2"
+                        placeholder="เช่น 2.5"
+                      />
+                    )}
                   </td>
                   <td className="p-2 text-center">
                     {items.length > 1 && (
@@ -528,12 +567,16 @@ function CreateReceipt() {
                 บาท
               </span>
             </div>
-            {isTaxInvoice && (
+            {priceType === "exclude_tax" && (
               <div className="flex justify-between">
                 <span>ภาษีมูลค่าเพิ่ม 7%</span>
-                <span>{vatAmount.toFixed(2)} บาท</span>
+                <span className="text-green-600">+ {vatAmount.toFixed(2)} บาท</span>
               </div>
             )}
+            <div className="flex justify-between">
+              <span>ยอดหัก ณ ที่จ่ายรวม</span>
+              <span className="text-red-600">- {totalWithholding.toFixed(2)} บาท</span>
+            </div>
             <div className="flex justify-between font-bold text-lg border-t pt-2">
               <span>จำนวนเงินทั้งสิ้น</span>
               <span>{grandTotal.toFixed(2)} บาท</span>
@@ -739,9 +782,25 @@ function CreateReceipt() {
               <SelectValue placeholder="กรุณาเลือกแท็กที่ต้องการ" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="urgent">ด่วน</SelectItem>
-              <SelectItem value="pending">รอดำเนินการ</SelectItem>
-              <SelectItem value="completed">เสร็จสิ้น</SelectItem>
+              <SelectItem value="ketshopweb">Ketshopweb</SelectItem>
+              <SelectItem value="website">Website</SelectItem>
+              <SelectItem value="cod">COD</SelectItem>
+              <SelectItem value="line@">Line@</SelectItem>
+              <SelectItem value="facebook">Facebook</SelectItem>
+              <SelectItem value="shopee">Shopee</SelectItem>
+              <SelectItem value="lazada">Lazada</SelectItem>
+              <SelectItem value="line-bot">Line Bot</SelectItem>
+              <SelectItem value="line">Line</SelectItem>
+              <SelectItem value="instagram">Instagram</SelectItem>
+              <SelectItem value="twitter">Twitter</SelectItem>
+              <SelectItem value="sale-page">Sale Page</SelectItem>
+              <SelectItem value="wechat">Wechat</SelectItem>
+              <SelectItem value="line-shopping">Line Shopping</SelectItem>
+              <SelectItem value="tiktok">Tiktok</SelectItem>
+              <SelectItem value="pos">POS</SelectItem>
+              <SelectItem value="shop">Shop</SelectItem>
+              <SelectItem value="other">Other</SelectItem>
+              <SelectItem value="app">App</SelectItem>
             </SelectContent>
           </Select>
         </div>
