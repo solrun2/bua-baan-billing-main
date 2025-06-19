@@ -16,7 +16,11 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Search, Loader2 } from "lucide-react";
 import ProductAutocomplete from "./receipt/components/ProductAutocomplete";
-import { calcGrandTotal, calcVatAmount, calcWithholding } from "./receipt/utils/itemCalcs";
+import {
+  calcGrandTotal,
+  calcVatAmount,
+  calcWithholding,
+} from "./receipt/utils/itemCalcs";
 import { Switch } from "@/components/ui/switch";
 
 function CreateReceipt() {
@@ -116,7 +120,6 @@ function CreateReceipt() {
       setIsProductSearching((prev) => ({ ...prev, [index]: false }));
     }
   }, []);
-
 
   const fetchAllCustomers = useCallback(async (query = "") => {
     try {
@@ -312,7 +315,7 @@ function CreateReceipt() {
   grandTotal -= totalWithholding;
 
   return (
-    <div className="max-w-6xl mx-auto p-6 space-y-6">
+    <div className="w-full max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 bg-white rounded-lg shadow">
       {/* Header */}
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">สร้างใบเสร็จรับเงิน</h1>
@@ -757,14 +760,11 @@ function CreateReceipt() {
               </div>
 
               {showAdjustments && (
-                <div className="space-y-4 pl-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                     <div className="space-y-2">
                       <Label>ประเภทเอกสาร</Label>
-                      <Select
-                        value={documentType}
-                        onValueChange={setDocumentType}
-                      >
+                      <Select>
                         <SelectTrigger>
                           <SelectValue placeholder="เลือกประเภทเอกสาร" />
                         </SelectTrigger>
@@ -912,7 +912,7 @@ function CreateReceipt() {
       </section>
 
       {/* Action Buttons */}
-      <div className="flex justify-between pt-4">
+      <div className="flex flex-col sm:flex-row justify-between gap-4 pt-4">
         <div>
           <Button variant="outline" className="mr-2">
             ยกเลิก
