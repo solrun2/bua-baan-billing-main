@@ -25,6 +25,7 @@ import Cashflow from "./pages/finance/Cashflow";
 import ChartOfAccounts from "./pages/settings/ChartOfAccounts";
 import DocumentNumbering from "./pages/settings/DocumentNumbering";
 import CompanyInfo from "./pages/settings/CompanyInfo";
+import { ProductForm } from "./pages/sub/create/ProductForm";
 
 const queryClient = new QueryClient();
 
@@ -65,6 +66,9 @@ const App = () => (
               element={<DocumentNumbering />}
             />
             <Route path="/settings/company-info" element={<CompanyInfo />} />
+
+            {/* Product Management */}
+            <Route path="/products/new" element={<ProductForm onSuccess={() => window.history.back()} />} />
 
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
