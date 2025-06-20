@@ -4,12 +4,12 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Layout } from "./components/Layout";
-import CreateReceipt from "./pages/documents/components/CreateReceipt";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 
 // Document pages
 import Quotation from "./pages/documents/Quotation";
+import QuotationForm from "./pages/sub/quotation/QuotationForm";
 import Invoice from "./pages/documents/Invoice";
 import Receipt from "./pages/documents/Receipt";
 import TaxInvoice from "./pages/documents/TaxInvoice";
@@ -40,12 +40,9 @@ const App = () => (
 
             {/* Document routes */}
             <Route path="/documents/quotation" element={<Quotation />} />
+            <Route path="/quotation/new" element={<QuotationForm onCancel={() => window.history.back()} />} />
             <Route path="/documents/invoice" element={<Invoice />} />
             <Route path="/documents/receipt" element={<Receipt />} />
-            <Route
-              path="/documents/components/CreateReceipt"
-              element={<CreateReceipt />}
-            />
             <Route path="/documents/tax-invoice" element={<TaxInvoice />} />
             <Route path="/documents/credit-note" element={<CreditNote />} />
             <Route

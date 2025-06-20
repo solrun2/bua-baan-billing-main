@@ -91,12 +91,10 @@ const verifyToken = async (token: string): Promise<boolean> => {
         response.status,
         response.statusText
       );
-      // Clear invalid token
       clearAuthToken();
       return false;
     }
 
-    // If we get here, token is valid
     return true;
   } catch (error) {
     console.error("Error verifying token:", error);
@@ -105,12 +103,11 @@ const verifyToken = async (token: string): Promise<boolean> => {
   }
 };
 
-// Set up token and test API
 const setupToken = async () => {
   const tokenData = {
     access_token:
       "eyJhbGciOiJFZERTQSIsImtpZCI6IjAxOTc2Nzg5LWNkODktNzYyZS1iMTM5LTFkZjIzZTUyYzQ3YiJ9.eyJjbGllbnRfaWQiOiIwMTk3Njc4OS1jZDg5LTc2MmUtYjEzOS0xZGYyM2U1MmM0N2IiLCJrZXRfd2ViX2lkIjoxMzE3LCJzY29wZXMiOlsiYWxsIl0sIm5hbWUiOiJJbnRlcm5zaGlwIiwiZG9tYWluIjoidWF0LmtldHNob3B0ZXN0LmNvbSIsInN1YiI6IjAxOTc2NzhiLTQ3YmUtNzA4YS04MTFkLWEwZWNiMDg1OTdiMCIsImlhdCI6MTc0OTc4ODg3MH0.OSbUayE_yS9IqOKLFrgsAGPJepiW7Otn3vzvE1SL9ijTpJmsGydGAP1_4AZA75cTmlXy583iS81EZxZszeYaBg",
-    expires_in: 3600, //1h
+    expires_in: 3600,
     token_type: "Bearer",
     client_id: "01976789-cd89-762e-b139-1df23e52c47b",
     scopes: ["all"],
@@ -126,12 +123,8 @@ const setupToken = async () => {
       new Date(Date.now() + 3600 * 1000).toISOString()
     );
 
-    // ตั้งค่า Token
     setAuthToken(tokenData);
     console.log("ตั้งค่า Token เรียบร้อยแล้ว");
-
-    // ทดสอบเรียก API
-    console.log("กำลังเรียก API...");
     const apiUrl = "https://openapi.ketshoptest.com/order/get/2506000042";
     console.log("URL ที่เรียก:", apiUrl);
 
@@ -182,7 +175,6 @@ const setupToken = async () => {
   }
 };
 
-// Call setupToken when page loads
 if (typeof window !== "undefined") {
   setupToken();
 }

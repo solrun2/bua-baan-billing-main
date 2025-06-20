@@ -1,5 +1,4 @@
 import * as React from "react"
-
 import { cn } from "@/lib/utils"
 
 const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
@@ -19,4 +18,27 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
 )
 Input.displayName = "Input"
 
-export { Input }
+interface InputWithSuffixProps extends React.ComponentProps<"input"> {
+  suffix?: string;
+}
+
+const InputWithSuffix = React.forwardRef<HTMLDivElement, InputWithSuffixProps>(
+  ({ className, suffix, ...props }, ref) => {
+    return (
+      <div className="relative flex items-center" ref={ref}>
+        <Input
+          className={cn("pr-8", className)}
+          {...props}
+        />
+        {suffix && (
+          <span className="absolute right-3 text-muted-foreground pointer-events-none">
+            {suffix}
+          </span>
+        )}
+      </div>
+    )
+  }
+)
+InputWithSuffix.displayName = "InputWithSuffix"
+
+export { Input, InputWithSuffix }

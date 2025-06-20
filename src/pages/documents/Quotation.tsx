@@ -1,10 +1,17 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { FileText, Plus, Search, Filter } from "lucide-react";
-import { QuotationForm } from "@/components/forms/QuotationForm";
+
 const Quotation = () => {
+  const navigate = useNavigate();
   const [showForm, setShowForm] = useState(false);
+  
+  const handleCreateNewQuotation = () => {
+    navigate('/quotation/new');
+  };
+
   const quotations = [{
     id: "QT-2024-001",
     client: "บริษัท ABC จำกัด",
@@ -30,9 +37,7 @@ const Quotation = () => {
     amount: "฿120,000",
     status: "ร่าง"
   }];
-  if (showForm) {
-    return <QuotationForm onCancel={() => setShowForm(false)} />;
-  }
+  
   return <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -45,7 +50,7 @@ const Quotation = () => {
             <p className="text-gray-400">จัดการใบเสนอราคาทั้งหมด</p>
           </div>
         </div>
-        <Button className="flex items-center gap-2" onClick={() => setShowForm(true)}>
+        <Button className="flex items-center gap-2" onClick={handleCreateNewQuotation}>
           <Plus className="w-4 h-4" />
           สร้างใบเสนอราคาใหม่
         </Button>

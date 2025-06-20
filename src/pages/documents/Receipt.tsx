@@ -2,10 +2,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { CreditCard, Plus, Search, Filter } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
-import ReceiptDetailsModal from "./components/ReceiptDetailsModal";
+import ReceiptDetailsModal from "./ReceiptDetailsModal";
 import { getToken } from "@/pages/services/auth";
 import { useNavigate } from "react-router-dom";
-import CreateReceipt from "./components/CreateReceipt";
 
 interface Receipt {
   id: string;
@@ -316,11 +315,7 @@ const Receipt = () => {
         </div>
         <div className="flex space-x-2">
           <Button
-            onClick={() =>
-              navigate(
-                "/documents/components/CreateReceipt"
-              )
-            }
+            
             className="flex items-center gap-2"
           >
             <Plus className="w-4 h-4" />
