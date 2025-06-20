@@ -105,21 +105,26 @@ export function ProductForm({ onSuccess, initialData }: ProductFormProps) {
   const [generatedSku, setGeneratedSku] = useState("");
   const [unitOptions, setUnitOptions] = useState(["ชิ้น", "อัน", "กล่อง", "โหล", "เมตร", "กิโลกรัม", "ลิตร"]);
   const [isUnitDialogOpen, setIsUnitDialogOpen] = useState(false);
-  const [newUnitName, setNewUnitName] = useState("");
+  const [newUnitName, setNewUnitName] = useState(""); // Will be phased out by newUnitNameTh/En
+  const [newUnitCode, setNewUnitCode] = useState("");
+  const [newUnitNameTh, setNewUnitNameTh] = useState("");
+  const [newUnitNameEn, setNewUnitNameEn] = useState("");
   const [formMode, setFormMode] = useState<'basic' | 'advanced'>('basic');
 
   const handleAddNewUnit = () => {
-    if (newUnitName.trim() && !unitOptions.includes(newUnitName.trim())) {
-      const updatedOptions = [...unitOptions, newUnitName.trim()];
+    if (newUnitNameTh.trim() && !unitOptions.includes(newUnitNameTh.trim())) { // Basic check using TH name for now
+      const updatedOptions = [...unitOptions, newUnitNameTh.trim()]; // Storing TH name string for now
       setUnitOptions(updatedOptions);
-      setFormData((prev) => ({ ...prev, unit: newUnitName.trim() }));
-      setNewUnitName("");
+      setFormData((prev) => ({ ...prev, unit: newUnitNameTh.trim() })); // Storing TH name string for now
+      setNewUnitCode("");
+      setNewUnitNameTh("");
+      setNewUnitNameEn("");
       setIsUnitDialogOpen(false);
-      toast.success(`เพิ่มหน่วยนับใหม่ "${newUnitName.trim()}" เรียบร้อยแล้ว`);
+      toast.success(`${formData.product_type === 'service' ? 'เพิ่มหน่วยบริการใหม่' : 'เพิ่มหน่วยนับใหม่'} "${newUnitNameTh.trim()}" เรียบร้อยแล้ว`);
     } else if (unitOptions.includes(newUnitName.trim())) {
-      toast.error("หน่วยนับนี้มีอยู่แล้ว");
+      toast.error(`หน่วย${formData.product_type === 'service' ? 'บริการ' : 'นับ'}นี้มีอยู่แล้ว`);
     } else {
-      toast.error("กรุณากรอกชื่อหน่วยนับ");
+      toast.error(`กรุณากรอกชื่อหน่วย${formData.product_type === 'service' ? 'บริการ' : 'นับ'} (TH)`);
     }
   };
 
@@ -226,7 +231,7 @@ export function ProductForm({ onSuccess, initialData }: ProductFormProps) {
       finalFormData.sku = generatedSku;
     }
     if (!finalFormData.sku) {
-      toast.error("รหัสสินค้า (SKU) เป็นสิ่งจำเป็น");
+      toast.error(`รหัส${formData.product_type === 'service' ? 'บริการ' : 'สินค้า'} (SKU) เป็นสิ่งจำเป็น`);
       setIsLoading(false);
       return;
     }
@@ -235,19 +240,19 @@ export function ProductForm({ onSuccess, initialData }: ProductFormProps) {
       const result = await productService.createProduct({ ...finalFormData, price: finalFormData.selling_price, instock: finalFormData.instock ?? 0 });
 
       if (result.success) {
-        toast.success(initialData ? "อัปเดตสินค้าสำเร็จ" : "สร้างสินค้าสำเร็จ");
+        toast.success(formData.product_type === 'service' ? (initialData ? "อัปเดตบริการสำเร็จ" : "สร้างบริการสำเร็จ") : (initialData ? "อัปเดตสินค้าสำเร็จ" : "สร้างสินค้าสำเร็จ"));
         onSuccess?.();
       } else {
         toast.error(
           result.error ||
-            (initialData
-              ? "ไม่สามารถอัปเดตสินค้าได้"
-              : "ไม่สามารถสร้างสินค้าได้")
+            (formData.product_type === 'service'
+              ? (initialData ? "ไม่สามารถอัปเดตบริการได้" : "ไม่สามารถสร้างบริการได้")
+              : (initialData ? "ไม่สามารถอัปเดตสินค้าได้" : "ไม่สามารถสร้างสินค้าได้"))
         );
       }
     } catch (error) {
       console.error("Error submitting product form:", error);
-      toast.error("เกิดข้อผิดพลาดในการบันทึกข้อมูลสินค้า");
+      toast.error(`เกิดข้อผิดพลาดในการบันทึกข้อมูล${formData.product_type === 'service' ? 'บริการ' : 'สินค้า'}`);
     } finally {
       setIsLoading(false);
     }
@@ -257,10 +262,10 @@ export function ProductForm({ onSuccess, initialData }: ProductFormProps) {
     <form onSubmit={handleSubmit} className="space-y-8 max-w-4xl mx-auto p-4">
       <div className="flex justify-between items-start mb-6">
         <h2 className="text-2xl font-semibold">
-          {initialData ? "แก้ไขสินค้า" : "เพิ่มสินค้าใหม่"}
+          {formData.product_type === 'service' ? (initialData ? "แก้ไขบริการ" : "เพิ่มบริการใหม่") : (initialData ? "แก้ไขสินค้า" : "เพิ่มสินค้าใหม่")}
         </h2>
         <div className="space-y-2 w-48">
-          <Label htmlFor="sku">เลขที่สินค้า *</Label>
+          <Label htmlFor="sku">{formData.product_type === 'service' ? 'เลขที่บริการ' : 'เลขที่สินค้า'} *</Label>
           <Input
             id="sku"
             name="sku"
@@ -312,14 +317,14 @@ export function ProductForm({ onSuccess, initialData }: ProductFormProps) {
 
       {/* ข้อมูลสินค้า */}
       <section className="p-6 border rounded-lg space-y-6">
-        <h3 className="text-lg font-medium">ข้อมูลสินค้า</h3>
+        <h3 className="text-lg font-medium">{formData.product_type === 'service' ? 'ข้อมูลบริการ' : 'ข้อมูลสินค้า'}</h3>
         <div className="space-y-2">
-          <Label htmlFor="name">ชื่อสินค้า *</Label>
+          <Label htmlFor="name">{formData.product_type === 'service' ? 'ชื่อบริการ' : 'ชื่อสินค้า'} *</Label>
           <Input id="name" name="name" value={formData.name} onChange={handleChange} required />
         </div>
         {formMode === 'advanced' && (
           <div className="space-y-2">
-            <Label htmlFor="description">คำบรรยายสินค้า</Label>
+            <Label htmlFor="description">{formData.product_type === 'service' ? 'คำบรรยายบริการ' : 'คำบรรยายสินค้า'}</Label>
             <Textarea id="description" name="description" value={formData.description || ""} onChange={handleChange} />
           </div>
         )}
@@ -339,7 +344,7 @@ export function ProductForm({ onSuccess, initialData }: ProductFormProps) {
         )}
         <div className="flex items-end space-x-2">
             <div className="space-y-2">
-            <Label htmlFor="unit">หน่วยนับ</Label>
+            <Label htmlFor="unit">{formData.product_type === 'service' ? 'หน่วยบริการ' : 'หน่วยนับ'}</Label>
             <div className="flex items-center space-x-2">
               <Select name="unit" value={formData.unit} onValueChange={(value) => handleSelectChange("unit", value)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
@@ -350,32 +355,61 @@ export function ProductForm({ onSuccess, initialData }: ProductFormProps) {
               <Dialog open={isUnitDialogOpen} onOpenChange={setIsUnitDialogOpen}>
                 <DialogTrigger asChild>
                   <Button type="button" variant="outline">
-                    <Plus className="mr-2 h-4 w-4" /> สร้างหน่วยนับใหม่
+                    <Plus className="mr-2 h-4 w-4" /> {formData.product_type === 'service' ? 'สร้างหน่วยบริการใหม่' : 'สร้างหน่วยนับใหม่'}
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="sm:max-w-[425px]">
                   <DialogHeader>
-                    <DialogTitle>สร้างหน่วยนับใหม่</DialogTitle>
+                    <DialogTitle>{formData.product_type === 'service' ? 'สร้างหน่วยบริการใหม่' : 'สร้างหน่วยนับใหม่'}</DialogTitle>
                     <DialogDescription>
-                      กรอกชื่อหน่วยนับที่คุณต้องการเพิ่ม
+                      {formData.product_type === 'service' ? 'กรอกชื่อหน่วยบริการที่คุณต้องการเพิ่ม' : 'กรอกชื่อหน่วยนับที่คุณต้องการเพิ่ม'}
                     </DialogDescription>
                   </DialogHeader>
                   <div className="grid gap-4 py-4">
                     <div className="grid grid-cols-4 items-center gap-4">
-                      <Label htmlFor="new-unit-name" className="text-right">
-                        ชื่อหน่วยนับ
+                      <Label htmlFor="new-unit-code" className="text-right">
+                        รหัสหน่วย
                       </Label>
                       <Input
-                        id="new-unit-name"
-                        value={newUnitName}
-                        onChange={(e) => setNewUnitName(e.target.value)}
+                        id="new-unit-code"
+                        value={newUnitCode} // Display only for now, or connect to state if editable
+                        onChange={(e) => setNewUnitCode(e.target.value)}
+                        placeholder="จะสร้างอัตโนมัติ"
                         className="col-span-3"
-                        placeholder="เช่น แพ็ค, ลัง"
+                        disabled
+                      />
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="new-unit-name-th" className="text-right">
+                        {formData.product_type === 'service' ? 'ชื่อหน่วยบริการ (TH)' : 'ชื่อหน่วยนับ (TH)'} <span className="text-red-500">*</span>
+                      </Label>
+                      <Input
+                        id="new-unit-name-th"
+                        value={newUnitNameTh}
+                        onChange={(e) => setNewUnitNameTh(e.target.value)}
+                        className="col-span-3"
+                        maxLength={20}
+                      />
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="new-unit-name-en" className="text-right">
+                        {formData.product_type === 'service' ? 'ชื่อหน่วยบริการ (EN)' : 'ชื่อหน่วยนับ (EN)'}
+                      </Label>
+                      <Input
+                        id="new-unit-name-en"
+                        value={newUnitNameEn}
+                        onChange={(e) => setNewUnitNameEn(e.target.value)}
+                        className="col-span-3"
+                        maxLength={20}
                       />
                     </div>
                   </div>
                   <DialogFooter>
-                    <Button type="button" onClick={handleAddNewUnit}>บันทึก</Button>
+                    <Button type="button" variant="outline" onClick={() => setIsUnitDialogOpen(false)}>ยกเลิก</Button>
+                    <Button type="button" onClick={handleAddNewUnit}>
+                      <Plus className="mr-2 h-4 w-4" /> 
+                      {formData.product_type === 'service' ? 'เพิ่มหน่วยบริการ' : 'เพิ่มหน่วยนับ'}
+                    </Button>
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
@@ -385,14 +419,13 @@ export function ProductForm({ onSuccess, initialData }: ProductFormProps) {
       </section>
 
       {/* รูปสินค้า */}
-      <section className="p-6 border rounded-lg space-y-4">
+      {formData.product_type === 'product' && <section className="p-6 border rounded-lg space-y-4">
           <h3 className="text-lg font-medium">รูปสินค้า</h3>
           <div className="space-y-2">
-              <Label htmlFor="feature_img">ลิงก์รูปสินค้า</Label>
-              <Input id="feature_img" name="feature_img" value={formData.feature_img} onChange={handleChange} placeholder="https://..." />
+            <Label htmlFor="feature_img">ลิงก์รูปสินค้า</Label>
+            <Input id="feature_img" name="feature_img" value={formData.feature_img} onChange={handleChange} placeholder="https://..." />
           </div>
-          {/* TODO: Add actual upload component */}
-      </section>
+      </section>}
 
       {/* ข้อมูลราคามาตรฐาน */}
       <section className="p-6 border rounded-lg space-y-6">
@@ -408,11 +441,11 @@ export function ProductForm({ onSuccess, initialData }: ProductFormProps) {
               <Input id="selling_vat_rate" name="selling_vat_rate" type="number" value={formData.selling_vat_rate || 0} onChange={handleChange} />
             </div>
           )}
-          <div className="space-y-2">
+          {formData.product_type === 'product' && <div className="space-y-2">
             <Label htmlFor="purchase_price">ราคาซื้อ/หน่วย</Label>
             <Input id="purchase_price" name="purchase_price" type="number" value={formData.purchase_price} onChange={handleChange} />
-          </div>
-          {formMode === 'advanced' && (
+          </div>}
+          {formMode === 'advanced' && formData.product_type === 'product' && (
             <div className="space-y-2">
               <Label htmlFor="purchase_vat_rate">อัตราภาษีมูลค่าเพิ่ม (ซื้อ)</Label>
               <Input id="purchase_vat_rate" name="purchase_vat_rate" type="number" value={formData.purchase_vat_rate || 0} onChange={handleChange} />
@@ -435,32 +468,34 @@ export function ProductForm({ onSuccess, initialData }: ProductFormProps) {
                 <Input id="purchase_account" name="purchase_account" value={formData.purchase_account || ""} onChange={handleChange} />
             </div>
         </div>
-        <div className="flex items-center space-x-2 pt-4">
-            <Switch id="calculate_cogs_on_sale" name="calculate_cogs_on_sale" checked={!!formData.calculate_cogs_on_sale} onCheckedChange={(checked) => handleSwitchChange('calculate_cogs_on_sale', checked)} />
-            <Label htmlFor="calculate_cogs_on_sale">คำนวณต้นทุนเมื่อขาย</Label>
-        </div>
-        {formData.calculate_cogs_on_sale && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pl-8">
-                <div className="space-y-2">
-                    <Label htmlFor="cogs_account">บันทึกบัญชีต้นทุนขาย</Label>
-                    <Input id="cogs_account" name="cogs_account" value={formData.cogs_account || ""} onChange={handleChange} />
-                </div>
-                <div className="space-y-2">
-                    <Label htmlFor="costing_method">วิธีคำนวณต้นทุน</Label>
-                    <Select name="costing_method" value={formData.costing_method} onValueChange={(value) => handleSelectChange("costing_method", value as CostingMethod)}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                        {costingMethodOptions.map((opt) => (<SelectItem key={opt} value={opt}>{opt}</SelectItem>))}
-                        </SelectContent>
-                    </Select>
-                </div>
-            </div>
-        )}
+        {formData.product_type === 'product' && <>
+          <div className="flex items-center space-x-2 pt-4">
+              <Switch id="calculate_cogs_on_sale" name="calculate_cogs_on_sale" checked={!!formData.calculate_cogs_on_sale} onCheckedChange={(checked) => handleSwitchChange('calculate_cogs_on_sale', checked)} />
+              <Label htmlFor="calculate_cogs_on_sale">คำนวณต้นทุนเมื่อขาย</Label>
+          </div>
+          {formData.calculate_cogs_on_sale && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pl-8">
+                  <div className="space-y-2">
+                      <Label htmlFor="cogs_account">บันทึกบัญชีต้นทุนขาย</Label>
+                      <Input id="cogs_account" name="cogs_account" value={formData.cogs_account || ""} onChange={handleChange} />
+                  </div>
+                  <div className="space-y-2">
+                      <Label htmlFor="costing_method">วิธีคำนวณต้นทุน</Label>
+                      <Select name="costing_method" value={formData.costing_method} onValueChange={(value) => handleSelectChange("costing_method", value as CostingMethod)}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                          {costingMethodOptions.map((opt) => (<SelectItem key={opt} value={opt}>{opt}</SelectItem>))}
+                          </SelectContent>
+                      </Select>
+                  </div>
+              </div>
+          )}
+        </>}
       </section>
-      )} {/* Closing for formMode === 'advanced' for Accounting section */}
+      )}
 
       {/* ข้อมูลยอดยกมา */}
-      {formMode === 'advanced' && (
+      {formMode === 'advanced' && formData.product_type === 'product' && (
         <section className="p-6 border rounded-lg space-y-6">
         <div className="flex justify-between items-center">
             <h3 className="text-lg font-medium">ข้อมูลยอดยกมา</h3>
@@ -490,7 +525,7 @@ export function ProductForm({ onSuccess, initialData }: ProductFormProps) {
         )}
         </div>
         </section>
-      )} {/* Closing for formMode === 'advanced' for Opening Balance section */}
+      )}
 
       {/* Action Buttons */}
       <div className="flex justify-end space-x-4 pt-6 border-t mt-8">
