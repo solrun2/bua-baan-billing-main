@@ -34,7 +34,19 @@ const CreateCustomerDialog: React.FC<CreateCustomerDialogProps> = ({ open, onOpe
   const [isSaving, setIsSaving] = useState(false);
 
   const handleInputChange = (field: keyof CustomerCreateData, value: string) => {
-    setNewCustomer(prev => ({ ...prev, [field]: value }));
+    let processedValue = value;
+
+    if (field === 'tax_id') {
+      // Allow only numbers and limit to 13 digits
+      processedValue = value.replace(/[^\d]/g, '').slice(0, 13);
+    }
+
+    if (field === 'phone') {
+      // Allow only numbers and limit to a reasonable length, e.g., 15 digits
+      processedValue = value.replace(/[^\d]/g, '').slice(0, 15);
+    }
+
+    setNewCustomer(prev => ({ ...prev, [field]: processedValue }));
   };
 
   const handleSubmit = async () => {

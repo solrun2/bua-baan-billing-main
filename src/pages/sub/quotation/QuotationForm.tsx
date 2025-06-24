@@ -28,27 +28,29 @@ const QuotationForm = ({
     setIsClient(true);
   }, []);
 
-  const generateQuotationNumber = () =>
-    `QT-${new Date().getFullYear()}-${String(
-      Math.floor(1000 + Math.random() * 9000)
-    )}`;
-
-  const defaultInitialData: DocumentData = {
-    documentNumber: generateQuotationNumber(),
-    customer: { name: "", tax_id: "", phone: "", address: "" },
-    items: [],
-    summary: { subtotal: 0, discount: 0, tax: 0, total: 0, withholdingTax: 0 },
-    notes: "",
-    documentDate: format(new Date(), "yyyy-MM-dd"),
-    validUntil: format(
-      new Date(new Date().setDate(new Date().getDate() + 30)),
-      "yyyy-MM-dd"
-    ),
-    reference: "",
-    status: "draft",
-  };
-
-  const initialData = externalInitialData || defaultInitialData;
+  const [initialData] = useState(() => {
+    if (externalInitialData) {
+      return externalInitialData;
+    }
+    const generateQuotationNumber = () =>
+      `QT-${new Date().getFullYear()}-${String(
+        Math.floor(1000 + Math.random() * 9000)
+      )}`;
+    return {
+      documentNumber: generateQuotationNumber(),
+      customer: { name: "", tax_id: "", phone: "", address: "" },
+      items: [],
+      summary: { subtotal: 0, discount: 0, tax: 0, total: 0, withholdingTax: 0 },
+      notes: "",
+      documentDate: format(new Date(), "yyyy-MM-dd"),
+      validUntil: format(
+        new Date(new Date().setDate(new Date().getDate() + 30)),
+        "yyyy-MM-dd"
+      ),
+      reference: "",
+      status: "draft",
+    };
+  });
 
   const handleCancel = () => {
     if (externalOnCancel) {

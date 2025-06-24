@@ -6,9 +6,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 interface CustomerAutocompleteProps {
   onCustomerSelect: (customer: Customer) => void;
   initialData?: Partial<Customer>;
+  refreshKey?: number;
 }
 
-export const CustomerAutocomplete: React.FC<CustomerAutocompleteProps> = ({ onCustomerSelect, initialData }) => {
+export const CustomerAutocomplete: React.FC<CustomerAutocompleteProps> = ({ onCustomerSelect, initialData, refreshKey }) => {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [selectedValue, setSelectedValue] = useState<string | undefined>(
     initialData?.id?.toString()
@@ -25,7 +26,7 @@ export const CustomerAutocomplete: React.FC<CustomerAutocompleteProps> = ({ onCu
       }
     };
     fetchCustomers();
-  }, []);
+  }, [refreshKey]);
 
 
 

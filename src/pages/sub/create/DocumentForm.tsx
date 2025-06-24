@@ -111,6 +111,9 @@ export const DocumentForm: FC<DocumentFormProps> = ({
 
   const [customer, setCustomer] = useState<CustomerData>(initialData.customer);
   const [isCreateCustomerOpen, setCreateCustomerOpen] = useState(false);
+  const [customerRefreshKey, setCustomerRefreshKey] = useState(0);
+
+
 
   const [dueDate, setDueDate] = useState(initialData.dueDate || "");
   const [issueTaxInvoice, setIssueTaxInvoice] = useState(
@@ -140,7 +143,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
     };
   };
 
-  const [items, setItems] = useState<DocumentItem[]>(
+    const [items, setItems] = useState<DocumentItem[]>(() =>
     initialData.items.length > 0 ? initialData.items : [createDefaultItem()]
   );
 
@@ -161,7 +164,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
     setSummary(newSummary);
   }, [items]);
 
-  const handleCustomerSelect = (selectedCustomer: Customer) => {
+    const handleCustomerSelect = (selectedCustomer: Customer) => {
     setCustomer({
       id: selectedCustomer.id,
       name: selectedCustomer.name,
@@ -172,9 +175,10 @@ export const DocumentForm: FC<DocumentFormProps> = ({
     });
   };
 
-  const handleCustomerCreated = (newCustomer: Customer) => {
+    const handleCustomerCreated = (newCustomer: Customer) => {
     handleCustomerSelect(newCustomer);
-    // Optionally, you might want to refresh the customer list in the autocomplete component
+    setCreateCustomerOpen(false); // Close the dialog
+    setCustomerRefreshKey(prevKey => prevKey + 1); // Trigger refresh
   };
 
   const handleCustomerChange = (field: keyof CustomerData, value: string) => {
@@ -428,11 +432,17 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                 <CustomerAutocomplete 
                   onCustomerSelect={handleCustomerSelect}
                   initialData={customer}
+                  refreshKey={customerRefreshKey}
                 />
               </div>
               <Button type="button" variant="outline" onClick={() => setCreateCustomerOpen(true)}>
                 สร้างใหม่
               </Button>
+              <CreateCustomerDialog 
+                open={isCreateCustomerOpen}
+                onOpenChange={setCreateCustomerOpen}
+                onCustomerCreated={handleCustomerCreated}
+              />
             </div>
             {customer && customer.id && (
               <div className="mt-4 space-y-4 pt-4 border-t">
