@@ -254,9 +254,11 @@ export const DocumentForm: FC<DocumentFormProps> = ({
         if (item.id === itemId) {
           return {
             ...item,
+            productId: String(product.id),
             productTitle: product.title,
             description: product.description || "",
             unitPrice: product.price,
+            unit: product.unit || "",
             isEditing: false,
           };
         }
@@ -516,6 +518,10 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                     <div className="space-y-2">
                       <Label>สินค้าหรือบริการ</Label>
                       <ProductAutocomplete
+                        value={{
+                          id: item.productId ? parseInt(item.productId, 10) : 0,
+                          title: item.productTitle,
+                        }}
                         onChange={(product) =>
                           handleProductSelect(product, item.id)
                         }

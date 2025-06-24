@@ -74,10 +74,12 @@ const ProductAutocomplete = ({
 
   // Clear search when dropdown is closed
   useEffect(() => {
-    if (!open) {
-      setSearchQuery("");
+    // When the popover opens, initialize the search query with the current value's title.
+    // This makes the current selection visible in the search box and easy to edit.
+    if (open) {
+      setSearchQuery(value?.title || "");
     }
-  }, [open]);
+  }, [open, value]);
 
   return (
     <div className={cn("flex w-full space-x-2", className)}>
@@ -102,8 +104,8 @@ const ProductAutocomplete = ({
                       !value ? "text-muted-foreground" : ""
                     }`}
                   >
-                    {value
-                      ? value.title 
+                    {value && value.id && value.title
+                      ? `${value.id} - ${value.title}`
                       : placeholder || "เลือกสินค้าหรือบริการ"}
                   </div>
                 </div>
