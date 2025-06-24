@@ -1,38 +1,23 @@
 import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Receipt, Plus, Search, Filter } from "lucide-react";
+import { documentService } from "../services/documentService";
+import { DocumentData } from "@/types/document";
 const Invoice = () => {
   const navigate = useNavigate();
-  const invoices = [{
-    id: "INV-2024-001",
-    client: "บริษัท ABC จำกัด",
-    date: "2024-01-15",
-    amount: "฿50,000",
-    status: "ส่งแล้ว",
-    dueDate: "2024-02-15"
-  }, {
-    id: "INV-2024-002",
-    client: "บริษัท XYZ จำกัด",
-    date: "2024-01-14",
-    amount: "฿75,000",
-    status: "ชำระแล้ว",
-    dueDate: "2024-02-14"
-  }, {
-    id: "INV-2024-003",
-    client: "บริษัท DEF จำกัด",
-    date: "2024-01-13",
-    amount: "฿30,000",
-    status: "เกินกำหนด",
-    dueDate: "2024-01-20"
-  }, {
-    id: "INV-2024-004",
-    client: "บริษัท GHI จำกัด",
-    date: "2024-01-12",
-    amount: "฿120,000",
-    status: "ร่าง",
-    dueDate: "2024-02-12"
-  }];
+  const [invoices, setInvoices] = useState<DocumentData[]>([]);
+
+  useEffect(() => {
+    const allDocs = documentService.getAll();
+    setInvoices(allDocs.filter(doc => doc.documentNumber.startsWith('INV-')));
+  }, []);
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(amount);
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -107,25 +92,25 @@ const Invoice = () => {
                 </tr>
               </thead>
               <tbody>
-                {invoices.map((invoice, index) => (
+                {invoices.map((invoice) => (
                   <tr
-                    key={index}
+                    key={invoice.id}
                     className="border-b border-border/40 hover:bg-muted/30 transition-colors"
                   >
                     <td className="py-3 px-4 font-medium text-foreground">
-                      {invoice.id}
+                      {invoice.documentNumber}
                     </td>
                     <td className="py-3 px-4 text-foreground">
-                      {invoice.client}
+                      {invoice.customer.name}
                     </td>
                     <td className="py-3 px-4 text-muted-foreground">
-                      {invoice.date}
+                      {invoice.documentDate}
                     </td>
                     <td className="py-3 px-4 text-muted-foreground">
                       {invoice.dueDate}
                     </td>
                     <td className="py-3 px-4 font-medium text-foreground">
-                      {invoice.amount}
+                      {formatCurrency(invoice.summary.total)}
                     </td>
                     <td className="py-3 px-4">
                       <span
@@ -144,10 +129,10 @@ const Invoice = () => {
                     </td>
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-2">
-                        <Button variant="outline" size="sm">
+                        <Button variant="outline" size="sm" onClick={() => navigate(`/invoice/edit/${invoice.id}`)}>
                           ดู
                         </Button>
-                        <Button variant="outline" size="sm">
+                        <Button variant="outline" size="sm" onClick={() => navigate(`/invoice/edit/${invoice.id}`)}>
                           แก้ไข
                         </Button>
                       </div>

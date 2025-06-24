@@ -35,6 +35,7 @@ export interface CustomerData {
 
 export interface DocumentData {
   id?: string;
+  documentType?: 'quotation' | 'invoice' | 'receipt' | 'tax_invoice';
   customer: CustomerData;
   items: DocumentItem[];
   summary: DocumentSummary;
