@@ -1,0 +1,47 @@
+CREATE TABLE IF NOT EXISTS `customers` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `name` VARCHAR(255) NOT NULL,
+  `address` TEXT,
+  `email` VARCHAR(255),
+  `phone` VARCHAR(50),
+  `tax_id` VARCHAR(100),
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `products` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `name` VARCHAR(255) NOT NULL,
+  `description` TEXT,
+  `unit_price` DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `documents` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `customer_id` INT NOT NULL,
+  `document_number` VARCHAR(100) NOT NULL UNIQUE,
+  `document_type` ENUM('QUOTATION', 'INVOICE', 'RECEIPT', 'TAX_INVOICE') NOT NULL,
+  `status` ENUM('DRAFT', 'SENT', 'ACCEPTED', 'PAID', 'CANCELLED') NOT NULL,
+  `issue_date` DATE NOT NULL,
+  `due_date` DATE,
+  `subtotal` DECIMAL(15, 2) NOT NULL DEFAULT 0.00,
+  `tax_amount` DECIMAL(15, 2) NOT NULL DEFAULT 0.00,
+  `total_amount` DECIMAL(15, 2) NOT NULL DEFAULT 0.00,
+  `notes` TEXT,
+  `related_document_id` INT NULL,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (`customer_id`) REFERENCES `customers`(`id`) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `document_items` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `document_id` INT NOT NULL,
+  `product_id` INT NULL, 
+  `description` TEXT NOT NULL,
+  `quantity` DECIMAL(10, 2) NOT NULL DEFAULT 1.00,
+  `unit_price` DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
+  `amount` DECIMAL(15, 2) NOT NULL DEFAULT 0.00,
+  FOREIGN KEY (`document_id`) REFERENCES `documents`(`id`) ON DELETE CASCADE,
+  FOREIGN KEY (`product_id`) REFERENCES `products`(`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
