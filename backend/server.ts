@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import pool from './db';
@@ -9,10 +9,60 @@ const app = express();
 const port = process.env.PORT || 3001;
 
 app.use(cors());
+
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // API route to get all documents
-app.get('/api/documents', async (req, res) => {
+// Endpoint to get all customers
+app.get('/api/customers', async (req: Request, res: Response) => {
+  try {
+    // Correctly assign the query result to rows without destructuring
+    const rows = await pool.query('SELECT * FROM customers ORDER BY name ASC');
+    res.json(rows);
+  } catch (err) {
+    console.error('Failed to fetch customers:', err);
+    res.status(500).json({ error: 'Failed to fetch customers' });
+  }
+});
+
+app.post('/api/customers', async (req: Request, res: Response) => {
+  const { name, address, tax_id, phone, email } = req.body;
+
+  if (!name || !tax_id) {
+    return res.status(400).json({ error: 'Customer name and tax ID are required' });
+  }
+
+  try {
+    const result: any = await pool.query(
+      'INSERT INTO customers (name, address, tax_id, phone, email) VALUES (?, ?, ?, ?, ?)',
+      [name, address, tax_id, phone, email]
+    );
+    
+    const insertId = result.insertId;
+    if (!insertId) {
+        throw new Error('Failed to get new customer ID');
+    }
+
+    // Correctly assign the query result to rows without destructuring
+    const rows: any = await pool.query('SELECT * FROM customers WHERE id = ?', [insertId]);
+    
+    const newCustomer = rows[0];
+    if (!newCustomer) {
+        return res.status(404).json({ error: 'Could not find newly created customer' });
+    }
+
+    res.status(201).json(newCustomer);
+  } catch (err) {
+    console.error('Failed to create customer:', err);
+    if ((err as any).code === 'ER_DUP_ENTRY') {
+        return res.status(409).json({ error: 'A customer with this Tax ID or Name might already exist.' });
+    }
+    res.status(500).json({ error: 'Failed to create customer' });
+  }
+});
+
+app.get('/api/documents', async (req: Request, res: Response) => {
   let conn;
   try {
     conn = await pool.getConnection();
@@ -34,14 +84,15 @@ app.get('/api/documents', async (req, res) => {
 });
 
 // API route to create a new document
-app.post('/api/documents', async (req, res) => {
+app.post('/api/documents', async (req: Request, res: Response) => {
   let conn;
   try {
     const { customer_id, document_type, status, issue_date, due_date, notes, items } = req.body;
 
     // Basic validation
     if (!customer_id || !document_type || !status || !issue_date || !items || !Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({ error: 'Missing required document fields.' });
+      res.status(400).json({ error: 'Missing required document fields.' });
+      return;
     }
 
     // Calculations
@@ -63,12 +114,12 @@ app.post('/api/documents', async (req, res) => {
     await conn.beginTransaction();
 
     // Insert into documents table
-    const docResult = await conn.query(
+    const [docResult] = await conn.query(
       'INSERT INTO documents (customer_id, document_number, document_type, status, issue_date, due_date, subtotal, tax_amount, total_amount, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [customer_id, document_number, document_type, status, issue_date, due_date, subtotal, tax_amount, total_amount, notes]
     );
 
-    const documentId = Number(docResult.insertId);
+    const documentId = (docResult as any).insertId;
 
     // Insert into document_items table
     for (const item of items) {

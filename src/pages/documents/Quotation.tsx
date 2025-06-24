@@ -1,44 +1,60 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileText, Plus, Search, Filter } from "lucide-react";
+import { FileText, Plus, Search, Filter, AlertTriangle, Loader2 } from "lucide-react";
+import { apiService } from '@/pages/services/apiService';
 
 const Quotation = () => {
   const navigate = useNavigate();
-  const [showForm, setShowForm] = useState(false);
-  
-  const handleCreateNewQuotation = () => {
-    navigate('/quotation/new');
+
+  const handleCreateNew = () => {
+    navigate('/documents/quotation/new');
   };
 
-  const quotations = [{
-    id: "QT-2024-001",
-    client: "บริษัท ABC จำกัด",
-    date: "2024-01-15",
-    amount: "฿50,000",
-    status: "รอการอนุมัติ"
-  }, {
-    id: "QT-2024-002",
-    client: "บริษัท XYZ จำกัด",
-    date: "2024-01-14",
-    amount: "฿75,000",
-    status: "อนุมัติแล้ว"
-  }, {
-    id: "QT-2024-003",
-    client: "บริษัท DEF จำกัด",
-    date: "2024-01-13",
-    amount: "฿30,000",
-    status: "ยกเลิก"
-  }, {
-    id: "QT-2024-004",
-    client: "บริษัท GHI จำกัด",
-    date: "2024-01-12",
-    amount: "฿120,000",
-    status: "ร่าง"
-  }];
-  
-  return <div className="space-y-6">
+  const [quotations, setQuotations] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadQuotations = async () => {
+      try {
+        setLoading(true);
+        const data = await apiService.getDocuments();
+        const quotationsData = data
+          .filter(doc => doc.document_type === 'QUOTATION')
+          .map(doc => ({
+            id: doc.id,
+            number: doc.document_number,
+            customer: doc.customer_name,
+            date: new Date(doc.issue_date).toLocaleDateString('th-TH'),
+            total: new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(doc.total_amount),
+            status: doc.status,
+          }));
+        setQuotations(quotationsData);
+      } catch (err) {
+        setError((err as Error).message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadQuotations();
+  }, []);
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'DRAFT': return 'bg-gray-100 text-gray-700';
+      case 'SENT': return 'bg-blue-100 text-blue-700';
+      case 'ACCEPTED': return 'bg-green-100 text-green-700';
+      case 'REJECTED': return 'bg-red-100 text-red-700';
+      case 'CANCELLED': return 'bg-red-100 text-red-700';
+      default: return 'bg-gray-100 text-gray-700';
+    }
+  };
+
+  return (
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
@@ -50,7 +66,7 @@ const Quotation = () => {
             <p className="text-gray-400">จัดการใบเสนอราคาทั้งหมด</p>
           </div>
         </div>
-        <Button className="flex items-center gap-2" onClick={handleCreateNewQuotation}>
+        <Button className="flex items-center gap-2" onClick={handleCreateNew}>
           <Plus className="w-4 h-4" />
           สร้างใบเสนอราคาใหม่
         </Button>
@@ -70,47 +86,68 @@ const Quotation = () => {
         </Button>
       </div>
 
-      {/* Table */}
+      {/* Content */}
       <Card className="border border-border/40">
         <CardHeader>
           <CardTitle>รายการใบเสนอราคา</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">เลขที่</th>
-                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">ลูกค้า</th>
-                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">วันที่</th>
-                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">จำนวนเงิน</th>
-                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">สถานะ</th>
-                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">การดำเนินการ</th>
-                </tr>
-              </thead>
-              <tbody>
-                {quotations.map((quotation, index) => <tr key={index} className="border-b border-border/40 hover:bg-muted/30 transition-colors">
-                    <td className="py-3 px-4 font-medium text-foreground">{quotation.id}</td>
-                    <td className="py-3 px-4 text-foreground">{quotation.client}</td>
-                    <td className="py-3 px-4 text-muted-foreground">{quotation.date}</td>
-                    <td className="py-3 px-4 font-medium text-foreground">{quotation.amount}</td>
-                    <td className="py-3 px-4">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${quotation.status === 'อนุมัติแล้ว' ? 'bg-green-100 text-green-700' : quotation.status === 'รอการอนุมัติ' ? 'bg-yellow-100 text-yellow-700' : quotation.status === 'ยกเลิก' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'}`}>
-                        {quotation.status}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4">
-                      <div className="flex items-center gap-2">
-                        <Button variant="outline" size="sm">ดู</Button>
-                        <Button variant="outline" size="sm">แก้ไข</Button>
-                      </div>
-                    </td>
-                  </tr>)}
-              </tbody>
-            </table>
-          </div>
+          {loading ? (
+            <div className="flex justify-center items-center py-10">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            </div>
+          ) : error ? (
+            <div className="text-center py-10 text-red-500">
+              <AlertTriangle className="w-8 h-8 mx-auto mb-2" />
+              <p>เกิดข้อผิดพลาด: {error}</p>
+            </div>
+          ) : quotations.length === 0 ? (
+            <div className="text-center py-10 text-muted-foreground">
+              <FileText className="w-12 h-12 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold">ยังไม่มีใบเสนอราคา</h3>
+              <p>เริ่มต้นสร้างใบเสนอราคาใหม่ได้เลย</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">เลขที่</th>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">ลูกค้า</th>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">วันที่</th>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">จำนวนเงิน</th>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">สถานะ</th>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">การดำเนินการ</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {quotations.map((quotation) => (
+                    <tr key={quotation.id} className="border-b border-border/40 hover:bg-muted/30 transition-colors">
+                      <td className="py-3 px-4 font-medium text-foreground">{quotation.number}</td>
+                      <td className="py-3 px-4 text-foreground">{quotation.customer}</td>
+                      <td className="py-3 px-4 text-muted-foreground">{quotation.date}</td>
+                      <td className="py-3 px-4 font-medium text-foreground">{quotation.total}</td>
+                      <td className="py-3 px-4">
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(quotation.status)}`}>
+                          {quotation.status}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-2">
+                          <Button variant="outline" size="sm">ดู</Button>
+                          <Button variant="outline" size="sm">แก้ไข</Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </CardContent>
       </Card>
-    </div>;
+    </div>
+  );
 };
+
 export default Quotation;

@@ -75,7 +75,7 @@ const App = () => {
     const newInvoiceData: DocumentData = {
       id: `inv_${Date.now()}`,
       documentNumber: documentService.generateNewDocumentNumber('invoice'),
-      customer: { name: "ลูกค้าใหม่", taxId: "", phone: "", address: "" },
+      customer: { name: "", tax_id: "", phone: "", address: "" },
       items: [],
       summary: { subtotal: 0, discount: 0, tax: 0, total: 0, withholdingTax: 0 },
       status: 'ร่าง',
@@ -110,7 +110,7 @@ const App = () => {
 
               {/* Document routes */}
               <Route path="/documents/quotation" element={<Quotation />} />
-              <Route path="/quotation/new" element={<QuotationForm onCancel={() => window.history.back()} />} />
+              <Route path="/documents/quotation/new" element={<QuotationForm onCancel={() => window.history.back()} />} />
 
               <Route path="/documents/invoice" element={<Invoice />} />
               <Route path="/invoice/new" element={<InvoiceFormWrapper />} />

@@ -3,7 +3,10 @@ import { useState, useEffect, useCallback, useRef, FC } from "react";
 import { useNavigate } from "react-router-dom";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Product } from "@/types/product";
-import { DocumentItem, DocumentSummary, DocumentData } from "@/types/document";
+import { Customer } from '@/types/customer';
+import { CustomerAutocomplete } from '@/pages/sub/autocomplete/CustomerAutocomplete';
+import CreateCustomerDialog from './CreateCustomerDialog';
+import { DocumentItem, DocumentSummary, DocumentData, CustomerData } from "@/types/document";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,13 +52,6 @@ export interface DocumentFormProps {
   isLoading: boolean;
 }
 
-interface CustomerData {
-  name: string;
-  taxId: string;
-  phone: string;
-  address: string;
-}
-
 export const DocumentForm: FC<DocumentFormProps> = ({
   onCancel,
   onSave,
@@ -82,14 +78,6 @@ export const DocumentForm: FC<DocumentFormProps> = ({
 
     setIsGeneratingNumber(true);
     try {
-      // NOTE: This is a placeholder for your backend API call.
-      // You should replace this with a fetch to an endpoint that returns
-      // the next sequential document number to avoid duplicates.
-      // e.g., const response = await fetch(`/api/next-doc-number?type=${documentType}`);
-      // const { number } = await response.json();
-      // setDocumentNumber(number);
-
-      // Simulating API call with a 500ms delay
       await new Promise((resolve) => setTimeout(resolve, 500));
 
       const date = new Date();
@@ -122,6 +110,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
   const [validUntil, setValidUntil] = useState(initialData.validUntil || "");
 
   const [customer, setCustomer] = useState<CustomerData>(initialData.customer);
+  const [isCreateCustomerOpen, setCreateCustomerOpen] = useState(false);
 
   const [dueDate, setDueDate] = useState(initialData.dueDate || "");
   const [issueTaxInvoice, setIssueTaxInvoice] = useState(
@@ -172,9 +161,25 @@ export const DocumentForm: FC<DocumentFormProps> = ({
     setSummary(newSummary);
   }, [items]);
 
+  const handleCustomerSelect = (selectedCustomer: Customer) => {
+    setCustomer({
+      id: selectedCustomer.id,
+      name: selectedCustomer.name,
+      tax_id: selectedCustomer.tax_id,
+      phone: selectedCustomer.phone,
+      address: selectedCustomer.address,
+      email: selectedCustomer.email,
+    });
+  };
+
+  const handleCustomerCreated = (newCustomer: Customer) => {
+    handleCustomerSelect(newCustomer);
+    // Optionally, you might want to refresh the customer list in the autocomplete component
+  };
+
   const handleCustomerChange = (field: keyof CustomerData, value: string) => {
     let processedValue = value;
-    if (field === "taxId") {
+    if (field === "tax_id") {
       processedValue = value.replace(/[^\d]/g, "").slice(0, 13);
     }
     setCustomer((prev) => ({ ...prev, [field]: processedValue }));
@@ -183,7 +188,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
   const handleReferenceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setReference(e.target.value);
   };
-
+  
   const addNewItem = () => {
     setItems([...items, createDefaultItem()]);
   };
@@ -416,37 +421,64 @@ export const DocumentForm: FC<DocumentFormProps> = ({
           <CardHeader>
             <CardTitle>ข้อมูลลูกค้า</CardTitle>
           </CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="customerName">ชื่อลูกค้า</Label>
-              <Input
-                id="customerName"
-                value={customer.name}
-                onChange={(e) => handleCustomerChange("name", e.target.value)}
-                placeholder="ชื่อ-นามสกุล หรือชื่อบริษัท"
-              />
+          <CardContent>
+            <div className="flex items-end gap-2">
+              <div className="flex-grow">
+                <Label>ค้นหาลูกค้า</Label>
+                <CustomerAutocomplete 
+                  onCustomerSelect={handleCustomerSelect}
+                  initialData={customer}
+                />
+              </div>
+              <Button type="button" variant="outline" onClick={() => setCreateCustomerOpen(true)}>
+                สร้างใหม่
+              </Button>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="taxId">เลขประจำตัวผู้เสียภาษี</Label>
-              <Input
-                id="taxId"
-                value={customer.taxId}
-                onChange={(e) => handleCustomerChange("taxId", e.target.value)}
-                placeholder="กรอกเลข 13 หลัก"
-              />
-            </div>
-            <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="address">ที่อยู่</Label>
-              <Textarea
-                id="customerAddress"
-                value={customer.address}
-                onChange={(e) =>
-                  handleCustomerChange("address", e.target.value)
-                }
-                placeholder="ที่อยู่สำหรับออกใบกำกับภาษี"
-                rows={3}
-              />
-            </div>
+            {customer && customer.id && (
+              <div className="mt-4 space-y-4 pt-4 border-t">
+                <div className="space-y-2">
+                  <Label htmlFor="customer-address">ที่อยู่</Label>
+                  <Textarea
+                    id="customer-address"
+                    value={customer.address || ''}
+                    onChange={(e) => handleCustomerChange('address', e.target.value)}
+                    placeholder="ที่อยู่สำหรับออกใบกำกับภาษี"
+                    className="h-24"
+                  />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="customer-tax-id">เลขประจำตัวผู้เสียภาษี</Label>
+                    <Input
+                      id="customer-tax-id"
+                      value={customer.tax_id || ''}
+                      onChange={(e) => handleCustomerChange('tax_id', e.target.value)}
+                      placeholder="เลข 13 หลัก"
+                      readOnly
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="customer-phone">โทรศัพท์</Label>
+                    <Input
+                      id="customer-phone"
+                      value={customer.phone || ''}
+                      onChange={(e) => handleCustomerChange('phone', e.target.value)}
+                      placeholder="เบอร์โทรศัพท์"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="customer-email">อีเมล</Label>
+                  <Input
+                    id="customer-email"
+                    type="email"
+                    value={customer.email || ''}
+                    onChange={(e) => handleCustomerChange('email', e.target.value)}
+                    placeholder="อีเมลสำหรับส่งเอกสาร"
+                  />
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 

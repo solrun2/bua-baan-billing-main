@@ -35,7 +35,7 @@ const QuotationForm = ({
 
   const defaultInitialData: DocumentData = {
     documentNumber: generateQuotationNumber(),
-    customer: { name: "", taxId: "", phone: "", address: "" },
+    customer: { name: "", tax_id: "", phone: "", address: "" },
     items: [],
     summary: { subtotal: 0, discount: 0, tax: 0, total: 0, withholdingTax: 0 },
     notes: "",

@@ -22,7 +22,7 @@ if (typeof window !== "undefined" && !localStorage.getItem(STORAGE_KEY)) {
     {
       id: "inv_001",
       documentNumber: "INV-2024-001",
-      customer: { name: "บริษัท ABC จำกัด", taxId: "", phone: "", address: "" },
+      customer: { name: "บริษัท ABC จำกัด", tax_id: "", phone: "", address: "" },
       items: [],
       summary: { subtotal: 50000, discount: 0, tax: 3500, total: 53500, withholdingTax: 0 },
       status: "ส่งแล้ว",
@@ -35,7 +35,7 @@ if (typeof window !== "undefined" && !localStorage.getItem(STORAGE_KEY)) {
     {
       id: "inv_002",
       documentNumber: "INV-2024-002",
-      customer: { name: "บริษัท XYZ จำกัด", taxId: "", phone: "", address: "" },
+      customer: { name: "บริษัท XYZ จำกัด", tax_id: "", phone: "", address: "" },
       items: [],
       summary: { subtotal: 75000, discount: 0, tax: 5250, total: 80250, withholdingTax: 0 },
       status: "ชำระแล้ว",
@@ -54,12 +54,10 @@ export const documentService = {
   getAll: (): DocumentData[] => {
     return getDocuments();
   },
-
   getById: (id: string): DocumentData | undefined => {
     const documents = getDocuments();
     return documents.find((doc) => doc.id === id);
   },
-
   save: (data: DocumentData): DocumentData => {
     let documents = getDocuments();
     const existingIndex = documents.findIndex((doc) => doc.id === data.id);

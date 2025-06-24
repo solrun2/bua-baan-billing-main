@@ -2,29 +2,59 @@ import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Receipt, Plus, Search, Filter } from "lucide-react";
-import { documentService } from "../services/documentService";
-import { DocumentData } from "@/types/document";
+import { Receipt, Plus, Search, Filter, AlertTriangle, Loader2 } from "lucide-react";
+import { apiService } from "@/pages/services/apiService";
+
 const Invoice = () => {
   const navigate = useNavigate();
-  const [invoices, setInvoices] = useState<DocumentData[]>([]);
+  const [invoices, setInvoices] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const allDocs = documentService.getAll();
-    setInvoices(allDocs.filter(doc => doc.documentNumber.startsWith('INV-')));
+    const loadInvoices = async () => {
+      try {
+        setLoading(true);
+        const data = await apiService.getDocuments();
+        const invoicesData = data
+          .filter(doc => doc.document_type === 'INVOICE')
+          .map(doc => ({
+            id: doc.id,
+            number: doc.document_number,
+            customer: doc.customer_name,
+            date: new Date(doc.issue_date).toLocaleDateString('th-TH'),
+            dueDate: doc.due_date ? new Date(doc.due_date).toLocaleDateString('th-TH') : '-',
+            total: new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(doc.total_amount),
+            status: doc.status,
+          }));
+        setInvoices(invoicesData);
+      } catch (err) {
+        setError((err as Error).message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadInvoices();
   }, []);
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(amount);
-  }
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'PAID': return 'bg-green-100 text-green-700';
+      case 'SENT': return 'bg-blue-100 text-blue-700';
+      case 'OVERDUE': return 'bg-red-100 text-red-700';
+      case 'DRAFT': return 'bg-gray-100 text-gray-700';
+      default: return 'bg-gray-100 text-gray-700';
+    }
+  };
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-green-100 flex items-center justify-center">
-            <Receipt className="w-6 h-6 text-green-600" />
+          <div className="w-12 h-12 rounded-xl bg-orange-100 flex items-center justify-center">
+            <Receipt className="w-6 h-6 text-orange-600" />
           </div>
           <div>
             <h1 className="text-2xl font-bold text-foreground">ใบแจ้งหนี้</h1>
@@ -58,90 +88,70 @@ const Invoice = () => {
         </Button>
       </div>
 
-      {/* Table */}
+      {/* Content */}
       <Card className="border border-border/40">
         <CardHeader>
           <CardTitle>รายการใบแจ้งหนี้</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">
-                    เลขที่
-                  </th>
-                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">
-                    ลูกค้า
-                  </th>
-                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">
-                    วันที่
-                  </th>
-                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">
-                    กำหนดชำระ
-                  </th>
-                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">
-                    จำนวนเงิน
-                  </th>
-                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">
-                    สถานะ
-                  </th>
-                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">
-                    การดำเนินการ
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {invoices.map((invoice) => (
-                  <tr
-                    key={invoice.id}
-                    className="border-b border-border/40 hover:bg-muted/30 transition-colors"
-                  >
-                    <td className="py-3 px-4 font-medium text-foreground">
-                      {invoice.documentNumber}
-                    </td>
-                    <td className="py-3 px-4 text-foreground">
-                      {invoice.customer.name}
-                    </td>
-                    <td className="py-3 px-4 text-muted-foreground">
-                      {invoice.documentDate}
-                    </td>
-                    <td className="py-3 px-4 text-muted-foreground">
-                      {invoice.dueDate}
-                    </td>
-                    <td className="py-3 px-4 font-medium text-foreground">
-                      {formatCurrency(invoice.summary.total)}
-                    </td>
-                    <td className="py-3 px-4">
-                      <span
-                        className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          invoice.status === "ชำระแล้ว"
-                            ? "bg-green-100 text-green-700"
-                            : invoice.status === "ส่งแล้ว"
-                            ? "bg-blue-100 text-blue-700"
-                            : invoice.status === "เกินกำหนด"
-                            ? "bg-red-100 text-red-700"
-                            : "bg-gray-100 text-gray-700"
-                        }`}
-                      >
-                        {invoice.status}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4">
-                      <div className="flex items-center gap-2">
-                        <Button variant="outline" size="sm" onClick={() => navigate(`/invoice/edit/${invoice.id}`)}>
-                          ดู
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={() => navigate(`/invoice/edit/${invoice.id}`)}>
-                          แก้ไข
-                        </Button>
-                      </div>
-                    </td>
+          {loading ? (
+            <div className="flex justify-center items-center py-10">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            </div>
+          ) : error ? (
+            <div className="text-center py-10 text-red-500">
+              <AlertTriangle className="w-8 h-8 mx-auto mb-2" />
+              <p>เกิดข้อผิดพลาด: {error}</p>
+            </div>
+          ) : invoices.length === 0 ? (
+            <div className="text-center py-10 text-muted-foreground">
+              <Receipt className="w-12 h-12 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold">ยังไม่มีใบแจ้งหนี้</h3>
+              <p>เริ่มต้นสร้างใบแจ้งหนี้ใหม่ได้เลย</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">เลขที่</th>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">ลูกค้า</th>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">วันที่</th>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">กำหนดชำระ</th>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">จำนวนเงิน</th>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">สถานะ</th>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">การดำเนินการ</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {invoices.map((invoice) => (
+                    <tr key={invoice.id} className="border-b border-border/40 hover:bg-muted/30 transition-colors">
+                      <td className="py-3 px-4 font-medium text-foreground">{invoice.number}</td>
+                      <td className="py-3 px-4 text-foreground">{invoice.customer}</td>
+                      <td className="py-3 px-4 text-muted-foreground">{invoice.date}</td>
+                      <td className="py-3 px-4 text-muted-foreground">{invoice.dueDate}</td>
+                      <td className="py-3 px-4 font-medium text-foreground">{invoice.total}</td>
+                      <td className="py-3 px-4">
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(invoice.status)}`}>
+                          {invoice.status}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-2">
+                          <Button variant="outline" size="sm" onClick={() => navigate(`/invoice/edit/${invoice.id}`)}>
+                            ดู
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => navigate(`/invoice/edit/${invoice.id}`)}>
+                            แก้ไข
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

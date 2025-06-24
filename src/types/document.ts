@@ -27,10 +27,12 @@ export interface DocumentSummary {
 }
 
 export interface CustomerData {
+  id?: number;
   name: string;
-  taxId: string;
+  tax_id: string;
   phone: string;
   address: string;
+  email?: string;
 }
 
 export interface DocumentData {
@@ -53,4 +55,20 @@ export interface DocumentData {
   priceType?: "inclusive" | "exclusive" | "none";
   deposit?: number;
   tags?: string[];
+}
+
+export interface Document {
+  id: number;
+  document_number: string;
+  customer_name: string;
+  customer_address?: string;
+  customer_phone?: string;
+  issue_date: string;
+  due_date?: string;
+  total_amount: number;
+  status: string;
+  document_type: 'QUOTATION' | 'INVOICE' | 'RECEIPT';
+  items?: DocumentItem[];
+  payment_method?: string;
+  shipping_cost?: number;
 }
