@@ -37,7 +37,8 @@ interface ProductLot {
   purchasePricePerUnit: number;
 }
 
-interface ProductFormData {
+export interface ProductFormData {
+  id?: string;
   product_type: ProductType;
   name: string;
   sku: string;
@@ -92,11 +93,12 @@ const costingMethodOptions: CostingMethod[] = [
 ];
 
 interface ProductFormProps {
-  onSuccess?: () => void;
+  onSuccess?: (newProduct: ProductFormData) => void;
+  onCancel?: () => void;
   initialData?: Partial<ProductFormData>;
 }
 
-export function ProductForm({ onSuccess, initialData }: ProductFormProps) {
+export function ProductForm({ onSuccess, onCancel, initialData }: ProductFormProps) {
   const [formData, setFormData] = useState<ProductFormData>({
     ...initialFormData,
     ...initialData,
@@ -241,7 +243,9 @@ export function ProductForm({ onSuccess, initialData }: ProductFormProps) {
 
       if (result.success) {
         toast.success(formData.product_type === 'service' ? (initialData ? "อัปเดตบริการสำเร็จ" : "สร้างบริการสำเร็จ") : (initialData ? "อัปเดตสินค้าสำเร็จ" : "สร้างสินค้าสำเร็จ"));
-        onSuccess?.();
+        if (onSuccess) {
+          onSuccess(finalFormData);
+        }
       } else {
         toast.error(
           result.error ||
@@ -529,7 +533,7 @@ export function ProductForm({ onSuccess, initialData }: ProductFormProps) {
 
       {/* Action Buttons */}
       <div className="flex justify-end space-x-4 pt-6 border-t mt-8">
-        <Button type="button" variant="outline" onClick={onSuccess} disabled={isLoading} className="min-w-[120px]">
+        <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading} className="min-w-[120px]">
           ยกเลิก
         </Button>
         <Button type="submit" disabled={isLoading} className="min-w-[120px]">

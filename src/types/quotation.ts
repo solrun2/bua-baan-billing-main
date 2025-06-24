@@ -5,8 +5,9 @@ export interface QuotationItem {
   description: string;
   quantity: number;
   unitPrice: number;
+  priceType: 'inclusive' | 'exclusive';
   discount: number;
-  discountType: 'percent' | 'thb';
+  discountType: 'thb' | 'percentage';
   tax: number;
   amountBeforeTax: number;
   withholdingTax: number;

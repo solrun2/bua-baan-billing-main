@@ -3,8 +3,9 @@ import { QuotationItem, QuotationSummary } from "@/types/quotation";
 interface BaseItem {
   quantity: number;
   unitPrice: number;
+  priceType: 'inclusive' | 'exclusive' | 'none';
   discount: number;
-  discountType: 'percent' | 'thb';
+  discountType: 'thb' | 'percentage';
   tax?: number;
 }
 
@@ -20,24 +21,30 @@ export interface CalculatedItem {
  * Calculate item amounts including subtotal, discount, tax, and total
  */
 export const calculateItemAmounts = (item: BaseItem): CalculatedItem => {
-  // Calculate subtotal (quantity * unit price)
-  const subtotal = item.quantity * item.unitPrice;
-  
+  const taxRate = item.tax !== undefined ? item.tax / 100 : 0;
+
+  // Adjust unitPrice if it's tax-inclusive
+  const priceBeforeTaxPerUnit = item.priceType === 'inclusive' && taxRate > 0
+    ? item.unitPrice / (1 + taxRate)
+    : item.unitPrice;
+
+  // Calculate subtotal from the (potentially adjusted) unit price
+  const subtotal = item.quantity * priceBeforeTaxPerUnit;
+
   // Calculate discount amount based on discount type
-  const discountAmount = item.discountType === 'percent'
+  const discountAmount = item.discountType === 'percentage'
     ? (subtotal * item.discount) / 100
-    : item.discount * item.quantity; // For THB discount, multiply by quantity
-  
+    : item.discount * item.quantity; // For THB discount, it's per unit, so multiply by quantity
+
   // Calculate amount before tax
   const amountBeforeTax = subtotal - discountAmount;
-  
-  // Calculate tax amount (default to 0 if tax is not provided)
-  const taxRate = item.tax !== undefined ? item.tax / 100 : 0;
-  const taxAmount = amountBeforeTax * taxRate;
-  
+
+  // Calculate tax amount from the amount after discount, but only if priceType is not 'none'
+  const taxAmount = item.priceType !== 'none' ? amountBeforeTax * taxRate : 0;
+
   // Calculate final amount including tax
   const amount = amountBeforeTax + taxAmount;
-  
+
   return {
     subtotal,
     discountAmount,
@@ -50,7 +57,7 @@ export const calculateItemAmounts = (item: BaseItem): CalculatedItem => {
 /**
  * Calculate document summary including subtotal, discount, tax, and total
  */
-export const calculateDocumentSummary = (items: QuotationItem[]): QuotationSummary => {
+export const calculateDocumentSummary = <T extends BaseItem>(items: T[]): QuotationSummary => {
   const initialSummary: QuotationSummary = {
     subtotal: 0,
     discount: 0,
@@ -92,7 +99,7 @@ export const handleCalculatedFieldUpdate = <T extends BaseItem>(
   value: any
 ): T & Partial<CalculatedItem> => {
   // If the field affects calculations, return updated item with new calculations
-  if (['quantity', 'unitPrice', 'discount', 'discountType', 'tax'].includes(field as string)) {
+  if (['quantity', 'unitPrice', 'priceType', 'discount', 'discountType', 'tax'].includes(field as string)) {
     const updatedItem = {
       ...currentItem,
       [field]: value
