@@ -26,6 +26,7 @@ import ChartOfAccounts from "./pages/settings/ChartOfAccounts";
 import DocumentNumbering from "./pages/settings/DocumentNumbering";
 import CompanyInfo from "./pages/settings/CompanyInfo";
 import { ProductForm } from "./pages/sub/create/ProductForm";
+import InvoiceForm from "./pages/sub/invoice/InvoiceForm";
 
 const queryClient = new QueryClient();
 
@@ -43,6 +44,16 @@ const App = () => (
             <Route path="/documents/quotation" element={<Quotation />} />
             <Route path="/quotation/new" element={<QuotationForm onCancel={() => window.history.back()} />} />
             <Route path="/documents/invoice" element={<Invoice />} />
+            <Route path="/invoice/new" element={<InvoiceForm onSave={async () => {}} initialData={{
+              customer: { name: '', taxId: '', phone: '', address: '' },
+              items: [],
+              summary: { subtotal: 0, discount: 0, tax: 0, total: 0, withholdingTax: 0 },
+              notes: '',
+              documentNumber: '',
+              documentDate: new Date().toISOString().split('T')[0],
+              reference: '',
+              status: 'draft'
+            }} isLoading={false} />} />
             <Route path="/documents/receipt" element={<Receipt />} />
             <Route path="/documents/tax-invoice" element={<TaxInvoice />} />
             <Route path="/documents/credit-note" element={<CreditNote />} />

@@ -1,4 +1,5 @@
 import { useState, useEffect, ChangeEvent, FormEvent } from "react";
+import { useNavigate } from "react-router-dom";
 import { Plus, Save, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -99,6 +100,7 @@ interface ProductFormProps {
 }
 
 export function ProductForm({ onSuccess, onCancel, initialData }: ProductFormProps) {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState<ProductFormData>({
     ...initialFormData,
     ...initialData,
@@ -224,6 +226,22 @@ export function ProductForm({ onSuccess, onCancel, initialData }: ProductFormPro
     }));
   };
 
+  const handleSuccess = (newProduct: ProductFormData) => {
+    if (onSuccess) {
+      onSuccess(newProduct);
+    } else {
+      navigate(-1); // Default fallback
+    }
+  };
+
+  const handleCancel = () => {
+    if (onCancel) {
+      onCancel();
+    } else {
+      navigate(-1); // Default fallback
+    }
+  };
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -243,9 +261,7 @@ export function ProductForm({ onSuccess, onCancel, initialData }: ProductFormPro
 
       if (result.success) {
         toast.success(formData.product_type === 'service' ? (initialData ? "อัปเดตบริการสำเร็จ" : "สร้างบริการสำเร็จ") : (initialData ? "อัปเดตสินค้าสำเร็จ" : "สร้างสินค้าสำเร็จ"));
-        if (onSuccess) {
-          onSuccess(finalFormData);
-        }
+        handleSuccess(result.product || finalFormData);
       } else {
         toast.error(
           result.error ||
@@ -255,8 +271,8 @@ export function ProductForm({ onSuccess, onCancel, initialData }: ProductFormPro
         );
       }
     } catch (error) {
-      console.error("Error submitting product form:", error);
-      toast.error(`เกิดข้อผิดพลาดในการบันทึกข้อมูล${formData.product_type === 'service' ? 'บริการ' : 'สินค้า'}`);
+      console.error("Failed to save product:", error);
+      toast.error("เกิดข้อผิดพลาดในการบันทึกสินค้า");
     } finally {
       setIsLoading(false);
     }
@@ -533,7 +549,7 @@ export function ProductForm({ onSuccess, onCancel, initialData }: ProductFormPro
 
       {/* Action Buttons */}
       <div className="flex justify-end space-x-4 pt-6 border-t mt-8">
-        <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading} className="min-w-[120px]">
+        <Button type="button" variant="outline" onClick={handleCancel} disabled={isLoading} className="min-w-[120px]">
           ยกเลิก
         </Button>
         <Button type="submit" disabled={isLoading} className="min-w-[120px]">

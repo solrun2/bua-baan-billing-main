@@ -48,7 +48,7 @@ const Invoice = () => {
         </div>
         <Button
           className="flex items-center gap-2"
-          onClick={() => navigate("components/CreateInvoice")}
+          onClick={() => navigate("/invoice/new")}
         >
           <Plus className="w-4 h-4" />
           สร้างใบแจ้งหนี้ใหม่

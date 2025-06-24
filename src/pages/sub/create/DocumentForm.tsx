@@ -1,13 +1,21 @@
 import { format } from "date-fns";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef, FC } from "react";
 import { useNavigate } from "react-router-dom";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Product } from "@/types/product";
 import { DocumentItem, DocumentSummary, DocumentData } from "@/types/document";
-import { QuotationItem } from "@/types/quotation";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
@@ -18,33 +26,22 @@ import {
 } from "@/components/ui/select";
 import {
   ArrowLeft,
-  Calendar,
-  Download,
-  FileText,
   Plus,
   Save,
-  Search,
   Trash2,
-  Upload,
   Loader2,
+  Paperclip,
+  X,
+  Info,
 } from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
 import ProductAutocomplete from "../autocomplete/ProductAutocomplete";
 import {
   calculateDocumentSummary,
-  handleCalculatedFieldUpdate,
   updateItemWithCalculations,
 } from "@/calculate/documentCalculations";
-import { toast } from "sonner";
-import { ProductForm, ProductFormData } from "./ProductForm";
+import { ProductForm } from "./ProductForm";
 
-interface DocumentFormProps {
+export interface DocumentFormProps {
   onCancel: () => void;
   onSave: (data: DocumentData) => Promise<void>;
   initialData: DocumentData;
@@ -59,7 +56,7 @@ interface CustomerData {
   address: string;
 }
 
-const DocumentForm = ({
+export const DocumentForm: FC<DocumentFormProps> = ({
   onCancel,
   onSave,
   initialData,
@@ -68,21 +65,79 @@ const DocumentForm = ({
 }: DocumentFormProps) => {
   const navigate = useNavigate();
 
+  const [isProductFormOpen, setIsProductFormOpen] = useState(false);
+  const [isGeneratingNumber, setIsGeneratingNumber] = useState(false);
+
   const [reference, setReference] = useState(initialData.reference);
-  const [documentDate, setDocumentDate] = useState(initialData.documentDate);
-  const [documentNumber, setDocumentNumber] = useState(
+  const [documentNumber, setDocumentNumber] = useState<string>(
     initialData.documentNumber || ""
   );
+  const [documentDate, setDocumentDate] = useState<string>(
+    initialData.documentDate || format(new Date(), "yyyy-MM-dd")
+  );
+
+  const fetchNextDocumentNumber = useCallback(async () => {
+    // Only generate a new number if one isn't already provided
+    if (initialData.documentNumber) return;
+
+    setIsGeneratingNumber(true);
+    try {
+      // NOTE: This is a placeholder for your backend API call.
+      // You should replace this with a fetch to an endpoint that returns
+      // the next sequential document number to avoid duplicates.
+      // e.g., const response = await fetch(`/api/next-doc-number?type=${documentType}`);
+      // const { number } = await response.json();
+      // setDocumentNumber(number);
+
+      // Simulating API call with a 500ms delay
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      const date = new Date();
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const prefix = documentType === "invoice" ? "IV" : "QT";
+
+      // This random part should be replaced by a sequential number from your API
+      const sequence = String(Math.floor(Math.random() * 99999) + 1).padStart(
+        5,
+        "0"
+      );
+
+      const newDocNumber = `${prefix}-${year}-${month}${sequence}`;
+      setDocumentNumber(newDocNumber);
+    } catch (error) {
+      console.error("Failed to fetch document number:", error);
+      setDocumentNumber("เกิดข้อผิดพลาด");
+    } finally {
+      setIsGeneratingNumber(false);
+    }
+  }, [documentType, initialData.documentNumber]);
+
+  useEffect(() => {
+    fetchNextDocumentNumber();
+  }, [fetchNextDocumentNumber]);
+
+  const [isTaxInvoice, setIsTaxInvoice] = useState(false);
 
   const [validUntil, setValidUntil] = useState(initialData.validUntil || "");
 
   const [customer, setCustomer] = useState<CustomerData>(initialData.customer);
+
+  const [dueDate, setDueDate] = useState(initialData.dueDate || "");
+  const [issueTaxInvoice, setIssueTaxInvoice] = useState(
+    initialData.issueTaxInvoice ?? true
+  );
+  const [priceType, setPriceType] = useState<
+    "inclusive" | "exclusive" | "none"
+  >(initialData.priceType || "exclusive");
+  const [tags, setTags] = useState<string[]>(initialData.tags || []);
 
   const createDefaultItem = (): DocumentItem => {
     return {
       id: `item-${Date.now()}`,
       productTitle: "",
       description: "",
+      unit: "",
       quantity: 1,
       unitPrice: 0,
       priceType: "exclusive",
@@ -90,7 +145,7 @@ const DocumentForm = ({
       discountType: "thb",
       tax: 7,
       amountBeforeTax: 0,
-      withholdingTax: 0,
+      withholdingTax: -1,
       amount: 0,
       isEditing: true,
     };
@@ -105,48 +160,17 @@ const DocumentForm = ({
     discount: 0,
     tax: 0,
     total: 0,
+    withholdingTax: 0,
   });
 
   const [notes, setNotes] = useState(initialData.notes);
-
-  const [isNewProductDialogOpen, setIsNewProductDialogOpen] = useState(false);
+  const [attachments, setAttachments] = useState<File[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const newSummary = calculateDocumentSummary(items);
     setSummary(newSummary);
   }, [items]);
-
-  const handleAddNewProduct = useCallback(() => {
-    const formData = {
-      customer,
-      items,
-      summary,
-      notes,
-      documentNumber,
-      documentDate,
-      validUntil,
-      reference,
-      status: "draft",
-      createdAt: new Date().toISOString(),
-    };
-
-    sessionStorage.setItem("draftDocument", JSON.stringify(formData));
-
-    navigate("/products/new", {
-      state: { returnTo: `/${documentType}/new` },
-    });
-  }, [
-    customer,
-    items,
-    summary,
-    notes,
-    documentNumber,
-    documentDate,
-    validUntil,
-    reference,
-    navigate,
-    documentType,
-  ]);
 
   const handleCustomerChange = (field: keyof CustomerData, value: string) => {
     let processedValue = value;
@@ -171,7 +195,31 @@ const DocumentForm = ({
 
   const handlePriceTypeChange = (value: "exclusive" | "inclusive" | "none") => {
     const updatedItems = items.map((item) => {
-      const newItem = { ...item, priceType: value };
+      const newPriceType = value;
+      const oldPriceType = item.priceType;
+
+      let newUnitPrice = item.unitPrice;
+      const taxRate = (item.tax ?? 0) / 100;
+
+      if (taxRate > 0 && newPriceType !== oldPriceType) {
+        if (oldPriceType === "inclusive" && newPriceType === "exclusive") {
+          // If switching from inclusive to exclusive, the new unit price should be the pre-tax value.
+          newUnitPrice = item.unitPrice / (1 + taxRate);
+        } else if (
+          oldPriceType === "exclusive" &&
+          newPriceType === "inclusive"
+        ) {
+          // If switching from exclusive to inclusive, the new unit price should include the tax.
+          newUnitPrice = item.unitPrice * (1 + taxRate);
+        }
+      }
+
+      const newItem = {
+        ...item,
+        priceType: newPriceType,
+        unitPrice: newUnitPrice,
+      };
+
       return updateItemWithCalculations(newItem);
     });
     setItems(updatedItems);
@@ -180,16 +228,24 @@ const DocumentForm = ({
   const handleInputChange = (
     id: string,
     field: keyof DocumentItem,
-    value: DocumentItem[keyof DocumentItem]
+    value: any
   ) => {
-    const updatedItems = items.map((item) =>
-      item.id === id ? { ...item, [field]: value } : item
-    );
-    const itemToUpdate = updatedItems.find((i) => i.id === id);
-    if (itemToUpdate) {
-      const calculatedItem = updateItemWithCalculations(itemToUpdate);
-      setItems(updatedItems.map((i) => (i.id === id ? calculatedItem : i)));
-    }
+    const updatedItems = items.map((item) => {
+      if (item.id === id) {
+        const updatedItemState = { ...item, [field]: value };
+
+        if (field === "withholdingTax" && value !== "custom") {
+          delete updatedItemState.customWithholdingTaxAmount;
+        } else if (field === "withholdingTax" && value === "custom") {
+          updatedItemState.customWithholdingTaxAmount =
+            item.customWithholdingTaxAmount ?? 0;
+        }
+
+        return updateItemWithCalculations(updatedItemState);
+      }
+      return item;
+    });
+    setItems(updatedItems);
   };
 
   const handleProductSelect = (product: Product | null, itemId: string) => {
@@ -216,67 +272,52 @@ const DocumentForm = ({
     }
   };
 
-  const handleProductFormSuccess = (newProductData: ProductFormData) => {
-    const newItem: DocumentItem = {
-      id: `item-${Date.now()}`,
-      productTitle: newProductData.name,
-      description: newProductData.description,
-      quantity: 1,
-      unitPrice: newProductData.selling_price,
-      priceType: items[0]?.priceType || "exclusive",
-      discount: 0,
-      discountType: "thb",
-      tax: 7,
-      amountBeforeTax: 0,
-      withholdingTax: 0,
-      amount: 0, // Let updateItemWithCalculations handle this
-      isEditing: false,
-      productId: newProductData.id,
-    };
-    const itemWithCalculations = updateItemWithCalculations(newItem);
-
-    const firstEmptyItemIndex = items.findIndex(
-      (item) =>
-        !item.productTitle && item.quantity === 1 && item.unitPrice === 0
-    );
-
-    if (firstEmptyItemIndex !== -1) {
-      const updatedItems = [...items];
-      updatedItems[firstEmptyItemIndex] = itemWithCalculations;
-      setItems(updatedItems);
-    } else {
-      setItems([...items, itemWithCalculations]);
-    }
-
-    setIsNewProductDialogOpen(false);
-    toast.success(`เพิ่มสินค้า "${newProductData.name}" ในรายการแล้ว`);
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const documentData: DocumentData = {
-      ...initialData,
+      id: initialData.id,
       customer,
       items,
       summary,
       notes,
+      attachments,
+      documentNumber: documentNumber,
       documentDate,
       validUntil,
+      dueDate,
+      issueTaxInvoice,
+      priceType,
+      tags,
       reference,
+      status: "draft",
     };
     await onSave(documentData);
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      setAttachments((prev) => [...prev, ...Array.from(e.target.files!)]);
+    }
+  };
+
+  const handleRemoveAttachment = (fileName: string) => {
+    setAttachments((prev) => prev.filter((file) => file.name !== fileName));
+  };
+
   const pageTitle =
-    documentType === "quotation" ? "สร้างใบเสนอราคา" : "สร้างใบแจ้งหนี้";
+    documentType === "quotation"
+      ? "สร้างใบเสนอราคา"
+      : `สร้างใบแจ้งหนี้${isTaxInvoice ? " / ใบกำกับภาษี" : ""}`;
   const pageSubtitle =
     documentType === "quotation"
       ? "กรอกข้อมูลเพื่อสร้างใบเสนอราคาใหม่"
-      : "กรอกข้อมูลเพื่อสร้างใบแจ้งหนี้ใหม่";
+      : `กรอกข้อมูลเพื่อสร้างใบแจ้งหนี้ใหม่${
+          isTaxInvoice ? " / ใบกำกับภาษี" : ""
+        }`;
 
   return (
-    <div className="container mx-auto p-4 sm:p-6 lg:p-8">
-      <form onSubmit={handleSubmit}>
+    <>
+      <form onSubmit={handleSubmit} className="space-y-6">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
             <Button
@@ -309,98 +350,117 @@ const DocumentForm = ({
           </div>
         </div>
 
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>ข้อมูลเอกสาร</CardTitle>
-            </CardHeader>
-            <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="space-y-2">
-                <Label>เลขที่เอกสาร</Label>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="space-y-2">
+            <Label>
+              <div className="space-y-4">
+                <Label htmlFor="documentNumber">เลขที่เอกสาร</Label>
                 <Input
+                  id="documentNumber"
+                  value={
+                    isGeneratingNumber ? "กำลังสร้างเลขที่..." : documentNumber
+                  }
                   readOnly
-                  value={documentNumber}
-                  className="font-semibold bg-muted"
+                  className="font-mono bg-muted"
                 />
               </div>
-              <div className="space-y-2">
-                <Label>วันที่</Label>
-                <Input
-                  type="date"
-                  value={documentDate}
-                  onChange={(e) => setDocumentDate(e.target.value)}
-                />
-              </div>
-              {documentType === "quotation" && (
-                <div className="space-y-2">
-                  <Label>ยืนราคาถึงวันที่</Label>
-                  <Input
-                    type="date"
-                    value={validUntil}
-                    onChange={(e) => setValidUntil(e.target.value)}
-                  />
-                </div>
-              )}
-              <div className="space-y-2">
-                <Label>อ้างอิง</Label>
-                <Input
-                  value={reference}
-                  onChange={handleReferenceChange}
-                  placeholder="(ไม่บังคับ)"
-                />
-              </div>
-            </CardContent>
-          </Card>
+            </Label>
+          </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>ข้อมูลลูกค้า</CardTitle>
-            </CardHeader>
-            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="customerName">ชื่อลูกค้า</Label>
-                <Input
-                  id="customerName"
-                  value={customer.name}
-                  onChange={(e) => handleCustomerChange("name", e.target.value)}
-                  placeholder="ชื่อ-นามสกุล หรือชื่อบริษัท"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="taxId">เลขประจำตัวผู้เสียภาษี</Label>
-                <Input
-                  id="taxId"
-                  value={customer.taxId}
-                  onChange={(e) =>
-                    handleCustomerChange("taxId", e.target.value)
-                  }
-                  placeholder="กรอกเลข 13 หลัก"
-                />
-              </div>
-              <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="address">ที่อยู่</Label>
-                <Textarea
-                  id="address"
-                  value={customer.address}
-                  onChange={(e) =>
-                    handleCustomerChange("address", e.target.value)
-                  }
-                  placeholder="-ไม่มี-"
-                />
-              </div>
-            </CardContent>
-          </Card>
+          <div className="space-y-2">
+            <Label>วันที่</Label>
+            <Input
+              type="date"
+              value={documentDate}
+              onChange={(e) => {
+                setDocumentDate(e.target.value);
+              }}
+            />
+          </div>
 
-          <Card>
-            <CardHeader><CardTitle>ข้อมูลราคาและภาษี</CardTitle></CardHeader>
-            <CardContent>
-              <div className="space-y-2 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="space-y-2">
-                  <Label>รูปแบบราคา</Label>
-                  <Select
-                    value={items[0]?.priceType || "exclusive"}
-                    onValueChange={
-                      handlePriceTypeChange as (value: string) => void
+          {documentType === "quotation" ? (
+            <div className="space-y-2">
+              <Label>วันหมดอายุ</Label>
+              <Input
+                type="date"
+                value={validUntil}
+                onChange={(e) => setValidUntil(e.target.value)}
+              />
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <Label>วันครบกำหนดชำระ</Label>
+              <Input
+                type="date"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+              />
+            </div>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="space-y-2">
+            <Label>อ้างอิง</Label>
+            <Input
+              value={reference}
+              onChange={handleReferenceChange}
+              placeholder="อ้างอิง (ไม่บังคับ)"
+            />
+          </div>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>ข้อมูลลูกค้า</CardTitle>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="customerName">ชื่อลูกค้า</Label>
+              <Input
+                id="customerName"
+                value={customer.name}
+                onChange={(e) => handleCustomerChange("name", e.target.value)}
+                placeholder="ชื่อ-นามสกุล หรือชื่อบริษัท"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="taxId">เลขประจำตัวผู้เสียภาษี</Label>
+              <Input
+                id="taxId"
+                value={customer.taxId}
+                onChange={(e) => handleCustomerChange("taxId", e.target.value)}
+                placeholder="กรอกเลข 13 หลัก"
+              />
+            </div>
+            <div className="space-y-2 md:col-span-2">
+              <Label htmlFor="address">ที่อยู่</Label>
+              <Textarea
+                id="customerAddress"
+                value={customer.address}
+                onChange={(e) =>
+                  handleCustomerChange("address", e.target.value)
+                }
+                placeholder="ที่อยู่สำหรับออกใบกำกับภาษี"
+                rows={3}
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>ข้อมูลราคาและภาษี</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* รูปแบบราคา */}
+              <div className="space-y-2">
+                <Label>รูปแบบราคา</Label>
+                <Select
+                  value={items[0]?.priceType || "exclusive"}
+                  onValueChange={
+                    handlePriceTypeChange as (value: string) => void
                   }
                 >
                   <SelectTrigger>
@@ -412,219 +472,413 @@ const DocumentForm = ({
                     <SelectItem value="none">ไม่มีภาษี</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+
+              {/* สวิตช์ออกใบกำกับภาษี */}
+              <div className="space-y-2">
+                <Label className="flex items-center gap-1">
+                  การออกใบกำกับภาษี
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="w-4 h-4 text-gray-400" />
+                      </TooltipTrigger>
+                    </Tooltip>
+                  </TooltipProvider>
+                </Label>
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="tax-invoice"
+                    checked={isTaxInvoice} // ต้องกำหนด state ไว้ด้านนอก เช่น useState
+                    onCheckedChange={setIsTaxInvoice}
+                  />
+                  <Label htmlFor="tax-invoice" className="text-blue-600">
+                    ใบกำกับภาษี
+                  </Label>
                 </div>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </CardContent>
+        </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>รายการ</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {items.map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex flex-col space-y-2 p-4 border rounded-lg relative bg-background"
-                  >
-                    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-[1fr_100px_140px_180px_100px_140px] gap-4 items-start">
-                      <div className="space-y-2">
-                        <Label>รายการ</Label>
-                        <ProductAutocomplete
-                          onChange={(product) =>
-                            handleProductSelect(product, item.id)
-                          }
-                          onAddNew={() => setIsNewProductDialogOpen(true)}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>จำนวน</Label>
+        <Card>
+          <CardHeader>
+            <CardTitle>รายการ</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {items.map((item) => (
+                <div
+                  key={item.id}
+                  className="flex flex-col space-y-2 p-4 border rounded-lg relative bg-background"
+                >
+                  <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-[1fr_100px_140px_180px_100px_140px_140px] gap-4 items-start">
+                    <div className="space-y-2">
+                      <Label>สินค้าหรือบริการ</Label>
+                      <ProductAutocomplete
+                        onChange={(product) =>
+                          handleProductSelect(product, item.id)
+                        }
+                        onAddNew={() => {
+                          const newId = `new-${Date.now()}`;
+                          const newItem: DocumentItem = {
+                            id: newId,
+                            isNew: true,
+                            productTitle: "",
+                            quantity: 1,
+                            unitPrice: 0,
+                            priceType: priceType,
+                            discount: 0,
+                            discountType: "thb",
+                            tax: 7,
+                            withholdingTax: -1,
+                            description: "",
+                            unit: "",
+                            amountBeforeTax: 0,
+                            amount: 0,
+                            isEditing: true,
+                          };
+                          setItems([...items, newItem]);
+                          setIsProductFormOpen(true);
+                        }}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>จำนวน</Label>
+                      <Input
+                        type="number"
+                        value={item.quantity}
+                        onChange={(e) =>
+                          handleInputChange(
+                            item.id,
+                            "quantity",
+                            parseInt(e.target.value) || 0
+                          )
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>ราคาต่อหน่วย</Label>
+                      <Input
+                        type="number"
+                        value={item.unitPrice}
+                        onChange={(e) =>
+                          handleInputChange(
+                            item.id,
+                            "unitPrice",
+                            parseFloat(e.target.value) || 0
+                          )
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>ส่วนลดต่อหน่วย</Label>
+                      <div className="flex items-center gap-2">
                         <Input
                           type="number"
-                          value={item.quantity}
+                          value={item.discount}
                           onChange={(e) =>
                             handleInputChange(
                               item.id,
-                              "quantity",
-                              parseInt(e.target.value) || 0
-                            )
-                          }
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>ราคาต่อหน่วย</Label>
-                        <Input
-                          type="number"
-                          value={item.unitPrice}
-                          onChange={(e) =>
-                            handleInputChange(
-                              item.id,
-                              "unitPrice",
+                              "discount",
                               parseFloat(e.target.value) || 0
                             )
                           }
                         />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>ส่วนลดต่อหน่วย</Label>
-                        <div className="flex items-center gap-2">
-                          <Input
-                            type="number"
-                            value={item.discount}
-                            onChange={(e) =>
-                              handleInputChange(
-                                item.id,
-                                "discount",
-                                parseFloat(e.target.value) || 0
-                              )
-                            }
-                          />
-                          <Select
-                            value={item.discountType}
-                            onValueChange={(value) =>
-                              handleInputChange(item.id, "discountType", value)
-                            }
-                          >
-                            <SelectTrigger className="w-[80px]">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="thb">บาท</SelectItem>
-                              <SelectItem value="percentage">%</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label>ภาษี</Label>
                         <Select
-                          value={String(item.tax)}
+                          value={item.discountType}
                           onValueChange={(value) =>
-                            handleInputChange(item.id, "tax", parseInt(value))
+                            handleInputChange(item.id, "discountType", value)
                           }
                         >
-                          <SelectTrigger>
+                          <SelectTrigger className="w-[80px]">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="7">7%</SelectItem>
-                            <SelectItem value="0">0%</SelectItem>
+                            <SelectItem value="thb">บาท</SelectItem>
+                            <SelectItem value="percentage">%</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
-                      <div className="space-y-2">
-                        <Label>มูลค่าก่อนภาษี</Label>
-                        <Input
-                          type="text"
-                          readOnly
-                          value={item.amountBeforeTax.toLocaleString("th-TH", {
-                            minimumFractionDigits: 2,
-                          })}
-                          className="font-semibold bg-muted"
-                        />
-                      </div>
                     </div>
-                    <div className="flex justify-end">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => removeItem(item.id)}
-                        className="text-muted-foreground hover:text-destructive"
+                    <div className="space-y-2">
+                      <Label>ภาษี</Label>
+                      <Select
+                        value={String(item.tax)}
+                        onValueChange={(value) =>
+                          handleInputChange(item.id, "tax", parseInt(value))
+                        }
                       >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="7">7%</SelectItem>
+                          <SelectItem value="0">0%</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>มูลค่าก่อนภาษี</Label>
+                      <Input
+                        type="text"
+                        readOnly
+                        value={item.amountBeforeTax.toLocaleString("th-TH", {
+                          minimumFractionDigits: 2,
+                        })}
+                        className="font-semibold bg-muted"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>หัก ณ ที่จ่าย</Label>
+                      <Select
+                        value={String(item.withholdingTax)}
+                        onValueChange={(value) => {
+                          const whtValue =
+                            value === "custom" ? "custom" : parseFloat(value);
+                          handleInputChange(
+                            item.id,
+                            "withholdingTax",
+                            whtValue
+                          );
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="เลือก" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="-1">ไม่ระบุ</SelectItem>
+                          <SelectItem value="0">ไม่มี</SelectItem>
+                          <SelectItem value="1">1%</SelectItem>
+                          <SelectItem value="1.5">1.5%</SelectItem>
+                          <SelectItem value="2">2%</SelectItem>
+                          <SelectItem value="3">3%</SelectItem>
+                          <SelectItem value="5">5%</SelectItem>
+                          <SelectItem value="10">10%</SelectItem>
+                          <SelectItem value="15">15%</SelectItem>
+                          <SelectItem value="custom">กำหนดเอง</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {item.withholdingTax === "custom" && (
+                        <Input
+                          type="number"
+                          placeholder="ระบุจำนวนเงิน"
+                          value={item.customWithholdingTaxAmount || ""}
+                          onChange={(e) =>
+                            handleInputChange(
+                              item.id,
+                              "customWithholdingTaxAmount",
+                              parseFloat(e.target.value) || 0
+                            )
+                          }
+                          className="mt-2"
+                        />
+                      )}
                     </div>
                   </div>
-                ))}
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={addNewItem}
-                  className="w-full"
-                >
-                  <Plus className="w-4 h-4 mr-2" /> เพิ่มรายการ
-                </Button>
-              </div>
+                  <div className="flex justify-end">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => removeItem(item.id)}
+                      className="text-muted-foreground hover:text-destructive"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+              <Button
+                type="button"
+                variant="outline"
+                onClick={addNewItem}
+                className="w-full"
+              >
+                <Plus className="w-4 h-4 mr-2" /> เพิ่มรายการ
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {documentType === "invoice" && (
+          <Card>
+            <CardHeader>
+              <CardTitle>เงินมัดจำ</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Button type="button" variant="outline">
+                <Plus className="w-4 h-4 mr-2" /> เลือกเงินมัดจำ
+              </Button>
             </CardContent>
           </Card>
+        )}
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <Label>หมายเหตุ</Label>
-              <Textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="ระบุหมายเหตุ (ถ้ามี)"
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="space-y-2">
+            <Label>หมายเหตุ</Label>
+            <Textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="ระบุหมายเหตุ (ถ้ามี)"
+              className="h-32"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>แนบไฟล์</Label>
+            <div className="border rounded-lg p-4 h-32 flex flex-col">
+              <div className="flex-grow overflow-y-auto">
+                {attachments.length === 0 ? (
+                  <div className="mt-8">
+                    <Dialog
+                      open={isProductFormOpen}
+                      onOpenChange={setIsProductFormOpen}
+                    >
+                      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                        <ProductForm
+                          onSuccess={(newProductData) => {
+                            const updatedItems = items.map((item) => {
+                              if (item.isNew) {
+                                const newItem = {
+                                  ...item,
+                                  productId: newProductData.id,
+                                  productTitle: newProductData.name,
+                                  unitPrice: newProductData.selling_price,
+                                  unit: newProductData.unit,
+                                  description: newProductData.description,
+                                  tax:
+                                    newProductData.selling_vat_rate !== null
+                                      ? Number(newProductData.selling_vat_rate)
+                                      : undefined,
+                                  isNew: false,
+                                };
+                                return updateItemWithCalculations(newItem);
+                              }
+                              return item;
+                            });
+                            setItems(updatedItems);
+                            setIsProductFormOpen(false);
+                          }}
+                          onCancel={() => {
+                            setItems(items.filter((item) => !item.isNew));
+                            setIsProductFormOpen(false);
+                          }}
+                        />
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+                ) : (
+                  <ul className="space-y-2">
+                    {attachments.map((file, index) => (
+                      <li
+                        key={index}
+                        className="flex items-center justify-between text-sm bg-muted p-2 rounded-md"
+                      >
+                        <span className="truncate max-w-[200px]">
+                          {file.name}
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={() => handleRemoveAttachment(file.name)}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                className="mt-2"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <Paperclip className="w-4 h-4 mr-2" />
+                เพิ่มไฟล์แนบ
+              </Button>
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                multiple
+                className="hidden"
               />
             </div>
           </div>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>สรุปรายการ</CardTitle>
-            </CardHeader>
-            <CardContent className="p-4 space-y-3">
-              <div className="flex justify-between">
-                <span>รวมเป็นเงิน</span>
-                <span>
-                  {summary.subtotal.toLocaleString("th-TH", {
-                    minimumFractionDigits: 2,
-                  })}{" "}
-                  บาท
-                </span>
-              </div>
-              <div className="flex justify-between text-destructive">
-                <span>ส่วนลดรวม</span>
-                <span>
-                  -
-                  {summary.discount.toLocaleString("th-TH", {
-                    minimumFractionDigits: 2,
-                  })}{" "}
-                  บาท
-                </span>
-              </div>
-              <div className="border-t pt-3 mt-3 flex justify-between">
-                <span>ภาษีมูลค่าเพิ่ม 7%</span>
-                <span>
-                  {summary.tax.toLocaleString("th-TH", {
-                    minimumFractionDigits: 2,
-                  })}{" "}
-                  บาท
-                </span>
-              </div>
-              <div className="border-t-2 border-primary pt-3 mt-3 flex justify-between font-bold text-lg">
-                <span>จำนวนเงินทั้งสิ้น</span>
-                <span>
-                  {summary.total.toLocaleString("th-TH", {
-                    minimumFractionDigits: 2,
-                  })}{" "}
-                  บาท
-                </span>
-              </div>
-            </CardContent>
-          </Card>
         </div>
-      </form>
 
-      <Dialog
-        open={isNewProductDialogOpen}
-        onOpenChange={setIsNewProductDialogOpen}
-      >
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>เพิ่มสินค้า/บริการใหม่</DialogTitle>
-            <DialogDescription>
-              สร้างสินค้าหรือบริการใหม่เพื่อเพิ่มในเอกสารนี้ได้ทันที
-            </DialogDescription>
-          </DialogHeader>
-          <ProductForm
-            onSuccess={handleProductFormSuccess}
-            onCancel={() => setIsNewProductDialogOpen(false)}
-          />
-        </DialogContent>
-      </Dialog>
-    </div>
+        <div className="space-y-2">
+          <Label>แท็ก</Label>
+          <Input placeholder="กรุณาเลือกแท็กที่ต้องการ" />
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>สรุปรายการ</CardTitle>
+          </CardHeader>
+          <CardContent className="p-4 space-y-3">
+            <div className="flex justify-between">
+              <span>รวมเป็นเงิน</span>
+              <span>
+                {summary.subtotal.toLocaleString("th-TH", {
+                  minimumFractionDigits: 2,
+                })}{" "}
+                บาท
+              </span>
+            </div>
+            <div className="flex justify-between text-destructive">
+              <span>ส่วนลดรวม</span>
+              <span>
+                -
+                {summary.discount.toLocaleString("th-TH", {
+                  minimumFractionDigits: 2,
+                })}{" "}
+                บาท
+              </span>
+            </div>
+            <div className="border-t pt-3 mt-3 flex justify-between">
+              <span>มูลค่าก่อนภาษี</span>
+              <span>
+                {(summary.subtotal - summary.discount).toLocaleString("th-TH", {
+                  minimumFractionDigits: 2,
+                })}{" "}
+                บาท
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span>ภาษีมูลค่าเพิ่ม 7%</span>
+              <span>
+                {summary.tax.toLocaleString("th-TH", {
+                  minimumFractionDigits: 2,
+                })}{" "}
+                บาท
+              </span>
+            </div>
+            <div className="border-t pt-3 mt-3 flex justify-between items-center">
+              <Label>หัก ณ ที่จ่าย</Label>
+              <span>
+                -
+                {summary.withholdingTax?.toLocaleString("th-TH", {
+                  minimumFractionDigits: 2,
+                })}{" "}
+                บาท
+              </span>
+            </div>
+            <div className="border-t-2 border-primary pt-3 mt-3 flex justify-between font-bold text-lg">
+              <span>จำนวนเงินทั้งสิ้น</span>
+              <span>
+                {summary.total.toLocaleString("th-TH", {
+                  minimumFractionDigits: 2,
+                })}{" "}
+                บาท
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+      </form>
+    </>
   );
 };
 
