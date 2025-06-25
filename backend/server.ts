@@ -2,6 +2,8 @@ import express, { Request, Response } from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import pool from "./db";
+import multer from 'multer';
+import path from 'path';
 
 dotenv.config();
 
@@ -15,6 +17,32 @@ app.use(cors());
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// Multer setup for file uploads
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, 'uploads/')
+  },
+  filename: function (req, file, cb) {
+    cb(null, Date.now() + path.extname(file.originalname)) //Appending extension
+  }
+});
+
+const upload = multer({ storage: storage });
+
+// API route to upload an image
+app.post('/api/upload', upload.single('image'), (req: Request, res: Response) => {
+  if (!req.file) {
+    return res.status(400).send({ message: 'Please upload a file.' });
+  }
+  // Construct the URL of the uploaded file
+  const imageUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+  res.status(200).send({ 
+    message: 'File uploaded successfully.',
+    imageUrl: imageUrl
+  });
+});
 
 // Endpoint to get all customers
 app.get("/api/customers", async (req: Request, res: Response) => {
@@ -197,6 +225,96 @@ app.post("/api/products", async (req: Request, res: Response) => {
         .json({ error: "A product with this SKU already exists." });
     }
     res.status(500).json({ error: "Failed to create product" });
+  } finally {
+    if (conn) conn.release();
+  }
+});
+
+// API route to update an existing product
+app.put("/api/products/:id", async (req: Request, res: Response) => {
+  let conn;
+  const { id } = req.params;
+  try {
+    const {
+      product_type,
+      name,
+      unit,
+      description,
+      feature_img,
+      selling_price,
+      purchase_price,
+      selling_vat_rate,
+      purchase_vat_rate,
+      status,
+      instock,
+      has_barcode,
+      barcode,
+      sales_account,
+      purchase_account,
+      costing_method,
+      calculate_cogs_on_sale,
+      cogs_account,
+    } = req.body;
+
+    if (!name || selling_price === undefined) {
+      return res
+        .status(400)
+        .json({ error: "Product name and selling price are required" });
+    }
+
+    conn = await pool.getConnection();
+
+    await conn.query(
+      `UPDATE products SET 
+        product_type = ?, 
+        name = ?, 
+        unit = ?, 
+        description = ?, 
+        feature_img = ?, 
+        selling_price = ?, 
+        purchase_price = ?, 
+        selling_vat_rate = ?, 
+        purchase_vat_rate = ?, 
+        status = ?, 
+        instock = ?, 
+        has_barcode = ?, 
+        barcode = ?, 
+        sales_account = ?, 
+        purchase_account = ?, 
+        costing_method = ?, 
+        calculate_cogs_on_sale = ?, 
+        cogs_account = ?
+      WHERE id = ?`,
+      [
+        product_type,
+        name,
+        unit,
+        description,
+        feature_img,
+        selling_price,
+        purchase_price,
+        selling_vat_rate,
+        purchase_vat_rate,
+        status,
+        instock,
+        has_barcode,
+        barcode,
+        sales_account,
+        purchase_account,
+        costing_method,
+        calculate_cogs_on_sale,
+        cogs_account,
+        id,
+      ]
+    );
+
+    const [updatedProduct] = await conn.query("SELECT * FROM products WHERE id = ?", [id]);
+
+    res.status(200).json(updatedProduct);
+
+  } catch (err) {
+    console.error(`Failed to update product ${id}:`, err);
+    res.status(500).json({ error: "Failed to update product" });
   } finally {
     if (conn) conn.release();
   }

@@ -1,4 +1,5 @@
 import { Customer } from "@/types/customer";
+import axios from "axios";
 import { Document, DocumentData } from "@/types/document";
 import { Product } from "@/types/product";
 import { ProductFormData } from "@/pages/sub/create/ProductForm";
@@ -176,6 +177,52 @@ const createProduct = async (productData: ProductFormData): Promise<{ success: b
     }
 };
 
+const updateProduct = async (id: string, productData: ProductFormData): Promise<Product> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/products/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(productData),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to update product');
+    }
+
+    // The backend returns the updated product object directly
+    const updatedProduct = await response.json();
+    return updatedProduct;
+
+  } catch (error) {
+    console.error(`Error updating product ${id}:`, error);
+    throw error;
+  }
+};
+
+
+export const uploadImage = async (file: File): Promise<string> => {
+  const formData = new FormData();
+  formData.append("image", file);
+
+  try {
+    const response = await axios.post<{ imageUrl: string }>(
+      `${API_BASE_URL}/upload`,
+      formData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      }
+    );
+    return response.data.imageUrl;
+  } catch (error) {
+    console.error("Image upload failed:", error);
+    throw error;
+  }
+};
 
 export const apiService = {
   getDocuments,
@@ -185,4 +232,6 @@ export const apiService = {
   createCustomer,
   getProducts,
   createProduct,
+  updateProduct,
+  uploadImage,
 };

@@ -112,6 +112,8 @@ export function ProductForm({ onSuccess, onCancel, initialData }: ProductFormPro
   const [newUnitNameTh, setNewUnitNameTh] = useState("");
   const [newUnitNameEn, setNewUnitNameEn] = useState("");
   const [formMode, setFormMode] = useState<'basic' | 'advanced'>('basic');
+  const [imagePreview, setImagePreview] = useState<string | null>(initialData?.feature_img || null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const handleAddNewUnit = () => {
     if (newUnitNameTh.trim() && !unitOptions.includes(newUnitNameTh.trim())) { // Basic check using TH name for now
@@ -226,42 +228,61 @@ export function ProductForm({ onSuccess, onCancel, initialData }: ProductFormPro
     }
   };
 
+  const handleImageChange = (e: ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setSelectedFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
-    const finalFormData = { ...formData };
+    let productData = { ...formData };
+
+    if (selectedFile) {
+      try {
+        const imageUrl = await apiService.uploadImage(selectedFile);
+
+        if (imageUrl) {
+          productData.feature_img = imageUrl;
+        } else {
+          throw new Error("Image upload failed to return a URL.");
+        }
+      } catch (error: any) {
+        console.error("Image upload error:", error);
+        toast.error("เกิดข้อผิดพลาดในการอัปโหลดรูปภาพ", { description: error.message });
+        setIsLoading(false);
+        return; 
+      }
+    }
 
     try {
-      const result = await apiService.createProduct(finalFormData);
-
-      if (result.success && result.product) {
-        toast.success(formData.product_type === 'service' ? (initialData ? "อัปเดตบริการสำเร็จ" : "สร้างบริการสำเร็จ") : (initialData ? "อัปเดตสินค้าสำเร็จ" : "สร้างสินค้าสำเร็จ"));
-        
-        // The backend returns a Product (id: number) but the form expects ProductFormData (id?: string).
-        // We create a new object that conforms to what the form expects.
-        const productForForm = {
-          ...result.product,
-          id: String(result.product.id), // Convert number to string
-        };
-        handleSuccess(productForForm as ProductFormData);
-
+      let newProduct;
+      if (productData.id) {
+        newProduct = await apiService.updateProduct(productData.id, productData);
+        toast.success("อัปเดตข้อมูลสินค้าสำเร็จแล้ว");
       } else {
-        toast.error(
-          result.error ||
-            (formData.product_type === 'service'
-              ? (initialData ? "ไม่สามารถอัปเดตบริการได้" : "ไม่สามารถสร้างบริการได้")
-              : (initialData ? "ไม่สามารถอัปเดตสินค้าได้" : "ไม่สามารถสร้างสินค้าได้"))
-        );
+        newProduct = await apiService.createProduct(productData);
+        toast.success("สร้างสินค้าใหม่สำเร็จแล้ว");
       }
-    } catch (error) {
+      handleSuccess(newProduct);
+    } catch (error: any) {
       console.error("Failed to save product:", error);
-      toast.error("เกิดข้อผิดพลาดในการบันทึกสินค้า");
+      const errorMsg = error.response?.data?.message || "เกิดข้อผิดพลาดบางอย่าง";
+      toast.error("ไม่สามารถบันทึกข้อมูลสินค้าได้", {
+        description: errorMsg,
+      });
     } finally {
       setIsLoading(false);
     }
   };
-
   return (
     <form onSubmit={handleSubmit} className="space-y-8 max-w-4xl mx-auto p-4">
       <div className="flex justify-between items-start mb-6">
@@ -369,22 +390,34 @@ export function ProductForm({ onSuccess, onCancel, initialData }: ProductFormPro
                     </DialogDescription>
                   </DialogHeader>
                   <div className="grid gap-4 py-4">
-                    <div className="grid grid-cols-4 items-center gap-4">
-                      <Label htmlFor="new-unit-code" className="text-right">
-                        รหัสหน่วย
+                    <div className="flex flex-col items-center space-y-2 col-span-1 md:col-span-1">
+                      <Label htmlFor="product-image-upload" className="cursor-pointer w-40">
+                        <div className="w-40 h-40 border-2 border-dashed rounded-lg flex items-center justify-center bg-muted text-muted-foreground hover:border-primary hover:text-primary transition-colors">
+                          {imagePreview ? (
+                            <img
+                              src={imagePreview}
+                              alt={formData.name || "Product image"}
+                              className="w-full h-full object-cover rounded-lg"
+                            />
+                          ) : (
+                            <div className="text-center p-2">
+                              <Plus className="mx-auto h-8 w-8" />
+                              <span className="text-xs">แนบรูปภาพ</span>
+                            </div>
+                          )}
+                        </div>
                       </Label>
                       <Input
-                        id="new-unit-code"
-                        value={newUnitCode} // Display only for now, or connect to state if editable
-                        onChange={(e) => setNewUnitCode(e.target.value)}
-                        placeholder="จะสร้างอัตโนมัติ"
-                        className="col-span-3"
-                        disabled
+                        id="product-image-upload"
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageChange}
+                        className="hidden"
                       />
                     </div>
                     <div className="grid grid-cols-4 items-center gap-4">
                       <Label htmlFor="new-unit-name-th" className="text-right">
-                        {formData.product_type === 'service' ? 'ชื่อหน่วยบริการ (TH)' : 'ชื่อหน่วยนับ (TH)'} <span className="text-red-500">*</span>
+                        {formData.product_type === 'service' ? 'ชื่อหน่วยบริการ (TH)' : 'ชื่อหน่วยนับ (TH)'}
                       </Label>
                       <Input
                         id="new-unit-name-th"
@@ -422,13 +455,38 @@ export function ProductForm({ onSuccess, onCancel, initialData }: ProductFormPro
       </section>
 
       {/* รูปสินค้า */}
-      {formData.product_type === 'product' && <section className="p-6 border rounded-lg space-y-4">
+      {formData.product_type === 'product' && (
+        <section className="p-6 border rounded-lg space-y-4">
           <h3 className="text-lg font-medium">รูปสินค้า</h3>
-          <div className="space-y-2">
-            <Label htmlFor="feature_img">ลิงก์รูปสินค้า</Label>
-            <Input id="feature_img" name="feature_img" value={formData.feature_img} onChange={handleChange} placeholder="https://..." />
+          <div className="flex justify-center">
+            <div className="flex flex-col items-center space-y-2">
+              <Label htmlFor="product-image-upload" className="cursor-pointer">
+                <div className="w-40 h-40 border-2 border-dashed rounded-lg flex items-center justify-center bg-muted text-muted-foreground hover:border-primary hover:text-primary transition-colors">
+                  {imagePreview ? (
+                    <img
+                      src={imagePreview}
+                      alt={formData.name || "Product image"}
+                      className="w-full h-full object-cover rounded-lg"
+                    />
+                  ) : (
+                    <div className="text-center p-2">
+                      <Plus className="mx-auto h-8 w-8" />
+                      <span className="text-xs">แนบรูปภาพ</span>
+                    </div>
+                  )}
+                </div>
+              </Label>
+              <Input
+                id="product-image-upload"
+                type="file"
+                accept="image/*"
+                onChange={handleImageChange}
+                className="hidden"
+              />
+            </div>
           </div>
-      </section>}
+        </section>
+      )}
 
       {/* ข้อมูลราคามาตรฐาน */}
       <section className="p-6 border rounded-lg space-y-6">

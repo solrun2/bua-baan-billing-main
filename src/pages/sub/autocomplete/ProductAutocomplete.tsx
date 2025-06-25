@@ -102,7 +102,7 @@ const ProductAutocomplete = ({
                     }`}
                   >
                     {value && value.id && value.title
-                      ? `${value.id} - ${value.title}`
+                      ? `${value.title}`
                       : placeholder || "เลือกสินค้าหรือบริการ"}
                   </div>
                 </div>
