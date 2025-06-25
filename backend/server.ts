@@ -243,35 +243,50 @@ app.get("/api/documents", async (req: Request, res: Response) => {
   }
 });
 
-// Helper function to generate document number
-const generateDocumentNumber = async (conn: any, type: string, issueDate: string): Promise<string> => {
-    const date = new Date(issueDate);
-    const year = date.getFullYear();
-    let prefix = '';
-    switch (type.toUpperCase()) {
-        case 'QUOTATION': prefix = 'QT'; break;
-        case 'INVOICE': prefix = 'IV'; break;
-        case 'RECEIPT': prefix = 'RE'; break;
-        default: prefix = 'DOC'; break;
-    }
+const generateDocumentNumber = async (
+  conn: any,
+  type: string,
+  issueDate: string
+): Promise<string> => {
+  const date = new Date(issueDate);
+  const year = date.getFullYear();
+  let prefix = "";
+  switch (type.toUpperCase()) {
+    case "QUOTATION":
+      prefix = "QT";
+      break;
+    case "INVOICE":
+      prefix = "IV";
+      break;
+    case "RECEIPT":
+      prefix = "RE";
+      break;
+    default:
+      prefix = "DOC";
+      break;
+  }
 
-    const searchPattern = `${prefix}-${year}-%`;
-    const rows = await conn.query(
-        "SELECT document_number FROM documents WHERE document_number LIKE ? ORDER BY document_number DESC LIMIT 1",
-        [searchPattern]
-    );
+  const searchPattern = `${prefix}-${year}-%`;
+  const rows = await conn.query(
+    "SELECT document_number FROM documents WHERE document_number LIKE ? ORDER BY document_number DESC LIMIT 1",
+    [searchPattern]
+  );
 
-    let nextNumber = 1;
-    if (Array.isArray(rows) && rows.length > 0 && rows[0].document_number) {
-        const lastNumber = rows[0].document_number;
-        const lastRunningPart = lastNumber.split('-').pop();
-        if (lastRunningPart) {
-            nextNumber = parseInt(lastRunningPart, 10) + 1;
-        }
+  let nextNumber = 1;
+  if (Array.isArray(rows) && rows.length > 0 && rows[0].document_number) {
+    const lastNumber = rows[0].document_number;
+    const parts = lastNumber.split("-");
+    if (parts.length >= 3) {
+      const lastRunningPart = parts[2]; // Get the last part after splitting by '-'
+      const lastNumber = parseInt(lastRunningPart, 10);
+      if (!isNaN(lastNumber)) {
+        nextNumber = lastNumber + 1;
+      }
     }
-    
-    const runningNumber = String(nextNumber).padStart(4, '0');
-    return `${prefix}-${year}-${runningNumber}`;
+  }
+
+  const runningNumber = String(nextNumber).padStart(4, "0");
+  return `${prefix}-${year}-${runningNumber}`;
 };
 
 // API route to get the next document number
