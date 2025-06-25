@@ -264,18 +264,22 @@ export function ProductForm({ onSuccess, onCancel, initialData }: ProductFormPro
     }
 
     try {
-      let newProduct;
       if (productData.id) {
-        newProduct = await apiService.updateProduct(productData.id, productData);
+        const updatedProduct = await apiService.updateProduct(productData.id, productData);
         toast.success("อัปเดตข้อมูลสินค้าสำเร็จแล้ว");
+        handleSuccess({ ...updatedProduct, id: updatedProduct.id.toString() } as ProductFormData);
       } else {
-        newProduct = await apiService.createProduct(productData);
-        toast.success("สร้างสินค้าใหม่สำเร็จแล้ว");
+        const result = await apiService.createProduct(productData);
+        if (result.success && result.product) {
+          toast.success("สร้างสินค้าใหม่สำเร็จแล้ว");
+          handleSuccess({ ...result.product, id: result.product.id.toString() } as ProductFormData);
+        } else {
+          throw new Error(result.error || "An unknown error occurred during product creation.");
+        }
       }
-      handleSuccess(newProduct);
     } catch (error: any) {
       console.error("Failed to save product:", error);
-      const errorMsg = error.response?.data?.message || "เกิดข้อผิดพลาดบางอย่าง";
+      const errorMsg = error.response?.data?.message || error.message || "เกิดข้อผิดพลาดบางอย่าง";
       toast.error("ไม่สามารถบันทึกข้อมูลสินค้าได้", {
         description: errorMsg,
       });

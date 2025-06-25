@@ -12,23 +12,46 @@ const getDocuments = async (): Promise<Document[]> => {
     if (!response.ok) {
       throw new Error('Failed to fetch documents');
     }
-    return await response.json();
+    const data = await response.json();
+    if (!Array.isArray(data)) {
+      console.error('API response for documents is not an array:', data);
+      throw new Error('Received invalid data format for documents.');
+    }
+    return data;
   } catch (error) {
     console.error('Error fetching documents:', error);
     throw error;
   }
 };
 
-const createDocument = async (document: DocumentData): Promise<DocumentData> => {
-    const backendData = {
-      customer_id: document.customer.id,
-      document_type: (document as any).documentType,
-      status: document.status,
-      issue_date: document.documentDate,
-      due_date: document.validUntil,
-      notes: document.notes,
-      items: document.items,
+const prepareDocumentData = (document: DocumentData): any => {
+  const baseData = {
+    customer_id: document.customer.id,
+    document_type: document.documentType.toUpperCase(),
+    status: document.status,
+    issue_date: document.documentDate,
+    notes: document.notes,
+    items: document.items,
+    summary: document.summary,
+  };
+
+  if (document.documentType === 'quotation') {
+    return {
+      ...baseData,
+      valid_until: document.validUntil,
     };
+  } else if (document.documentType === 'invoice') {
+    return {
+      ...baseData,
+      due_date: document.dueDate,
+    };
+  }
+  
+  return baseData;
+};
+
+const createDocument = async (document: DocumentData): Promise<DocumentData> => {
+    const backendData = prepareDocumentData(document);
 
     try {
       const response = await fetch(`${API_BASE_URL}/documents`, {

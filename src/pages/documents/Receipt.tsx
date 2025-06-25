@@ -19,9 +19,11 @@ const Receipt = () => {
       try {
         setLoading(true);
         const data = await apiService.getDocuments();
-        const receiptsData = data.filter(
-          (doc) => doc.document_type === "RECEIPT"
-        );
+        const receiptsData = data
+          .filter((doc) => doc.document_type === "RECEIPT")
+          .map((doc) => ({
+            ...doc,
+          }));
         setReceipts(receiptsData);
       } catch (err) {
         setError((err as Error).message);

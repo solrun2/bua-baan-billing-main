@@ -1,12 +1,18 @@
 import { format } from "date-fns";
 import { useState, useEffect, useCallback, useRef, FC } from "react";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Product } from "@/types/product";
-import { Customer } from '@/types/customer';
-import { CustomerAutocomplete } from '@/pages/sub/autocomplete/CustomerAutocomplete';
-import CreateCustomerDialog from './CreateCustomerDialog';
-import { DocumentItem, DocumentSummary, DocumentData, CustomerData } from "@/types/document";
+import { Customer } from "@/types/customer";
+import { CustomerAutocomplete } from "@/pages/sub/autocomplete/CustomerAutocomplete";
+import CreateCustomerDialog from "./CreateCustomerDialog";
+import {
+  DocumentItem,
+  DocumentSummary,
+  DocumentData,
+  CustomerData,
+} from "@/types/document";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -62,7 +68,6 @@ export const DocumentForm: FC<DocumentFormProps> = ({
   const navigate = useNavigate();
 
   const [isProductFormOpen, setIsProductFormOpen] = useState(false);
-  const [isGeneratingNumber, setIsGeneratingNumber] = useState(false);
 
   const [reference, setReference] = useState(initialData.reference);
   const [documentNumber, setDocumentNumber] = useState<string>(
@@ -72,39 +77,6 @@ export const DocumentForm: FC<DocumentFormProps> = ({
     initialData.documentDate || format(new Date(), "yyyy-MM-dd")
   );
 
-  const fetchNextDocumentNumber = useCallback(async () => {
-    // Only generate a new number if one isn't already provided
-    if (initialData.documentNumber) return;
-
-    setIsGeneratingNumber(true);
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 500));
-
-      const date = new Date();
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, "0");
-      const prefix = documentType === "invoice" ? "IV" : "QT";
-
-      // This random part should be replaced by a sequential number from your API
-      const sequence = String(Math.floor(Math.random() * 99999) + 1).padStart(
-        5,
-        "0"
-      );
-
-      const newDocNumber = `${prefix}-${year}-${month}${sequence}`;
-      setDocumentNumber(newDocNumber);
-    } catch (error) {
-      console.error("Failed to fetch document number:", error);
-      setDocumentNumber("เกิดข้อผิดพลาด");
-    } finally {
-      setIsGeneratingNumber(false);
-    }
-  }, [documentType, initialData.documentNumber]);
-
-  useEffect(() => {
-    fetchNextDocumentNumber();
-  }, [fetchNextDocumentNumber]);
-
   const [isTaxInvoice, setIsTaxInvoice] = useState(false);
 
   const [validUntil, setValidUntil] = useState(initialData.validUntil || "");
@@ -112,8 +84,6 @@ export const DocumentForm: FC<DocumentFormProps> = ({
   const [customer, setCustomer] = useState<CustomerData>(initialData.customer);
   const [isCreateCustomerOpen, setCreateCustomerOpen] = useState(false);
   const [customerRefreshKey, setCustomerRefreshKey] = useState(0);
-
-
 
   const [dueDate, setDueDate] = useState(initialData.dueDate || "");
   const [issueTaxInvoice, setIssueTaxInvoice] = useState(
@@ -164,7 +134,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
     setSummary(newSummary);
   }, [items]);
 
-    const handleCustomerSelect = (selectedCustomer: Customer) => {
+  const handleCustomerSelect = (selectedCustomer: Customer) => {
     setCustomer({
       id: selectedCustomer.id,
       name: selectedCustomer.name,
@@ -175,10 +145,10 @@ export const DocumentForm: FC<DocumentFormProps> = ({
     });
   };
 
-    const handleCustomerCreated = (newCustomer: Customer) => {
+  const handleCustomerCreated = (newCustomer: Customer) => {
     handleCustomerSelect(newCustomer);
     setCreateCustomerOpen(false); // Close the dialog
-    setCustomerRefreshKey(prevKey => prevKey + 1); // Trigger refresh
+    setCustomerRefreshKey((prevKey) => prevKey + 1); // Trigger refresh
   };
 
   const handleCustomerChange = (field: keyof CustomerData, value: string) => {
@@ -192,7 +162,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
   const handleReferenceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setReference(e.target.value);
   };
-  
+
   const addNewItem = () => {
     setItems([...items, createDefaultItem()]);
   };
@@ -243,10 +213,11 @@ export const DocumentForm: FC<DocumentFormProps> = ({
         if (item.id === itemId) {
           return {
             ...item,
-            productId: String(product.id),
+            product_id: String(product.id),
             productTitle: product.name,
             description: product.description || "",
             unitPrice: product.selling_price,
+            quantity: 1, // Set default quantity to 1
             unit: product.unit || "",
             isEditing: false,
           };
@@ -262,9 +233,23 @@ export const DocumentForm: FC<DocumentFormProps> = ({
       }
     }
   };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!customer || !customer.id) {
+      toast.error("กรุณาเลือกลูกค้า", {
+        description: "คุณต้องเลือกลูกค้าก่อนทำการบันทึกเอกสาร",
+      });
+      return;
+    }
+
+    if (items.length === 0) {
+      toast.error("ไม่มีรายการสินค้า", {
+        description: "คุณต้องเพิ่มสินค้าอย่างน้อย 1 รายการ",
+      });
+      return;
+    }
+
     const documentData: DocumentData = {
       id: initialData.id,
       customer,
@@ -281,6 +266,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
       tags,
       reference,
       status: "draft",
+      documentType: documentType,
     };
     await onSave(documentData);
   };
@@ -348,9 +334,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                 <Label htmlFor="documentNumber">เลขที่เอกสาร</Label>
                 <Input
                   id="documentNumber"
-                  value={
-                    isGeneratingNumber ? "กำลังสร้างเลขที่..." : documentNumber
-                  }
+                  value={documentNumber || "จะถูกสร้างโดยอัตโนมัติ"}
                   readOnly
                   className="font-mono bg-muted"
                 />
@@ -409,15 +393,19 @@ export const DocumentForm: FC<DocumentFormProps> = ({
             <div className="flex items-end gap-2">
               <div className="flex-grow">
                 <Label>ค้นหาลูกค้า</Label>
-                <CustomerAutocomplete 
+                <CustomerAutocomplete
                   value={customer}
                   onCustomerSelect={handleCustomerSelect}
                 />
               </div>
-              <Button type="button" variant="outline" onClick={() => setCreateCustomerOpen(true)}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setCreateCustomerOpen(true)}
+              >
                 สร้างใหม่
               </Button>
-              <CreateCustomerDialog 
+              <CreateCustomerDialog
                 open={isCreateCustomerOpen}
                 onOpenChange={setCreateCustomerOpen}
                 onCustomerCreated={handleCustomerCreated}
@@ -429,19 +417,25 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                   <Label htmlFor="customer-address">ที่อยู่</Label>
                   <Textarea
                     id="customer-address"
-                    value={customer.address || ''}
-                    onChange={(e) => handleCustomerChange('address', e.target.value)}
+                    value={customer.address || ""}
+                    onChange={(e) =>
+                      handleCustomerChange("address", e.target.value)
+                    }
                     placeholder="ที่อยู่สำหรับออกใบกำกับภาษี"
                     className="h-24"
                   />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="customer-tax-id">เลขประจำตัวผู้เสียภาษี</Label>
+                    <Label htmlFor="customer-tax-id">
+                      เลขประจำตัวผู้เสียภาษี
+                    </Label>
                     <Input
                       id="customer-tax-id"
-                      value={customer.tax_id || ''}
-                      onChange={(e) => handleCustomerChange('tax_id', e.target.value)}
+                      value={customer.tax_id || ""}
+                      onChange={(e) =>
+                        handleCustomerChange("tax_id", e.target.value)
+                      }
                       placeholder="เลข 13 หลัก"
                       readOnly
                     />
@@ -450,8 +444,10 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                     <Label htmlFor="customer-phone">โทรศัพท์</Label>
                     <Input
                       id="customer-phone"
-                      value={customer.phone || ''}
-                      onChange={(e) => handleCustomerChange('phone', e.target.value)}
+                      value={customer.phone || ""}
+                      onChange={(e) =>
+                        handleCustomerChange("phone", e.target.value)
+                      }
                       placeholder="เบอร์โทรศัพท์"
                     />
                   </div>
@@ -461,8 +457,10 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                   <Input
                     id="customer-email"
                     type="email"
-                    value={customer.email || ''}
-                    onChange={(e) => handleCustomerChange('email', e.target.value)}
+                    value={customer.email || ""}
+                    onChange={(e) =>
+                      handleCustomerChange("email", e.target.value)
+                    }
                     placeholder="อีเมลสำหรับส่งเอกสาร"
                   />
                 </div>
