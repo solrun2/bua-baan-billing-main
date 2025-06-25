@@ -1,5 +1,7 @@
 import { Customer } from "@/types/customer";
 import { Document, DocumentData } from "@/types/document";
+import { Product } from "@/types/product";
+import { ProductFormData } from "@/pages/sub/create/ProductForm";
 
 const API_BASE_URL = 'http://localhost:3001/api';
 
@@ -35,7 +37,7 @@ const createDocument = async (document: DocumentData): Promise<DocumentData> => 
       });
       if (!response.ok) {
           const errorData = await response.json();
-          throw new Error(errorData.message || 'Failed to create document');
+          throw new Error(errorData.error || 'Failed to create document');
       }
       return await response.json();
     } catch (error) {
@@ -44,13 +46,22 @@ const createDocument = async (document: DocumentData): Promise<DocumentData> => 
     }
   };
 
-const getCustomers = async (): Promise<Customer[]> => {
+const getCustomers = async (query: string = ''): Promise<Customer[]> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/customers`);
+    const response = await fetch(`${API_BASE_URL}/customers?q=${encodeURIComponent(query)}`);
     if (!response.ok) {
       throw new Error("Failed to fetch customers");
     }
-    return await response.json();
+    // The backend now returns a flat array, so we consume it directly.
+    const customersArray = await response.json();
+
+    // Safety check to ensure we always work with an array.
+    if (!Array.isArray(customersArray)) {
+      console.error('Expected customer data to be an array but got:', customersArray);
+      return [];
+    }
+
+    return customersArray;
   } catch (error) {
     console.error("Error fetching customers:", error);
     throw error;
@@ -75,7 +86,7 @@ const updateDocument = async (id: string, document: DocumentData): Promise<Docum
   }
 };
 
-const createCustomer = async (customer: Omit<Customer, 'id'>): Promise<Customer> => {
+const createCustomer = async (customer: Omit<Customer, 'id'>): Promise<{ customer: Customer, customers: Customer[] }> => {
   try {
     const response = await fetch(`${API_BASE_URL}/customers`, {
       method: 'POST',
@@ -83,17 +94,88 @@ const createCustomer = async (customer: Omit<Customer, 'id'>): Promise<Customer>
       body: JSON.stringify(customer),
     });
 
+    const customers = await response.json();
+
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to create customer');
+      throw new Error(customers.error || 'Failed to create customer');
     }
 
-    return await response.json();
+    if (!Array.isArray(customers) || customers.length === 0) {
+      throw new Error('API did not return the expected customer list.');
+    }
+
+    const newCustomer = customers.reduce((latest, current) => 
+        (latest.id > current.id) ? latest : current
+    );
+
+    return { customer: newCustomer, customers: customers };
   } catch (error) {
     console.error('Error creating customer:', error);
     throw error;
   }
 };
+
+// --- Functions from productService ---
+
+const getProducts = async (query: string = ''): Promise<Product[]> => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/products?q=${encodeURIComponent(query)}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch products');
+      }
+      const productsArray = await response.json();
+
+      if (!Array.isArray(productsArray)) {
+        console.error('Expected product data to be an array but got:', productsArray);
+        return [];
+      }
+
+      return productsArray.map((product: any) => ({
+        ...product,
+        title: product.name,
+        price: product.selling_price, 
+      }));
+    } catch (error) {
+      console.error('Error in getProducts:', error);
+      throw error;
+    }
+};
+
+const createProduct = async (productData: ProductFormData): Promise<{ success: boolean; product?: Product; products?: Product[]; error?: string }> => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/products`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(productData),
+      });
+
+      const products = await response.json();
+
+      if (!response.ok) {
+        throw new Error(products.error || 'Failed to create product');
+      }
+
+      if (!Array.isArray(products) || products.length === 0) {
+        throw new Error('API did not return the expected product list.');
+      }
+
+      const newProduct = products.reduce((latest, current) => 
+        (latest.id > current.id) ? latest : current
+      );
+
+      return { success: true, product: newProduct, products: products };
+
+    } catch (error) {
+      console.error('Error creating product:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'An unknown error occurred',
+      };
+    }
+};
+
 
 export const apiService = {
   getDocuments,
@@ -101,4 +183,6 @@ export const apiService = {
   updateDocument,
   getCustomers,
   createCustomer,
+  getProducts,
+  createProduct,
 };

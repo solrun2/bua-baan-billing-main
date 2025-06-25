@@ -64,8 +64,8 @@ const CreateCustomerDialog: React.FC<CreateCustomerDialogProps> = ({
     setError(null);
     setIsSaving(true);
     try {
-      const createdCustomer = await apiService.createCustomer(newCustomer);
-      onCustomerCreated(createdCustomer);
+      const { customer } = await apiService.createCustomer(newCustomer);
+      onCustomerCreated(customer);
       onOpenChange(false);
       // Reset form
       setNewCustomer({

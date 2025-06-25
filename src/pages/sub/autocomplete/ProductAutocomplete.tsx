@@ -16,7 +16,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Plus, ChevronsUpDown, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { productService } from "../../services/productService";
+import { apiService } from "@/pages/services/apiService";
 import { toast } from "sonner";
 
 interface ProductAutocompleteProps {
@@ -53,9 +53,9 @@ const ProductAutocomplete = ({
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        const response = await productService.searchProducts(searchQuery);
-        console.log("Fetched products:", response);
-        setProducts(response.data);
+        const products = await apiService.getProducts(searchQuery);
+        console.log("Fetched products:", products);
+        setProducts(products);
       } catch (error) {
         console.error("Error fetching products:", error);
         toast.error("ไม่สามารถโหลดรายการสินค้าได้");
@@ -72,14 +72,11 @@ const ProductAutocomplete = ({
     return () => clearTimeout(timeoutId);
   }, [searchQuery, open]);
 
-  // Clear search when dropdown is closed
   useEffect(() => {
-    // When the popover opens, initialize the search query with the current value's title.
-    // This makes the current selection visible in the search box and easy to edit.
     if (open) {
-      setSearchQuery(value?.title || "");
+      setSearchQuery("");
     }
-  }, [open, value]);
+  }, [open]);
 
   return (
     <div className={cn("flex w-full space-x-2", className)}>

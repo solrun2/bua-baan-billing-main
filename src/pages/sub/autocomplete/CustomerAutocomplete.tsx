@@ -1,56 +1,123 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Customer } from '@/types/customer';
 import { apiService } from '@/pages/services/apiService';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { 
+  Command, 
+  CommandEmpty, 
+  CommandGroup, 
+  CommandInput, 
+  CommandItem, 
+  CommandList 
+} from '@/components/ui/command';
+import { 
+  Popover, 
+  PopoverContent, 
+  PopoverTrigger 
+} from '@/components/ui/popover';
+import { Button } from '@/components/ui/button';
+import { ChevronsUpDown, Loader2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface CustomerAutocompleteProps {
-  onCustomerSelect: (customer: Customer) => void;
-  initialData?: Partial<Customer>;
-  refreshKey?: number;
+  value?: Partial<Customer> | null;
+  onCustomerSelect: (customer: Customer | null) => void;
+  placeholder?: string;
+  className?: string;
 }
 
-export const CustomerAutocomplete: React.FC<CustomerAutocompleteProps> = ({ onCustomerSelect, initialData, refreshKey }) => {
+export const CustomerAutocomplete: React.FC<CustomerAutocompleteProps> = ({ 
+  value,
+  onCustomerSelect,
+  placeholder = "ค้นหาหรือเลือกลูกค้า",
+  className 
+}) => {
+  const [open, setOpen] = useState(false);
   const [customers, setCustomers] = useState<Customer[]>([]);
-  const [selectedValue, setSelectedValue] = useState<string | undefined>(
-    initialData?.id?.toString()
-  );
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     const fetchCustomers = async () => {
+      setIsLoading(true);
       try {
-        const data = await apiService.getCustomers();
-        console.log('Fetched customers in frontend:', data); // Debugging line
-        setCustomers(data);
+        const fetchedCustomers = await apiService.getCustomers(searchQuery);
+        setCustomers(fetchedCustomers);
       } catch (error) {
-        console.error('Failed to fetch customers', error);
+        console.error('Error fetching customers:', error);
+        setCustomers([]);
+      } finally {
+        setIsLoading(false);
       }
     };
-    fetchCustomers();
-  }, [refreshKey]);
 
+    const timeoutId = setTimeout(() => {
+      fetchCustomers();
+    }, 300);
 
+    return () => clearTimeout(timeoutId);
+  }, [searchQuery, open]);
 
-  const handleSelect = (value: string) => {
-    const customerId = parseInt(value, 10);
-    const selectedCustomer = customers.find(c => c.id === customerId);
-    if (selectedCustomer) {
-      setSelectedValue(value);
-      onCustomerSelect(selectedCustomer);
+  useEffect(() => {
+    if (open) {
+      setSearchQuery("");
     }
-  };
+  }, [open]);
 
   return (
-    <Select onValueChange={handleSelect} value={selectedValue}>
-      <SelectTrigger className="w-full">
-        <SelectValue placeholder="เลือกลูกค้า" />
-      </SelectTrigger>
-      <SelectContent>
-        {customers.map((customer) => (
-          <SelectItem key={customer.id} value={customer.id.toString()}>
-            {customer.name}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+    <div className={cn("flex w-full", className)}>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            className="w-full justify-between"
+          >
+            <div className="flex-1 flex items-center truncate">
+              {value && value.id && value.name
+                ? value.name
+                : <span className="text-muted-foreground">{placeholder}</span>}
+            </div>
+            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-[300px] p-0" align="start">
+          <Command>
+            <CommandInput
+              placeholder="ค้นหาลูกค้า..."
+              value={searchQuery}
+              onValueChange={setSearchQuery}
+            />
+            <CommandList>
+              <CommandEmpty>
+                {isLoading ? (
+                  <div className="p-4 flex justify-center items-center">
+                     <Loader2 className="h-4 w-4 animate-spin" />
+                  </div>
+                ) : (
+                  <div className="py-6 text-center text-sm">
+                    ไม่พบลูกค้าที่ค้นหา
+                  </div>
+                )}
+              </CommandEmpty>
+              <CommandGroup>
+                {customers.map((customer) => (
+                  <CommandItem
+                    key={customer.id}
+                    value={`${customer.name}_${customer.id}`}
+                    onSelect={() => {
+                      onCustomerSelect(customer);
+                      setOpen(false);
+                    }}
+                  >
+                    {customer.name}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+    </div>
   );
 };

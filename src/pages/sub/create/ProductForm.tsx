@@ -23,9 +23,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { productService } from "@/pages/services/productService";
+import { apiService } from "@/pages/services/apiService";
 import { toast } from "sonner";
-import { generateProductId } from "@/lib/utils";
 import { v4 as uuidv4 } from "uuid";
 
 type ProductType = "product" | "service";
@@ -106,7 +105,6 @@ export function ProductForm({ onSuccess, onCancel, initialData }: ProductFormPro
     ...initialData,
   });
   const [isLoading, setIsLoading] = useState(false);
-  const [generatedSku, setGeneratedSku] = useState("");
   const [unitOptions, setUnitOptions] = useState(["ชิ้น", "อัน", "กล่อง", "โหล", "เมตร", "กิโลกรัม", "ลิตร"]);
   const [isUnitDialogOpen, setIsUnitDialogOpen] = useState(false);
   const [newUnitName, setNewUnitName] = useState(""); // Will be phased out by newUnitNameTh/En
@@ -132,21 +130,7 @@ export function ProductForm({ onSuccess, onCancel, initialData }: ProductFormPro
     }
   };
 
-  useEffect(() => {
-    const initSku = async () => {
-      if (!initialData?.sku) {
-        try {
-          const id = await generateProductId();
-          setGeneratedSku(id);
-          setFormData((prev) => ({ ...prev, sku: id }));
-        } catch (error) {
-          console.error("Error generating product ID:", error);
-          toast.error("ไม่สามารถสร้างรหัสสินค้าได้");
-        }
-      }
-    };
-    initSku();
-  }, [initialData?.sku]);
+
 
   const handleChange = (
     e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -247,21 +231,21 @@ export function ProductForm({ onSuccess, onCancel, initialData }: ProductFormPro
     setIsLoading(true);
 
     const finalFormData = { ...formData };
-    if (!finalFormData.sku && generatedSku) {
-      finalFormData.sku = generatedSku;
-    }
-    if (!finalFormData.sku) {
-      toast.error(`รหัส${formData.product_type === 'service' ? 'บริการ' : 'สินค้า'} (SKU) เป็นสิ่งจำเป็น`);
-      setIsLoading(false);
-      return;
-    }
 
     try {
-      const result = await productService.createProduct({ ...finalFormData, price: finalFormData.selling_price, instock: finalFormData.instock ?? 0 });
+      const result = await apiService.createProduct(finalFormData);
 
-      if (result.success) {
+      if (result.success && result.product) {
         toast.success(formData.product_type === 'service' ? (initialData ? "อัปเดตบริการสำเร็จ" : "สร้างบริการสำเร็จ") : (initialData ? "อัปเดตสินค้าสำเร็จ" : "สร้างสินค้าสำเร็จ"));
-        handleSuccess(result.product || finalFormData);
+        
+        // The backend returns a Product (id: number) but the form expects ProductFormData (id?: string).
+        // We create a new object that conforms to what the form expects.
+        const productForForm = {
+          ...result.product,
+          id: String(result.product.id), // Convert number to string
+        };
+        handleSuccess(productForForm as ProductFormData);
+
       } else {
         toast.error(
           result.error ||
@@ -285,14 +269,13 @@ export function ProductForm({ onSuccess, onCancel, initialData }: ProductFormPro
           {formData.product_type === 'service' ? (initialData ? "แก้ไขบริการ" : "เพิ่มบริการใหม่") : (initialData ? "แก้ไขสินค้า" : "เพิ่มสินค้าใหม่")}
         </h2>
         <div className="space-y-2 w-48">
-          <Label htmlFor="sku">{formData.product_type === 'service' ? 'เลขที่บริการ' : 'เลขที่สินค้า'} *</Label>
+          <Label htmlFor="sku">{formData.product_type === 'service' ? 'เลขที่บริการ' : 'เลขที่สินค้า'}</Label>
           <Input
             id="sku"
             name="sku"
-            value={formData.sku || generatedSku}
-            onChange={handleChange}
-            placeholder="จะสร้างให้โดยอัตโนมัติ"
-            required
+            value={formData.sku || ''}
+            placeholder="จะสร้างโดยอัตโนมัติ"
+            disabled
           />
         </div>
       </div>

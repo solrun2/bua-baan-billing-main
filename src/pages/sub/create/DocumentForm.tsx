@@ -143,7 +143,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
     };
   };
 
-    const [items, setItems] = useState<DocumentItem[]>(() =>
+  const [items, setItems] = useState<DocumentItem[]>(() =>
     initialData.items.length > 0 ? initialData.items : [createDefaultItem()]
   );
 
@@ -203,32 +203,12 @@ export const DocumentForm: FC<DocumentFormProps> = ({
   };
 
   const handlePriceTypeChange = (value: "exclusive" | "inclusive" | "none") => {
+    setPriceType(value);
     const updatedItems = items.map((item) => {
-      const newPriceType = value;
-      const oldPriceType = item.priceType;
-
-      let newUnitPrice = item.unitPrice;
-      const taxRate = (item.tax ?? 0) / 100;
-
-      if (taxRate > 0 && newPriceType !== oldPriceType) {
-        if (oldPriceType === "inclusive" && newPriceType === "exclusive") {
-          // If switching from inclusive to exclusive, the new unit price should be the pre-tax value.
-          newUnitPrice = item.unitPrice / (1 + taxRate);
-        } else if (
-          oldPriceType === "exclusive" &&
-          newPriceType === "inclusive"
-        ) {
-          // If switching from exclusive to inclusive, the new unit price should include the tax.
-          newUnitPrice = item.unitPrice * (1 + taxRate);
-        }
-      }
-
       const newItem = {
         ...item,
-        priceType: newPriceType,
-        unitPrice: newUnitPrice,
+        priceType: value,
       };
-
       return updateItemWithCalculations(newItem);
     });
     setItems(updatedItems);
@@ -264,9 +244,9 @@ export const DocumentForm: FC<DocumentFormProps> = ({
           return {
             ...item,
             productId: String(product.id),
-            productTitle: product.title,
+            productTitle: product.name,
             description: product.description || "",
-            unitPrice: product.price,
+            unitPrice: product.selling_price,
             unit: product.unit || "",
             isEditing: false,
           };
@@ -430,9 +410,8 @@ export const DocumentForm: FC<DocumentFormProps> = ({
               <div className="flex-grow">
                 <Label>ค้นหาลูกค้า</Label>
                 <CustomerAutocomplete 
+                  value={customer}
                   onCustomerSelect={handleCustomerSelect}
-                  initialData={customer}
-                  refreshKey={customerRefreshKey}
                 />
               </div>
               <Button type="button" variant="outline" onClick={() => setCreateCustomerOpen(true)}>
@@ -610,13 +589,9 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                       <Input
                         type="number"
                         value={item.unitPrice}
-                        onChange={(e) =>
-                          handleInputChange(
-                            item.id,
-                            "unitPrice",
-                            parseFloat(e.target.value) || 0
-                          )
-                        }
+                        readOnly
+                        placeholder="0.00"
+                        className="bg-gray-100 dark:bg-gray-800"
                       />
                     </div>
                     <div className="space-y-2">
