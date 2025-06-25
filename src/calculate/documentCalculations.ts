@@ -43,7 +43,7 @@ export const calculateItemAmounts = (item: BaseItem): CalculatedItem => {
   const discountAmount =
     item.discountType === "percentage"
       ? (subtotal * item.discount) / 100
-      : item.discount; // For THB discount, it's a fixed amount, not per unit
+      : item.discount * item.quantity; // For THB discount, it's per unit, so multiply by quantity
 
   // Calculate amount before tax
   const amountBeforeTax = subtotal - discountAmount;
