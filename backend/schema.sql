@@ -60,7 +60,7 @@ CREATE TABLE `documents` (
   `customer_id` INT NOT NULL,
   `document_number` VARCHAR(100) NOT NULL UNIQUE,
   `document_type` ENUM('QUOTATION', 'INVOICE', 'RECEIPT', 'TAX_INVOICE') NOT NULL,
-  `status` VARCHAR(50) NOT NULL DEFAULT 'ร่าง',
+  `status` ENUM('DRAFT', 'SENT', 'ACCEPTED', 'PAID', 'CANCELLED') NOT NULL,
   `issue_date` DATE NOT NULL,
   `subtotal` DECIMAL(15, 2) NOT NULL DEFAULT 0.00,
   `tax_amount` DECIMAL(15, 2) NOT NULL DEFAULT 0.00,
