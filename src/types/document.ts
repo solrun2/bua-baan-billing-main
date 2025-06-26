@@ -37,6 +37,14 @@ export interface CustomerData {
 
 export type DocumentType = "quotation" | "invoice" | "receipt" | "tax_invoice";
 
+export type DocumentStatus =
+  | 'รอตอบรับ'
+  | 'ตอบรับแล้ว'
+  | 'พ้นกำหนด'
+  | 'รอชำระ'
+  | 'ชำระแล้ว'
+  | 'ยกเลิก';
+
 export interface DocumentData {
   id?: string;
   documentType?: DocumentType;

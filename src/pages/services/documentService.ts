@@ -27,7 +27,7 @@ if (typeof window !== "undefined" && !localStorage.getItem(STORAGE_KEY)) {
       customer: { name: "บริษัท ABC จำกัด", tax_id: "", phone: "", address: "" },
       items: [],
       summary: { subtotal: 50000, discount: 0, tax: 3500, total: 53500, withholdingTax: 0 },
-      status: "ร่าง",
+      status: "รอตอบรับ",
       documentDate: new Date().toISOString().split('T')[0],
       dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       reference: "",

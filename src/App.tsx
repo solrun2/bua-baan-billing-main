@@ -120,7 +120,7 @@ const App = () => {
         total: 0,
         withholdingTax: 0,
       },
-      status: "ร่าง",
+      status: "รอตอบรับ",
       documentDate: new Date().toISOString().split("T")[0],
       dueDate: "",
       reference: "",

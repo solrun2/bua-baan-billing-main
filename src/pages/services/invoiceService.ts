@@ -108,7 +108,7 @@ export const getInvoice = async (id: string): Promise<DocumentData | null> => {
           withholdingTax: 0
         },
         notes: '', // Notes not available in the Document type
-        status: doc.status || 'ร่าง'
+        status: doc.status || 'รอชำระ'
       };
       
       // Save to local storage for offline access
@@ -153,7 +153,7 @@ export const getInvoices = async (): Promise<DocumentData[]> => {
           documentDate: doc.issue_date,
           priceType: 'inclusive',
           reference: '',
-          status: doc.status || 'ร่าง',
+          status: doc.status || 'รอชำระ',
           validUntil: doc.due_date || ''
         };
         return documentData;

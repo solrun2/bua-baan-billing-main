@@ -48,7 +48,7 @@ const InvoiceForm = ({
     documentDate: new Date().toISOString().split('T')[0],
     dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     reference: "",
-    status: "draft",
+    status: "รอชำระ",
     priceType: 'exclusive',
   });
   
@@ -69,7 +69,7 @@ const InvoiceForm = ({
             const documentData: EnsureDocumentType<DocumentData> = {
               ...doc,
               documentType: 'invoice',
-              status: doc.status || 'ร่าง',
+              status: doc.status || 'รอชำระ',
               priceType: doc.priceType || 'exclusive',
               customer: doc.customer || { name: "", tax_id: "", phone: "", address: "" },
               items: doc.items || [],
@@ -98,7 +98,7 @@ const InvoiceForm = ({
           setInitialData({
             ...externalInitialData,
             documentType: 'invoice',
-            status: externalInitialData.status || 'ร่าง',
+            status: externalInitialData.status || 'รอชำระ',
             priceType: externalInitialData.priceType || 'exclusive',
           });
         } else {
@@ -108,7 +108,7 @@ const InvoiceForm = ({
             ...prev,
             documentNumber: newNumber,
             documentType: 'invoice',
-            status: 'ร่าง',
+            status: 'รอชำระ',
             priceType: 'exclusive',
           }));
         }
@@ -143,7 +143,7 @@ const InvoiceForm = ({
         documentType: 'invoice',
         updatedAt: new Date().toISOString(),
         // Ensure required fields are set
-        status: data.status || 'ร่าง',
+        status: data.status || 'รอชำระ',
         priceType: data.priceType || 'exclusive',
         customer: data.customer || { name: "", tax_id: "", phone: "", address: "" },
         items: data.items || [],
@@ -212,7 +212,7 @@ const InvoiceForm = ({
         documentType="invoice"
         onCancel={handleCancel}
         onSave={handleSave}
-        initialData={initialData}
+        initialData={{ ...initialData, status: "รอชำระ" }}
         isLoading={isLoading || externalIsLoading}
       />
     </div>

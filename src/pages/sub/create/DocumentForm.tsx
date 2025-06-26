@@ -84,7 +84,9 @@ export const DocumentForm: FC<DocumentFormProps> = ({
     if (!initialData.id && !documentNumber) {
       try {
         // Get existing documents from localStorage
-        const storedDocs = JSON.parse(localStorage.getItem('documents') || '[]');
+        const storedDocs = JSON.parse(
+          localStorage.getItem("documents") || "[]"
+        );
         const existingNumbers = storedDocs
           .filter((doc: DocumentData) => doc.documentType === documentType)
           .map((doc: DocumentData) => doc.documentNumber);
@@ -95,9 +97,14 @@ export const DocumentForm: FC<DocumentFormProps> = ({
       } catch (error) {
         console.error("Error generating document number:", error);
         // Fallback to simple number if error
-        const prefix = documentType === 'quotation' ? 'QT' : 
-                      documentType === 'invoice' ? 'IV' :
-                      documentType === 'receipt' ? 'RC' : 'TAX';
+        const prefix =
+          documentType === "quotation"
+            ? "QT"
+            : documentType === "invoice"
+              ? "IV"
+              : documentType === "receipt"
+                ? "RC"
+                : "TAX";
         setDocumentNumber(`${prefix}-${new Date().getFullYear()}-0001`);
       }
     }
@@ -109,12 +116,17 @@ export const DocumentForm: FC<DocumentFormProps> = ({
       // Only for new documents
       const handleStorageChange = () => {
         try {
-          const storedDocs = JSON.parse(localStorage.getItem('documents') || '[]');
+          const storedDocs = JSON.parse(
+            localStorage.getItem("documents") || "[]"
+          );
           const existingNumbers = storedDocs
             .filter((doc: DocumentData) => doc.documentType === documentType)
             .map((doc: DocumentData) => doc.documentNumber);
 
-          const newNumber = generateDocumentNumber(documentType, existingNumbers);
+          const newNumber = generateDocumentNumber(
+            documentType,
+            existingNumbers
+          );
           if (newNumber && newNumber !== documentNumber) {
             setDocumentNumber(newNumber);
           }
@@ -139,12 +151,8 @@ export const DocumentForm: FC<DocumentFormProps> = ({
   const [documentDate, setDocumentDate] = useState(
     initialData.documentDate || new Date().toISOString().split("T")[0]
   );
-  const [dueDate, setDueDate] = useState(
-    initialData.dueDate || ""
-  );
-  const [validUntil, setValidUntil] = useState(
-    initialData.validUntil || ""
-  );
+  const [dueDate, setDueDate] = useState(initialData.dueDate || "");
+  const [validUntil, setValidUntil] = useState(initialData.validUntil || "");
 
   const [isTaxInvoice, setIsTaxInvoice] = useState(false);
 
@@ -325,15 +333,17 @@ export const DocumentForm: FC<DocumentFormProps> = ({
       documentType: documentType,
       documentNumber: documentNumber,
       documentDate: documentDate,
-      dueDate: documentType === 'invoice' ? dueDate : undefined,
-      validUntil: documentType === 'quotation' ? validUntil : undefined,
+      dueDate: documentType === "invoice" ? dueDate : undefined,
+      validUntil: documentType === "quotation" ? validUntil : undefined,
       reference: reference,
       customer: customer,
       items: items,
       summary: summary,
       notes: notes,
       priceType: priceType,
-      status: initialData.status || "ร่าง",
+      status:
+        initialData.status ||
+        (documentType === "invoice" ? "รอชำระ" : "รอตอบรับ"),
       attachments: attachments,
     };
     try {
@@ -388,9 +398,6 @@ export const DocumentForm: FC<DocumentFormProps> = ({
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" type="button">
-              บันทึกเป็นแบบร่าง
-            </Button>
             <Button type="submit" disabled={isLoading || isSaving}>
               {isLoading || isSaving ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />

@@ -49,7 +49,7 @@ const QuotationForm = ({
     validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     reference: "",
-    status: "draft",
+    status: "รอตอบรับ",
     priceType: 'exclusive',
   });
   
@@ -70,7 +70,7 @@ const QuotationForm = ({
             const documentData: EnsureDocumentType<DocumentData> = {
               ...doc,
               documentType: 'quotation',
-              status: doc.status || 'ร่าง',
+              status: doc.status || 'รอตอบรับ',
               priceType: doc.priceType || 'exclusive',
               customer: doc.customer || { name: "", tax_id: "", phone: "", address: "" },
               items: doc.items || [],
@@ -98,7 +98,7 @@ const QuotationForm = ({
           setInitialData({
             ...externalInitialData,
             documentType: 'quotation',
-            status: externalInitialData.status || 'ร่าง',
+            status: externalInitialData.status || 'รอตอบรับ',
             priceType: externalInitialData.priceType || 'exclusive',
           });
         } else {
@@ -108,7 +108,7 @@ const QuotationForm = ({
             ...prev,
             documentNumber: newNumber,
             documentType: 'quotation',
-            status: 'ร่าง',
+            status: 'รอตอบรับ',
             priceType: 'exclusive',
           }));
         }
@@ -143,7 +143,7 @@ const QuotationForm = ({
         documentType: 'quotation',
         updatedAt: new Date().toISOString(),
         // Ensure required fields are set
-        status: data.status || 'ร่าง',
+        status: data.status || 'รอตอบรับ',
         priceType: data.priceType || 'exclusive',
         customer: data.customer || { name: "", tax_id: "", phone: "", address: "" },
         items: data.items || [],

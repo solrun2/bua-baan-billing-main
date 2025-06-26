@@ -45,7 +45,7 @@ const Invoice = () => {
       case 'ชำระเงินแล้ว': return 'bg-green-100 text-green-700';
       case 'ส่งแล้ว': return 'bg-blue-100 text-blue-700';
       case 'เกินกำหนด': return 'bg-red-100 text-red-700';
-      case 'ร่าง': return 'bg-gray-100 text-gray-700';
+      case 'รอชำระ': return 'bg-gray-100 text-gray-700';
       default: return 'bg-gray-100 text-gray-700';
     }
   };
