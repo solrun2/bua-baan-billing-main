@@ -16,7 +16,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Plus, ChevronsUpDown, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { apiService } from "@/pages/services/apiService";
+import { listAllProducts } from "@/pages/services/productService";
 import { toast } from "sonner";
 
 interface ProductAutocompleteProps {
@@ -53,8 +53,7 @@ const ProductAutocomplete = ({
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        const products = await apiService.getProducts(searchQuery);
-        console.log("Fetched products:", products);
+        const products = await listAllProducts();
         setProducts(products);
       } catch (error) {
         console.error("Error fetching products:", error);
@@ -158,12 +157,12 @@ const ProductAutocomplete = ({
                   >
                     <div className="flex flex-col">
                       <span className="text-gray-900 dark:text-white">
-                        {product.title}
+                        {product.title || product.name}
                       </span>
                       {(product.sku ||
                         products.some(
                           (p) =>
-                            p.title === product.title && p.id !== product.id
+                            (p.title || p.name) === (product.title || product.name) && p.id !== product.id
                         )) && (
                         <span className="text-xs text-gray-500 dark:text-gray-400">
                           {product.sku
@@ -173,7 +172,7 @@ const ProductAutocomplete = ({
                       )}
                     </div>
                     <span className="ml-2 font-medium text-gray-900 dark:text-white whitespace-nowrap">
-                      ฿{product.price?.toLocaleString() || "0"}
+                      ฿{(product.price ?? product.selling_price ?? 0).toLocaleString()}
                     </span>
                   </CommandItem>
                 ))}

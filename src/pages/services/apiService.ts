@@ -179,105 +179,6 @@ const createCustomer = async (
   }
 };
 
-// --- Functions from productService ---
-
-const getProducts = async (query: string = ""): Promise<Product[]> => {
-  try {
-    const response = await fetch(
-      `${API_BASE_URL}/products?q=${encodeURIComponent(query)}`
-    );
-    if (!response.ok) {
-      throw new Error("Failed to fetch products");
-    }
-    const productsArray = await response.json();
-
-    if (!Array.isArray(productsArray)) {
-      console.error(
-        "Expected product data to be an array but got:",
-        productsArray
-      );
-      return [];
-    }
-
-    return productsArray.map((product: any) => ({
-      ...product,
-      title: product.name,
-      price: product.selling_price,
-    }));
-  } catch (error) {
-    console.error("Error in getProducts:", error);
-    throw error;
-  }
-};
-
-const createProduct = async (
-  productData: ProductFormData
-): Promise<{
-  success: boolean;
-  product?: Product;
-  products?: Product[];
-  error?: string;
-}> => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/products`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(productData),
-    });
-
-    const products = await response.json();
-
-    if (!response.ok) {
-      throw new Error(products.error || "Failed to create product");
-    }
-
-    if (!Array.isArray(products) || products.length === 0) {
-      throw new Error("API did not return the expected product list.");
-    }
-
-    const newProduct = products.reduce((latest, current) =>
-      latest.id > current.id ? latest : current
-    );
-
-    return { success: true, product: newProduct, products: products };
-  } catch (error) {
-    console.error("Error creating product:", error);
-    return {
-      success: false,
-      error:
-        error instanceof Error ? error.message : "An unknown error occurred",
-    };
-  }
-};
-
-const updateProduct = async (
-  id: string,
-  productData: ProductFormData
-): Promise<Product> => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/products/${id}`, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(productData),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || "Failed to update product");
-    }
-
-    // The backend returns the updated product object directly
-    const updatedProduct = await response.json();
-    return updatedProduct;
-  } catch (error) {
-    console.error(`Error updating product ${id}:`, error);
-    throw error;
-  }
-};
 
 export const uploadImage = async (file: File): Promise<string> => {
   const formData = new FormData();
@@ -366,8 +267,6 @@ export const apiService = {
   getDocumentNumbers,
   getCustomers,
   createCustomer,
-  getProducts,
-  createProduct,
-  updateProduct,
+  // getProducts, createProduct, updateProduct are now in productService.ts
   uploadImage,
 };

@@ -26,6 +26,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { apiService } from "@/pages/services/apiService";
 import { toast } from "sonner";
 import { v4 as uuidv4 } from "uuid";
+import { updateProduct as ketshopUpdateProduct, createProduct } from "@/pages/services/productService";
 
 type ProductType = "product" | "service";
 type CostingMethod = "FIFO" | "LIFO" | "Average" | "Specific";
@@ -265,11 +266,11 @@ export function ProductForm({ onSuccess, onCancel, initialData }: ProductFormPro
 
     try {
       if (productData.id) {
-        const updatedProduct = await apiService.updateProduct(productData.id, productData);
+        const updatedProduct = await ketshopUpdateProduct(productData);
         toast.success("อัปเดตข้อมูลสินค้าสำเร็จแล้ว");
         handleSuccess({ ...updatedProduct, id: updatedProduct.id.toString() } as ProductFormData);
       } else {
-        const result = await apiService.createProduct(productData);
+        const result = await createProduct(productData);
         if (result.success && result.product) {
           toast.success("สร้างสินค้าใหม่สำเร็จแล้ว");
           handleSuccess({ ...result.product, id: result.product.id.toString() } as ProductFormData);
