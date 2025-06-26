@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
+import { generateClientDocumentNumber } from "@/utils/documentUtils";
 import { DocumentData } from "@/types/document";
 import { DocumentForm } from "../create/DocumentForm";
 import { quotationService } from "@/pages/services/quotationService";
@@ -33,9 +34,7 @@ const QuotationForm = ({
       return externalInitialData;
     }
     const generateQuotationNumber = () =>
-      `QT-${new Date().getFullYear()}-${String(
-        Math.floor(1000 + Math.random() * 9000)
-      )}`;
+      generateClientDocumentNumber('quotation');
     return {
       documentNumber: generateQuotationNumber(),
       customer: { name: "", tax_id: "", phone: "", address: "" },

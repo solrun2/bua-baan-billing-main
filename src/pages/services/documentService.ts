@@ -1,4 +1,5 @@
 import { DocumentData } from "@/types/document";
+import { generateDocumentNumber } from "@/utils/documentUtils";
 
 const STORAGE_KEY = "documents";
 
@@ -75,21 +76,10 @@ export const documentService = {
     return data;
   },
 
-  generateNewDocumentNumber: (type: 'quotation' | 'invoice' | 'receipt' | 'tax_invoice'): string => {
-    const documents = getDocuments();
-    const prefixMap = {
-        quotation: 'QT',
-        invoice: 'IV',
-        receipt: 'RE',
-        tax_invoice: 'TI',
-    };
-    const prefix = prefixMap[type];
-    const year = new Date().getFullYear();
-    const month = String(new Date().getMonth() + 1).padStart(2, '0');
-
-    const relevantDocs = documents.filter(d => d.documentNumber.startsWith(`${prefix}-${year}`)).length + 1;
-    const sequence = String(relevantDocs).padStart(4, '0');
-
-    return `${prefix}-${year}-${sequence}`;
+  // Generate a new document number based on type
+  generateNewDocumentNumber(type: 'quotation' | 'invoice' | 'receipt' | 'tax_invoice'): string {
+    const documents = this.getAll();
+    const existingNumbers = documents.map(doc => doc.documentNumber);
+    return generateDocumentNumber(type, existingNumbers);
   }
 };
