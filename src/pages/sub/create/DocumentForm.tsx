@@ -67,6 +67,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
   documentType,
   isLoading,
 }: DocumentFormProps) => {
+  const [isSaving, setIsSaving] = useState(false);
   const navigate = useNavigate();
 
   const [isProductFormOpen, setIsProductFormOpen] = useState(false);
@@ -301,6 +302,9 @@ export const DocumentForm: FC<DocumentFormProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSaving) return; // Prevent double submission
+
+    setIsSaving(true);
 
     if (!customer || !customer.id) {
       toast.error("กรุณาเลือกลูกค้า", {
@@ -332,7 +336,14 @@ export const DocumentForm: FC<DocumentFormProps> = ({
       status: initialData.status || "ร่าง",
       attachments: attachments,
     };
-    await onSave(dataToSave);
+    try {
+      await onSave(dataToSave);
+    } catch (error) {
+      console.error("Error saving document:", error);
+      toast.error("เกิดข้อผิดพลาดในการบันทึกเอกสาร");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -380,8 +391,8 @@ export const DocumentForm: FC<DocumentFormProps> = ({
             <Button variant="outline" type="button">
               บันทึกเป็นแบบร่าง
             </Button>
-            <Button type="submit" disabled={isLoading}>
-              {isLoading ? (
+            <Button type="submit" disabled={isLoading || isSaving}>
+              {isLoading || isSaving ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
                 <Save className="mr-2 h-4 w-4" />

@@ -65,6 +65,7 @@ export interface Document {
   customer_phone?: string;
   issue_date: string;
   due_date?: string;
+  valid_until?: string;
   total_amount: number;
   status: string;
   document_type: "QUOTATION" | "INVOICE" | "RECEIPT";

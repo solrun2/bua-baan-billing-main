@@ -54,6 +54,11 @@ if (typeof window !== "undefined" && !localStorage.getItem(STORAGE_KEY)) {
 
 // Public service object
 export const documentService = {
+  clearAll: () => {
+    localStorage.removeItem('documents');
+    // We might need to reload to reflect the changes in the UI
+    window.location.reload();
+  },
   getAll: (): DocumentData[] => {
     return getDocuments();
   },

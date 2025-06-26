@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { FileText, Plus, Search, Filter, AlertTriangle, Loader2 } from "lucide-react";
 import { apiService } from '@/pages/services/apiService';
+import { toast } from 'sonner';
 
 const Quotation = () => {
   const navigate = useNavigate();
@@ -28,6 +29,7 @@ const Quotation = () => {
             number: doc.document_number,
             customer: doc.customer_name,
             date: new Date(doc.issue_date).toLocaleDateString('th-TH'),
+            validUntil: doc.valid_until ? new Date(doc.valid_until).toLocaleDateString('th-TH') : '-',
             total: new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(doc.total_amount),
             status: doc.status,
           }));
@@ -50,6 +52,28 @@ const Quotation = () => {
       case 'ปฏิเสธ': return 'bg-red-100 text-red-700';
       case 'หมดอายุ': return 'bg-yellow-100 text-yellow-700';
       default: return 'bg-gray-200 text-gray-800';
+    }
+  };
+
+  const handleViewClick = (quotation: any) => {
+    navigate(`/quotations/edit/${quotation.id}`);
+  };
+
+  const handleEditClick = (id: any) => {
+    navigate(`/quotations/edit/${id}`);
+  };
+
+  const handleDeleteClick = async (id: any) => {
+    if (window.confirm("Are you sure you want to delete this quotation?")) {
+      try {
+        await apiService.deleteDocument(id.toString());
+        setQuotations(prevQuotations => prevQuotations.filter(q => q.id !== id));
+        toast.success('ลบใบเสนอราคาเรียบร้อยแล้ว');
+      } catch (error) {
+        console.error("Failed to delete quotation:", error);
+        toast.error('เกิดข้อผิดพลาดในการลบใบเสนอราคา');
+        setError((error as Error).message);
+      }
     }
   };
 
@@ -115,6 +139,7 @@ const Quotation = () => {
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground">เลขที่</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground">ลูกค้า</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground">วันที่</th>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">ยืนราคาถึงวันที่</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground">จำนวนเงิน</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground">สถานะ</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground">การดำเนินการ</th>
@@ -126,6 +151,7 @@ const Quotation = () => {
                       <td className="py-3 px-4 font-medium text-foreground">{quotation.number}</td>
                       <td className="py-3 px-4 text-foreground">{quotation.customer}</td>
                       <td className="py-3 px-4 text-muted-foreground">{quotation.date}</td>
+                      <td className="py-3 px-4 text-muted-foreground">{quotation.validUntil}</td>
                       <td className="py-3 px-4 font-medium text-foreground">{quotation.total}</td>
                       <td className="py-3 px-4">
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(quotation.status)}`}>
@@ -134,8 +160,27 @@ const Quotation = () => {
                       </td>
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-2">
-                          <Button variant="outline" size="sm">ดู</Button>
-                          <Button variant="outline" size="sm">แก้ไข</Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleViewClick(quotation)}
+                          >
+                            ดู
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEditClick(quotation.id)}
+                          >
+                            แก้ไข
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => handleDeleteClick(quotation.id)}
+                          >
+                            ลบ
+                          </Button>
                         </div>
                       </td>
                     </tr>

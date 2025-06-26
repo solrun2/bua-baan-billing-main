@@ -55,10 +55,11 @@ const App = () => {
 
   const handleSaveInvoice = async (data: DocumentData) => {
     try {
-      // Save to the database
-      const savedInvoice = await apiService.createDocument(data);
-      
-      // Also save to localStorage for offline access
+      // The invoice is already saved by InvoiceForm's service.
+      // This function handles post-save actions like creating receipts and updating app state.
+      const savedInvoice = data;
+
+      // Sync with localStorage to be safe and update the main app state
       documentService.save(savedInvoice);
       
       // If the invoice is marked as paid, create a receipt
@@ -92,10 +93,10 @@ const App = () => {
       
       return savedInvoice;
     } catch (error) {
-      console.error("Error saving invoice:", error);
+      console.error("Error in post-save hook:", error);
       toast({
         title: "เกิดข้อผิดพลาด",
-        description: "ไม่สามารถบันทึกใบแจ้งหนี้ได้ กรุณาลองใหม่อีกครั้ง",
+        description: "เกิดข้อผิดพลาดหลังการบันทึกใบแจ้งหนี้",
         variant: "destructive",
       });
       throw error; // Re-throw to allow the form to handle the error

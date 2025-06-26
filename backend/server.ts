@@ -389,6 +389,35 @@ app.post("/api/documents", async (req: Request, res: Response) => {
   }
 });
 
+// API route to delete a document
+app.delete("/api/documents/:id", async (req: Request, res: Response) => {
+  let conn;
+  const { id } = req.params;
+  try {
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
+
+    // The database schema is set up with ON DELETE CASCADE,
+    // so this single delete is sufficient.
+    const deleteResult = await conn.query("DELETE FROM documents WHERE id = ?", [id]);
+
+    if (deleteResult.affectedRows === 0) {
+      await conn.rollback();
+      return res.status(404).json({ error: "Document not found." });
+    }
+
+    await conn.commit();
+    res.status(200).json({ message: "Document deleted successfully." });
+
+  } catch (err) {
+    if (conn) await conn.rollback();
+    console.error(`Failed to delete document ${id}:`, err);
+    res.status(500).json({ error: "Failed to delete document" });
+  } finally {
+    if (conn) conn.release();
+  }
+});
+
 app.listen(port, () => {
   console.log(`Backend server is running on http://localhost:${port}`);
 });

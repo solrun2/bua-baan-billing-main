@@ -4,6 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Receipt, Plus, Search, Filter, AlertTriangle, Loader2 } from "lucide-react";
 import { apiService } from "@/pages/services/apiService";
+import { documentService } from "@/pages/services/documentService";
+import { toast } from 'sonner';
 
 const Invoice = () => {
   const navigate = useNavigate();
@@ -48,6 +50,29 @@ const Invoice = () => {
     }
   };
 
+  const handleViewClick = (invoice: any) => {
+    // This can be changed to navigate to a dedicated view page if one is created
+    navigate(`/invoices/edit/${invoice.id}`);
+  };
+
+  const handleEditClick = (invoice: any) => {
+    navigate(`/invoices/edit/${invoice.id}`);
+  };
+
+  const handleDeleteClick = async (id: number) => {
+    if (window.confirm("Are you sure you want to delete this invoice?")) {
+      try {
+        await apiService.deleteDocument(id.toString());
+        setInvoices(prevInvoices => prevInvoices.filter(invoice => invoice.id !== id));
+        toast.success('ลบใบแจ้งหนี้เรียบร้อยแล้ว');
+      } catch (error) {
+        console.error("Failed to delete invoice:", error);
+        toast.error('เกิดข้อผิดพลาดในการลบใบแจ้งหนี้');
+        setError((error as Error).message);
+      }
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -86,6 +111,7 @@ const Invoice = () => {
           <Filter className="w-4 h-4" />
           กรองข้อมูล
         </Button>
+
       </div>
 
       {/* Content */}
@@ -138,11 +164,26 @@ const Invoice = () => {
                       </td>
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-2">
-                          <Button variant="outline" size="sm" onClick={() => navigate(`/invoice/edit/${invoice.id}`)}>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleViewClick(invoice)}
+                          >
                             ดู
                           </Button>
-                          <Button variant="outline" size="sm" onClick={() => navigate(`/invoice/edit/${invoice.id}`)}>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEditClick(invoice)}
+                          >
                             แก้ไข
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => handleDeleteClick(invoice.id)}
+                          >
+                            ลบ
                           </Button>
                         </div>
                       </td>

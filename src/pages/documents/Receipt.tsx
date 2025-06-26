@@ -5,6 +5,7 @@ import { CreditCard, Search, Filter, AlertTriangle, Loader2 } from "lucide-react
 import { apiService } from "@/pages/services/apiService";
 import type { Document } from "@/types/document";
 import ReceiptDetailsModal from "@/pages/documents/ReceiptDetailsModal";
+import { toast } from 'sonner';
 
 const Receipt = () => {
   const [receipts, setReceipts] = useState<Document[]>([]);
@@ -38,6 +39,20 @@ const Receipt = () => {
   const handleViewClick = (receipt: Document) => {
     setSelectedReceipt(receipt);
     setIsModalOpen(true);
+  };
+
+  const handleDeleteClick = async (id: number) => {
+    if (window.confirm("Are you sure you want to delete this receipt?")) {
+      try {
+        await apiService.deleteDocument(id.toString());
+        setReceipts(prevReceipts => prevReceipts.filter(receipt => receipt.id !== id));
+        toast.success('ลบใบเสร็จรับเงินเรียบร้อยแล้ว');
+      } catch (error) {
+        console.error("Failed to delete receipt:", error);
+        toast.error('เกิดข้อผิดพลาดในการลบใบเสร็จรับเงิน');
+        setError((error as Error).message);
+      }
+    }
   };
 
   const mapApiStatusToModalStatus = (
@@ -218,6 +233,13 @@ const Receipt = () => {
                             onClick={() => handleViewClick(receipt)}
                           >
                             ดู
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => handleDeleteClick(receipt.id)}
+                          >
+                            ลบ
                           </Button>
                         </div>
                       </td>
