@@ -44,10 +44,13 @@ const Receipt = () => {
     status: string
   ): "รอชำระเงิน" | "ชำระเงินแล้ว" | "ยกเลิก" | "คืนเงิน" | "รอตรวจสอบ" => {
     switch (status) {
+      case "ชำระเงินแล้ว":
       case "PAID":
         return "ชำระเงินแล้ว";
+      case "ยกเลิก":
       case "CANCELLED":
         return "ยกเลิก";
+      case "คืนเงิน":
       case "REFUNDED":
         return "คืนเงิน";
       default:
@@ -82,10 +85,13 @@ const Receipt = () => {
 
   const getStatusBadge = (status: string) => {
     switch (status) {
+      case "ชำระเงินแล้ว":
       case "PAID":
         return "bg-green-100 text-green-700";
+      case "ยกเลิก":
       case "CANCELLED":
         return "bg-red-100 text-red-700";
+      case "คืนเงิน":
       case "REFUNDED":
         return "bg-yellow-100 text-yellow-700";
       default:

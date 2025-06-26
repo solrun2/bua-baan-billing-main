@@ -5,12 +5,12 @@ export interface DocumentItem {
   unit: string;
   quantity: number;
   unitPrice: number;
-  priceType: 'inclusive' | 'exclusive' | 'none';
+  priceType: "inclusive" | "exclusive" | "none";
   discount: number;
-  discountType: 'thb' | 'percentage';
+  discountType: "thb" | "percentage";
   tax: number;
   amountBeforeTax: number;
-  withholdingTax: number | 'custom';
+  withholdingTax: number | "custom";
   customWithholdingTaxAmount?: number;
   amount: number;
   isEditing: boolean;
@@ -35,9 +35,11 @@ export interface CustomerData {
   email?: string;
 }
 
+export type DocumentType = "quotation" | "invoice" | "receipt" | "tax_invoice";
+
 export interface DocumentData {
   id?: string;
-  documentType?: 'quotation' | 'invoice' | 'receipt' | 'tax_invoice';
+  documentType?: DocumentType;
   customer: CustomerData;
   items: DocumentItem[];
   summary: DocumentSummary;
@@ -49,12 +51,10 @@ export interface DocumentData {
   dueDate?: string; // Optional, for invoices
   reference: string;
   status: string;
-
-  // Invoice specific fields
-  issueTaxInvoice?: boolean;
-  priceType?: "inclusive" | "exclusive" | "none";
-  deposit?: number;
+  priceType: 'inclusive' | 'exclusive' | 'none';
+  updatedAt?: string;
   tags?: string[];
+  issueTaxInvoice?: boolean;
 }
 
 export interface Document {
@@ -67,7 +67,7 @@ export interface Document {
   due_date?: string;
   total_amount: number;
   status: string;
-  document_type: 'QUOTATION' | 'INVOICE' | 'RECEIPT';
+  document_type: "QUOTATION" | "INVOICE" | "RECEIPT";
   items?: DocumentItem[];
   payment_method?: string;
   shipping_cost?: number;

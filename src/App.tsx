@@ -3,7 +3,13 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, useParams, useNavigate } from "react-router-dom";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  useParams,
+  useNavigate,
+} from "react-router-dom";
 import { Layout } from "./components/Layout";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
@@ -15,7 +21,8 @@ import Receipt from "./pages/documents/Receipt";
 import TaxInvoice from "./pages/documents/TaxInvoice";
 import Invoice from "./pages/documents/Invoice";
 
-// Form pages
+// Form components
+import { DocumentForm } from "./pages/sub/create/DocumentForm";
 import QuotationForm from "./pages/sub/quotation/QuotationForm";
 
 // Finance pages
@@ -30,6 +37,8 @@ import { ProductForm } from "./pages/sub/create/ProductForm";
 import InvoiceForm from "./pages/sub/invoice/InvoiceForm";
 import { documentService } from "./pages/services/documentService";
 import { DocumentData } from "./types/document";
+import { apiService } from "./pages/services/apiService";
+import { generateDocumentNumber } from "./utils/documentUtils";
 
 const queryClient = new QueryClient();
 
@@ -45,52 +54,85 @@ const App = () => {
   }, []);
 
   const handleSaveInvoice = async (data: DocumentData) => {
-    const savedInvoice = documentService.save(data);
-    
-    if (savedInvoice.status === 'ชำระแล้ว') {
-      const receiptData: DocumentData = {
-        ...savedInvoice,
-        id: `receipt_${Date.now()}`,
-        documentType: 'receipt',
-        documentNumber: documentService.generateNewDocumentNumber('receipt'),
-        status: 'ต้นฉบับ',
-        reference: savedInvoice.documentNumber,
-      };
-      documentService.save(receiptData);
+    try {
+      // Save to the database
+      const savedInvoice = await apiService.createDocument(data);
+      
+      // Also save to localStorage for offline access
+      documentService.save(savedInvoice);
+      
+      // If the invoice is marked as paid, create a receipt
+      if (savedInvoice.status === "ชำระแล้ว") {
+        // Generate a new receipt number
+        const receiptNumber = await apiService.getDocumentNumbers("receipt")
+          .then(numbers => generateDocumentNumber("receipt", numbers));
+        
+        const receiptData: DocumentData = {
+          ...savedInvoice,
+          id: `receipt_${Date.now()}`,
+          documentType: "receipt",
+          documentNumber: receiptNumber,
+          status: "ต้นฉบับ",
+          reference: savedInvoice.documentNumber,
+        };
+        
+        // Save receipt to database and localStorage
+        const savedReceipt = await apiService.createDocument(receiptData);
+        documentService.save(savedReceipt);
+        
+        toast({
+          title: "สร้างใบเสร็จรับเงินเรียบร้อยแล้ว",
+          description: `ใบเสร็จเลขที่ ${savedReceipt.documentNumber} ถูกสร้างขึ้นจากใบแจ้งหนี้ ${savedInvoice.documentNumber}`,
+        });
+      }
+      
+      // Update the local documents state
+      const updatedDocs = documentService.getAll();
+      setDocuments(updatedDocs);
+      
+      return savedInvoice;
+    } catch (error) {
+      console.error("Error saving invoice:", error);
       toast({
-        title: "สร้างใบเสร็จรับเงินเรียบร้อยแล้ว",
-        description: `ใบเสร็จเลขที่ ${receiptData.documentNumber} ถูกสร้างขึ้นจากใบแจ้งหนี้ ${savedInvoice.documentNumber}`,
+        title: "เกิดข้อผิดพลาด",
+        description: "ไม่สามารถบันทึกใบแจ้งหนี้ได้ กรุณาลองใหม่อีกครั้ง",
+        variant: "destructive",
       });
+      throw error; // Re-throw to allow the form to handle the error
     }
-
-    const updatedDocs = documentService.getAll();
-    setDocuments(updatedDocs);
   };
 
   const InvoiceFormWrapper = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
-    const initialData = id ? documents.find(d => d.id === id) : undefined;
+    const initialData = id ? documents.find((d) => d.id === id) : undefined;
 
     const newInvoiceData: DocumentData = {
       id: `inv_${Date.now()}`,
-      documentNumber: documentService.generateNewDocumentNumber('invoice'),
+      documentNumber: "", // Let DocumentForm handle the number generation
       customer: { name: "", tax_id: "", phone: "", address: "" },
       items: [],
-      summary: { subtotal: 0, discount: 0, tax: 0, total: 0, withholdingTax: 0 },
-      status: 'ร่าง',
-      documentDate: new Date().toISOString().split('T')[0],
+      summary: {
+        subtotal: 0,
+        discount: 0,
+        tax: 0,
+        total: 0,
+        withholdingTax: 0,
+      },
+      status: "ร่าง",
+      documentDate: new Date().toISOString().split("T")[0],
       dueDate: "",
       reference: "",
       notes: "",
-      priceType: 'exclusive',
+      priceType: "exclusive",
+      documentType: "invoice", // Make sure documentType is set
     };
 
     return (
       <InvoiceForm
         onSave={async (data) => {
           await handleSaveInvoice(data);
-          navigate('/documents/invoice');
+          navigate("/documents/invoice");
         }}
         initialData={initialData || newInvoiceData}
         isLoading={isLoading}
@@ -110,11 +152,19 @@ const App = () => {
 
               {/* Document routes */}
               <Route path="/documents/quotation" element={<Quotation />} />
-              <Route path="/documents/quotation/new" element={<QuotationForm onCancel={() => window.history.back()} />} />
+              <Route
+                path="/documents/quotation/new"
+                element={
+                  <QuotationForm onCancel={() => window.history.back()} />
+                }
+              />
 
               <Route path="/documents/invoice" element={<Invoice />} />
               <Route path="/invoice/new" element={<InvoiceFormWrapper />} />
-              <Route path="/invoice/edit/:id" element={<InvoiceFormWrapper />} />
+              <Route
+                path="/invoice/edit/:id"
+                element={<InvoiceFormWrapper />}
+              />
 
               <Route path="/documents/tax-invoice" element={<TaxInvoice />} />
               <Route path="/documents/receipt" element={<Receipt />} />
@@ -124,7 +174,10 @@ const App = () => {
               <Route path="/finance/cashflow" element={<Cashflow />} />
 
               {/* Settings routes */}
-              <Route path="/settings/chart-of-accounts" element={<ChartOfAccounts />} />
+              <Route
+                path="/settings/chart-of-accounts"
+                element={<ChartOfAccounts />}
+              />
               <Route
                 path="/settings/document-numbering"
                 element={<DocumentNumbering />}
@@ -132,7 +185,12 @@ const App = () => {
               <Route path="/settings/company-info" element={<CompanyInfo />} />
 
               {/* Product Management */}
-              <Route path="/products/new" element={<ProductForm onSuccess={() => window.history.back()} />} />
+              <Route
+                path="/products/new"
+                element={
+                  <ProductForm onSuccess={() => window.history.back()} />
+                }
+              />
 
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />

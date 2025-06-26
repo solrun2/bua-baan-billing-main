@@ -22,26 +22,28 @@ if (typeof window !== "undefined" && !localStorage.getItem(STORAGE_KEY)) {
   const mockInvoices: DocumentData[] = [
     {
       id: "inv_001",
-      documentNumber: "INV-2024-001",
+      documentNumber: "QT-2025-0001",
+      documentType: "quotation",
       customer: { name: "บริษัท ABC จำกัด", tax_id: "", phone: "", address: "" },
       items: [],
       summary: { subtotal: 50000, discount: 0, tax: 3500, total: 53500, withholdingTax: 0 },
-      status: "ส่งแล้ว",
-      documentDate: "2024-01-15",
-      dueDate: "2024-02-15",
+      status: "ร่าง",
+      documentDate: new Date().toISOString().split('T')[0],
+      dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       reference: "",
       notes: "",
       priceType: 'exclusive',
     },
     {
       id: "inv_002",
-      documentNumber: "INV-2024-002",
+      documentNumber: "INV-2025-0002",
+      documentType: "invoice",
       customer: { name: "บริษัท XYZ จำกัด", tax_id: "", phone: "", address: "" },
       items: [],
       summary: { subtotal: 75000, discount: 0, tax: 5250, total: 80250, withholdingTax: 0 },
       status: "ชำระแล้ว",
-      documentDate: "2024-01-14",
-      dueDate: "2024-02-14",
+      documentDate: new Date().toISOString().split('T')[0],
+      dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       reference: "",
       notes: "",
       priceType: 'exclusive',
@@ -81,5 +83,12 @@ export const documentService = {
     const documents = this.getAll();
     const existingNumbers = documents.map(doc => doc.documentNumber);
     return generateDocumentNumber(type, existingNumbers);
+  },
+
+  // Delete a document by ID
+  deleteById: (id: string): void => {
+    const documents = getDocuments();
+    const updatedDocuments = documents.filter(doc => doc.id !== id);
+    saveDocuments(updatedDocuments);
   }
 };

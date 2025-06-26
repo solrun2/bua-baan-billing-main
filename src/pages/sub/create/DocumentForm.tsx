@@ -1,11 +1,13 @@
 import { format } from "date-fns";
-import { useState, useEffect, useCallback, useRef, FC } from "react";
+import { useState, useEffect, useCallback, useRef, FC, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { generateDocumentNumber } from "@/utils/documentUtils";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Product } from "@/types/product";
 import { Customer } from "@/types/customer";
 import { CustomerAutocomplete } from "@/pages/sub/autocomplete/CustomerAutocomplete";
+import { apiService } from "@/pages/services/apiService";
 import CreateCustomerDialog from "./CreateCustomerDialog";
 import {
   DocumentItem,
@@ -70,22 +72,85 @@ export const DocumentForm: FC<DocumentFormProps> = ({
   const [isProductFormOpen, setIsProductFormOpen] = useState(false);
 
   const [reference, setReference] = useState(initialData.reference);
+  // Track documents and document number state
+  const [documents, setDocuments] = useState<DocumentData[]>([]);
   const [documentNumber, setDocumentNumber] = useState<string>(
     initialData.documentNumber || ""
   );
-  const [documentDate, setDocumentDate] = useState<string>(
-    initialData.documentDate || format(new Date(), "yyyy-MM-dd")
+
+  // Set initial document number when component mounts or document type changes
+  useEffect(() => {
+    if (!initialData.id && !documentNumber) {
+      try {
+        // Get existing documents from localStorage
+        const storedDocs = JSON.parse(localStorage.getItem('documents') || '[]');
+        const existingNumbers = storedDocs
+          .filter((doc: DocumentData) => doc.documentType === documentType)
+          .map((doc: DocumentData) => doc.documentNumber);
+
+        // Generate new document number using the utility function
+        const newNumber = generateDocumentNumber(documentType, existingNumbers);
+        setDocumentNumber(newNumber);
+      } catch (error) {
+        console.error("Error generating document number:", error);
+        // Fallback to simple number if error
+        const prefix = documentType === 'quotation' ? 'QT' : 
+                      documentType === 'invoice' ? 'IV' :
+                      documentType === 'receipt' ? 'RC' : 'TAX';
+        setDocumentNumber(`${prefix}-${new Date().getFullYear()}-0001`);
+      }
+    }
+  }, [documentType, initialData.id, documentNumber]);
+
+  // Sync document number with localStorage changes
+  useEffect(() => {
+    if (!initialData.id) {
+      // Only for new documents
+      const handleStorageChange = () => {
+        try {
+          const storedDocs = JSON.parse(localStorage.getItem('documents') || '[]');
+          const existingNumbers = storedDocs
+            .filter((doc: DocumentData) => doc.documentType === documentType)
+            .map((doc: DocumentData) => doc.documentNumber);
+
+          const newNumber = generateDocumentNumber(documentType, existingNumbers);
+          if (newNumber && newNumber !== documentNumber) {
+            setDocumentNumber(newNumber);
+          }
+        } catch (error) {
+          console.error("Error handling storage change:", error);
+        }
+      };
+
+      // Initial check
+      handleStorageChange();
+
+      // Listen for storage changes
+      window.addEventListener("storage", handleStorageChange);
+
+      // Cleanup
+      return () => {
+        window.removeEventListener("storage", handleStorageChange);
+      };
+    }
+  }, [documentType, initialData.id, documentNumber]);
+
+  const [documentDate, setDocumentDate] = useState(
+    initialData.documentDate || new Date().toISOString().split("T")[0]
+  );
+  const [dueDate, setDueDate] = useState(
+    initialData.dueDate || ""
+  );
+  const [validUntil, setValidUntil] = useState(
+    initialData.validUntil || ""
   );
 
   const [isTaxInvoice, setIsTaxInvoice] = useState(false);
-
-  const [validUntil, setValidUntil] = useState(initialData.validUntil || "");
 
   const [customer, setCustomer] = useState<CustomerData>(initialData.customer);
   const [isCreateCustomerOpen, setCreateCustomerOpen] = useState(false);
   const [customerRefreshKey, setCustomerRefreshKey] = useState(0);
 
-  const [dueDate, setDueDate] = useState(initialData.dueDate || "");
   const [issueTaxInvoice, setIssueTaxInvoice] = useState(
     initialData.issueTaxInvoice ?? true
   );
@@ -233,6 +298,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
       }
     }
   };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -250,25 +316,23 @@ export const DocumentForm: FC<DocumentFormProps> = ({
       return;
     }
 
-    const documentData: DocumentData = {
+    const dataToSave: DocumentData = {
       id: initialData.id,
-      customer,
-      items,
-      summary,
-      notes,
-      attachments,
-      documentNumber: documentNumber,
-      documentDate,
-      validUntil,
-      dueDate,
-      issueTaxInvoice,
-      priceType,
-      tags,
-      reference,
-      status: "draft",
       documentType: documentType,
+      documentNumber: documentNumber,
+      documentDate: documentDate,
+      dueDate: documentType === 'invoice' ? dueDate : undefined,
+      validUntil: documentType === 'quotation' ? validUntil : undefined,
+      reference: reference,
+      customer: customer,
+      items: items,
+      summary: summary,
+      notes: notes,
+      priceType: priceType,
+      status: initialData.status || "ร่าง",
+      attachments: attachments,
     };
-    await onSave(documentData);
+    await onSave(dataToSave);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -331,13 +395,31 @@ export const DocumentForm: FC<DocumentFormProps> = ({
           <div className="space-y-2">
             <Label>
               <div className="space-y-4">
-                <Label htmlFor="documentNumber">เลขที่เอกสาร</Label>
-                <Input
-                  id="documentNumber"
-                  value={documentNumber || "จะถูกสร้างโดยอัตโนมัติ"}
-                  readOnly
-                  className="font-mono bg-muted"
-                />
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="documentNumber">เลขที่เอกสาร</Label>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="h-4 w-4 text-muted-foreground" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>เลขที่เอกสารจะถูกสร้างโดยอัตโนมัติ</p>
+                      <p>ประเภทเอกสาร: {documentType}</p>
+                      <p>
+                        สถานะ:{" "}
+                        {initialData.id ? "แก้ไขเอกสาร" : "สร้างเอกสารใหม่"}
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+                <div className="relative">
+                  <Input
+                    id="documentNumber"
+                    value={documentNumber}
+                    readOnly
+                    className="font-mono bg-muted"
+                    placeholder=""
+                  />
+                </div>
               </div>
             </Label>
           </div>
@@ -355,7 +437,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
 
           {documentType === "quotation" ? (
             <div className="space-y-2">
-              <Label>วันหมดอายุ</Label>
+              <Label>ยืนราคาถึงวันที่</Label>
               <Input
                 type="date"
                 value={validUntil}
@@ -364,7 +446,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
             </div>
           ) : (
             <div className="space-y-2">
-              <Label>วันครบกำหนดชำระ</Label>
+              <Label>วันที่ครบกำหนดชำระ</Label>
               <Input
                 type="date"
                 value={dueDate}

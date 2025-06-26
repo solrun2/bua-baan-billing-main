@@ -316,13 +316,14 @@ app.post("/api/documents", async (req: Request, res: Response) => {
   try {
     const {
       customer_id, document_type, status, issue_date, notes, items, summary,
-      // Document-specific fields
-      due_date,       // For invoices
-      valid_until,    // For quotations
       payment_date,   // For receipts
       payment_method, // For receipts
       payment_reference, // For receipts
     } = req.body;
+
+    // Handle camelCase from frontend for document-specific dates
+    const due_date = req.body.due_date || req.body.dueDate;
+    const valid_until = req.body.valid_until || req.body.validUntil;
     
     // 1. Validation
     if (!summary || summary.subtotal === undefined || summary.tax === undefined || summary.total === undefined) {
@@ -354,11 +355,11 @@ app.post("/api/documents", async (req: Request, res: Response) => {
     }
 
     // 4. Insert into document-specific details table
-    if (document_type === 'quotation' && valid_until) {
+    if (document_type.toLowerCase() === 'quotation' && valid_until) {
       await conn.query('INSERT INTO quotation_details (document_id, valid_until) VALUES (?, ?)', [documentId, valid_until]);
-    } else if (document_type === 'invoice' && due_date) {
+    } else if (document_type.toLowerCase() === 'invoice' && due_date) {
       await conn.query('INSERT INTO invoice_details (document_id, due_date) VALUES (?, ?)', [documentId, due_date]);
-    } else if (document_type === 'receipt' && payment_date && payment_method) {
+    } else if (document_type.toLowerCase() === 'receipt' && payment_date && payment_method) {
       await conn.query('INSERT INTO receipt_details (document_id, payment_date, payment_method, payment_reference) VALUES (?, ?, ?, ?)', [documentId, payment_date, payment_method, payment_reference]);
     }
 
