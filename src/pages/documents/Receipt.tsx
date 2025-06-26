@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { CreditCard, Search, Filter, AlertTriangle, Loader2 } from "lucide-react";
 import { apiService } from "@/pages/services/apiService";
 import type { Document } from "@/types/document";
-import ReceiptDetailsModal from "./ReceiptDetailsModal";
+import ReceiptDetailsModal from "@/pages/documents/ReceiptDetailsModal";
 
 const Receipt = () => {
   const [receipts, setReceipts] = useState<Document[]>([]);
