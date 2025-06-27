@@ -1,8 +1,6 @@
 import { Customer } from "@/types/customer";
 import axios from "axios";
 import { Document, DocumentData } from "@/types/document";
-import { Product } from "@/types/product";
-import { ProductFormData } from "@/pages/sub/create/ProductForm";
 
 const API_BASE_URL = "http://localhost:3001/api";
 
@@ -85,33 +83,6 @@ const createDocument = async (
   }
 };
 
-const getCustomers = async (query: string = ""): Promise<Customer[]> => {
-  try {
-    const response = await fetch(
-      `${API_BASE_URL}/customers?q=${encodeURIComponent(query)}`
-    );
-    if (!response.ok) {
-      throw new Error("Failed to fetch customers");
-    }
-    // The backend now returns a flat array, so we consume it directly.
-    const customersArray = await response.json();
-
-    // Safety check to ensure we always work with an array.
-    if (!Array.isArray(customersArray)) {
-      console.error(
-        "Expected customer data to be an array but got:",
-        customersArray
-      );
-      return [];
-    }
-
-    return customersArray;
-  } catch (error) {
-    console.error("Error fetching customers:", error);
-    throw error;
-  }
-};
-
 const updateDocument = async (
   id: string,
   document: DocumentData
@@ -136,11 +107,11 @@ const updateDocument = async (
 const deleteDocument = async (id: string): Promise<void> => {
   try {
     const response = await fetch(`${API_BASE_URL}/documents/${id}`, {
-      method: 'DELETE',
+      method: "DELETE",
     });
     if (!response.ok) {
       const errorData = await response.json();
-      throw new Error(errorData.message || 'Failed to delete document');
+      throw new Error(errorData.message || "Failed to delete document");
     }
   } catch (error) {
     console.error(`Error deleting document with id ${id}:`, error);
@@ -178,7 +149,6 @@ const createCustomer = async (
     throw error;
   }
 };
-
 
 export const uploadImage = async (file: File): Promise<string> => {
   const formData = new FormData();
@@ -265,7 +235,6 @@ export const apiService = {
   deleteDocument,
   syncDocumentsToLocalStorage,
   getDocumentNumbers,
-  getCustomers,
   createCustomer,
   // getProducts, createProduct, updateProduct are now in productService.ts
   uploadImage,

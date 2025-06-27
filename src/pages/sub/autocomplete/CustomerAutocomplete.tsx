@@ -1,22 +1,22 @@
-import { useEffect, useState } from 'react';
-import { Customer } from '@/types/customer';
-import { apiService } from '@/pages/services/apiService';
-import { 
-  Command, 
-  CommandEmpty, 
-  CommandGroup, 
-  CommandInput, 
-  CommandItem, 
-  CommandList 
-} from '@/components/ui/command';
-import { 
-  Popover, 
-  PopoverContent, 
-  PopoverTrigger 
-} from '@/components/ui/popover';
-import { Button } from '@/components/ui/button';
-import { ChevronsUpDown, Loader2 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { useEffect, useState } from "react";
+import { Customer } from "@/types/customer";
+import { searchCustomers } from "@/pages/services/customerService";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Button } from "@/components/ui/button";
+import { ChevronsUpDown, Loader2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface CustomerAutocompleteProps {
   value?: Partial<Customer> | null;
@@ -25,25 +25,25 @@ interface CustomerAutocompleteProps {
   className?: string;
 }
 
-export const CustomerAutocomplete: React.FC<CustomerAutocompleteProps> = ({ 
+export const CustomerAutocomplete: React.FC<CustomerAutocompleteProps> = ({
   value,
   onCustomerSelect,
   placeholder = "ค้นหาหรือเลือกลูกค้า",
-  className 
+  className,
 }) => {
   const [open, setOpen] = useState(false);
   const [customers, setCustomers] = useState<Customer[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     const fetchCustomers = async () => {
       setIsLoading(true);
       try {
-        const fetchedCustomers = await apiService.getCustomers(searchQuery);
+        const fetchedCustomers = await searchCustomers(searchQuery);
         setCustomers(fetchedCustomers);
       } catch (error) {
-        console.error('Error fetching customers:', error);
+        console.error("Error fetching customers:", error);
         setCustomers([]);
       } finally {
         setIsLoading(false);
@@ -63,6 +63,8 @@ export const CustomerAutocomplete: React.FC<CustomerAutocompleteProps> = ({
     }
   }, [open]);
 
+  console.log("Customers for dropdown:", customers);
+
   return (
     <div className={cn("flex w-full", className)}>
       <Popover open={open} onOpenChange={setOpen}>
@@ -74,9 +76,11 @@ export const CustomerAutocomplete: React.FC<CustomerAutocompleteProps> = ({
             className="w-full justify-between"
           >
             <div className="flex-1 flex items-center truncate">
-              {value && value.id && value.name
-                ? value.name
-                : <span className="text-muted-foreground">{placeholder}</span>}
+              {value && value.id && value.name ? (
+                value.name
+              ) : (
+                <span className="text-muted-foreground">{placeholder}</span>
+              )}
             </div>
             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </Button>
@@ -92,7 +96,7 @@ export const CustomerAutocomplete: React.FC<CustomerAutocompleteProps> = ({
               <CommandEmpty>
                 {isLoading ? (
                   <div className="p-4 flex justify-center items-center">
-                     <Loader2 className="h-4 w-4 animate-spin" />
+                    <Loader2 className="h-4 w-4 animate-spin" />
                   </div>
                 ) : (
                   <div className="py-6 text-center text-sm">
@@ -110,7 +114,7 @@ export const CustomerAutocomplete: React.FC<CustomerAutocompleteProps> = ({
                       setOpen(false);
                     }}
                   >
-                    {customer.name}
+                    {`${customer.name || ""}${customer.lastname ? " " + customer.lastname : ""}${customer.tel ? " (" + customer.tel + ")" : ""}`}
                   </CommandItem>
                 ))}
               </CommandGroup>
