@@ -1,21 +1,31 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileText, Plus, Search, Filter, AlertTriangle, Loader2 } from "lucide-react";
-import { apiService } from '@/pages/services/apiService';
-import { toast } from 'sonner';
+import {
+  FileText,
+  Plus,
+  Search,
+  Filter,
+  AlertTriangle,
+  Loader2,
+} from "lucide-react";
+import { apiService } from "@/pages/services/apiService";
+import { toast } from "sonner";
+import QuotationModal from "@/pages/sub/quotation/QuotationModal";
 
 const Quotation = () => {
   const navigate = useNavigate();
 
   const handleCreateNew = () => {
-    navigate('/documents/quotation/new');
+    navigate("/documents/quotation/new");
   };
 
   const [quotations, setQuotations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedQuotation, setSelectedQuotation] = useState<any | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
     const loadQuotations = async () => {
@@ -23,14 +33,19 @@ const Quotation = () => {
         setLoading(true);
         const data = await apiService.getDocuments();
         const quotationsData = data
-          .filter(doc => doc.document_type === 'QUOTATION')
-          .map(doc => ({
+          .filter((doc) => doc.document_type === "QUOTATION")
+          .map((doc) => ({
             id: doc.id,
             number: doc.document_number,
             customer: doc.customer_name,
-            date: new Date(doc.issue_date).toLocaleDateString('th-TH'),
-            validUntil: doc.valid_until ? new Date(doc.valid_until).toLocaleDateString('th-TH') : '-',
-            total: new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(doc.total_amount),
+            date: new Date(doc.issue_date).toLocaleDateString("th-TH"),
+            validUntil: doc.valid_until
+              ? new Date(doc.valid_until).toLocaleDateString("th-TH")
+              : "-",
+            total: new Intl.NumberFormat("th-TH", {
+              style: "currency",
+              currency: "THB",
+            }).format(doc.total_amount),
             status: doc.status,
           }));
         setQuotations(quotationsData);
@@ -46,18 +61,32 @@ const Quotation = () => {
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'รอตอบรับ': return 'bg-gray-100 text-gray-700';
-      case 'ส่งแล้ว': return 'bg-blue-100 text-blue-700';
-      case 'ตอบรับแล้ว': return 'bg-green-100 text-green-700';
-      case 'ปฏิเสธ': return 'bg-red-100 text-red-700';
-      case 'หมดอายุ': return 'bg-yellow-100 text-yellow-700';
-      default: return 'bg-gray-200 text-gray-800';
+      case "รอตอบรับ":
+        return "bg-gray-100 text-gray-700";
+      case "ส่งแล้ว":
+        return "bg-blue-100 text-blue-700";
+      case "ตอบรับแล้ว":
+        return "bg-green-100 text-green-700";
+      case "ปฏิเสธ":
+        return "bg-red-100 text-red-700";
+      case "หมดอายุ":
+        return "bg-yellow-100 text-yellow-700";
+      default:
+        return "bg-gray-200 text-gray-800";
     }
   };
 
-  const handleViewClick = (quotation: any) => {
-    navigate(`/quotations/edit/${quotation.id}`);
-  };
+  const handleViewClick = useCallback(async (quotation: any) => {
+    try {
+      const allDocs = await apiService.getDocuments();
+      const fullDoc = allDocs.find((doc: any) => doc.id === quotation.id);
+      setSelectedQuotation(fullDoc);
+      setIsModalOpen(true);
+    } catch (err) {
+      setSelectedQuotation(null);
+      setIsModalOpen(false);
+    }
+  }, []);
 
   const handleEditClick = (id: any) => {
     navigate(`/quotations/edit/${id}`);
@@ -67,11 +96,13 @@ const Quotation = () => {
     if (window.confirm("Are you sure you want to delete this quotation?")) {
       try {
         await apiService.deleteDocument(id.toString());
-        setQuotations(prevQuotations => prevQuotations.filter(q => q.id !== id));
-        toast.success('ลบใบเสนอราคาเรียบร้อยแล้ว');
+        setQuotations((prevQuotations) =>
+          prevQuotations.filter((q) => q.id !== id)
+        );
+        toast.success("ลบใบเสนอราคาเรียบร้อยแล้ว");
       } catch (error) {
         console.error("Failed to delete quotation:", error);
-        toast.error('เกิดข้อผิดพลาดในการลบใบเสนอราคา');
+        toast.error("เกิดข้อผิดพลาดในการลบใบเสนอราคา");
         setError((error as Error).message);
       }
     }
@@ -101,7 +132,11 @@ const Quotation = () => {
         <div className="flex-1 max-w-md">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <input type="text" placeholder="ค้นหาใบเสนอราคา..." className="w-full pl-10 pr-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20" />
+            <input
+              type="text"
+              placeholder="ค้นหาใบเสนอราคา..."
+              className="w-full pl-10 pr-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
+            />
           </div>
         </div>
         <Button variant="outline" className="flex items-center gap-2">
@@ -136,25 +171,54 @@ const Quotation = () => {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-border">
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">เลขที่</th>
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">ลูกค้า</th>
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">วันที่</th>
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">ยืนราคาถึงวันที่</th>
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">จำนวนเงิน</th>
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">สถานะ</th>
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">การดำเนินการ</th>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">
+                      เลขที่
+                    </th>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">
+                      ลูกค้า
+                    </th>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">
+                      วันที่
+                    </th>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">
+                      ยืนราคาถึงวันที่
+                    </th>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">
+                      จำนวนเงิน
+                    </th>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">
+                      สถานะ
+                    </th>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">
+                      การดำเนินการ
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {quotations.map((quotation) => (
-                    <tr key={quotation.id} className="border-b border-border/40 hover:bg-muted/30 transition-colors">
-                      <td className="py-3 px-4 font-medium text-foreground">{quotation.number}</td>
-                      <td className="py-3 px-4 text-foreground">{quotation.customer}</td>
-                      <td className="py-3 px-4 text-muted-foreground">{quotation.date}</td>
-                      <td className="py-3 px-4 text-muted-foreground">{quotation.validUntil}</td>
-                      <td className="py-3 px-4 font-medium text-foreground">{quotation.total}</td>
+                    <tr
+                      key={quotation.id}
+                      className="border-b border-border/40 hover:bg-muted/30 transition-colors"
+                    >
+                      <td className="py-3 px-4 font-medium text-foreground">
+                        {quotation.number}
+                      </td>
+                      <td className="py-3 px-4 text-foreground">
+                        {quotation.customer}
+                      </td>
+                      <td className="py-3 px-4 text-muted-foreground">
+                        {quotation.date}
+                      </td>
+                      <td className="py-3 px-4 text-muted-foreground">
+                        {quotation.validUntil}
+                      </td>
+                      <td className="py-3 px-4 font-medium text-foreground">
+                        {quotation.total}
+                      </td>
                       <td className="py-3 px-4">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(quotation.status)}`}>
+                        <span
+                          className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(quotation.status)}`}
+                        >
                           {quotation.status}
                         </span>
                       </td>
@@ -189,6 +253,11 @@ const Quotation = () => {
               </table>
             </div>
           )}
+          <QuotationModal
+            open={isModalOpen}
+            onClose={() => setIsModalOpen(false)}
+            quotation={selectedQuotation}
+          />
         </CardContent>
       </Card>
     </div>

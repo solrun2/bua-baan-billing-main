@@ -328,7 +328,18 @@ export const DocumentForm: FC<DocumentFormProps> = ({
       return;
     }
 
-    const dataToSave: DocumentData = {
+    // เตรียมข้อมูล items ให้ตรงกับ backend schema ใหม่
+    const itemsToSave = items.map((item) => ({
+      product_id: item.product_id || item.productId || "",
+      productTitle: item.productTitle || "",
+      unit: item.unit || "",
+      quantity: item.quantity || 1,
+      unitPrice: item.unitPrice || 0,
+      amount: item.amount || 0,
+      description: item.description || "",
+    }));
+
+    const dataToSave = {
       id: initialData.id,
       documentType: documentType,
       documentNumber: documentNumber,
@@ -336,8 +347,15 @@ export const DocumentForm: FC<DocumentFormProps> = ({
       dueDate: documentType === "invoice" ? dueDate : undefined,
       validUntil: documentType === "quotation" ? validUntil : undefined,
       reference: reference,
-      customer: customer,
-      items: items,
+      customer: {
+        id: customer.id,
+        name: customer.name,
+        tax_id: customer.tax_id,
+        phone: customer.phone,
+        address: customer.address,
+        email: customer.email,
+      },
+      items: itemsToSave,
       summary: summary,
       notes: notes,
       priceType: priceType,

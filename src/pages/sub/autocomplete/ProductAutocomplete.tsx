@@ -16,7 +16,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Plus, ChevronsUpDown, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { listAllProducts } from "@/pages/services/productService";
+import { fetchAllProducts } from "@/pages/services/productService";
 import { toast } from "sonner";
 
 interface ProductAutocompleteProps {
@@ -60,7 +60,7 @@ const ProductAutocomplete = ({
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        const products = await listAllProducts();
+        const products = await fetchAllProducts();
         setProducts(products);
       } catch (error) {
         console.error("Error fetching products:", error);

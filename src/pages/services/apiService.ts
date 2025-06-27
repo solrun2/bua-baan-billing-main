@@ -23,14 +23,40 @@ const getDocuments = async (): Promise<Document[]> => {
 };
 
 const prepareDocumentData = (document: DocumentData): any => {
+  // เตรียมข้อมูล customer object ให้ครบ id, name
+  const customer =
+    document.customer && document.customer.id && document.customer.name
+      ? {
+          id: document.customer.id,
+          name: document.customer.name,
+          tax_id: document.customer.tax_id || "",
+          phone: document.customer.phone || "",
+          address: document.customer.address || "",
+          email: document.customer.email || "",
+        }
+      : undefined;
+
+  // เตรียม items array ให้ตรงกับ backend
+  const items = (document.items || []).map((item) => ({
+    product_id: (item as any).product_id || item.productId || "",
+    productTitle: item.productTitle || "",
+    unit: item.unit || "",
+    quantity: item.quantity || 1,
+    unitPrice: item.unitPrice || 0,
+    amount: item.amount || 0,
+    description: item.description || "",
+  }));
+
   const baseData = {
-    customer_id: document.customer.id,
-    document_type: document.documentType.toUpperCase(),
+    customer, // object
+    document_type: document.documentType
+      ? document.documentType.toUpperCase()
+      : "",
     document_number: document.documentNumber, // Add document number to the data sent to backend
     status: document.status,
     issue_date: document.documentDate,
     notes: document.notes,
-    items: document.items,
+    items,
     summary: document.summary,
   };
 

@@ -57,7 +57,8 @@ CREATE TABLE `product_lots` (
 
 CREATE TABLE `documents` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
-  `customer_id` INT NOT NULL,
+  `customer_id` VARCHAR(64) NOT NULL, -- อ้างอิง id จาก OpenAPI
+  `customer_name` VARCHAR(255) NOT NULL, -- ชื่อลูกค้า (snapshot)
   `document_number` VARCHAR(100) NOT NULL UNIQUE,
   `document_type` ENUM('QUOTATION', 'INVOICE', 'RECEIPT', 'TAX_INVOICE') NOT NULL,
   `status` ENUM('รอตอบรับ', 'ตอบรับแล้ว', 'พ้นกำหนด', 'รอชำระ', 'ชำระแล้ว', 'ยกเลิก') NOT NULL,
@@ -68,8 +69,7 @@ CREATE TABLE `documents` (
   `notes` TEXT,
   `related_document_id` INT NULL,
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (`customer_id`) REFERENCES `customers`(`id`) ON DELETE RESTRICT
+  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE `quotation_details` (
@@ -104,13 +104,14 @@ CREATE TABLE `receipt_details` (
 CREATE TABLE `document_items` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
   `document_id` INT NOT NULL,
-  `product_id` INT NULL, 
-  `description` TEXT NOT NULL,
+  `product_id` VARCHAR(64) NULL, -- อ้างอิง id จาก OpenAPI
+  `product_name` VARCHAR(255) NOT NULL, -- ชื่อสินค้า (snapshot)
+  `unit` VARCHAR(50),
   `quantity` DECIMAL(10, 2) NOT NULL DEFAULT 1.00,
   `unit_price` DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
   `amount` DECIMAL(15, 2) NOT NULL DEFAULT 0.00,
-  FOREIGN KEY (`document_id`) REFERENCES `documents`(`id`) ON DELETE CASCADE,
-  FOREIGN KEY (`product_id`) REFERENCES `products`(`id`) ON DELETE SET NULL
+  `description` TEXT,
+  FOREIGN KEY (`document_id`) REFERENCES `documents`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
