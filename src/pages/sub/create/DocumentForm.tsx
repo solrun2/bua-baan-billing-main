@@ -290,9 +290,9 @@ export const DocumentForm: FC<DocumentFormProps> = ({
             product_id: String(product.id),
             productTitle: product.name,
             description: product.description || "",
-            unitPrice: product.selling_price,
+            unitPrice: product.price || 0,
             quantity: 1, // Set default quantity to 1
-            unit: product.unit || "",
+            unit: product.unit || "ชิ้น",
             isEditing: false,
           };
         }
@@ -637,10 +637,16 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                     <div className="space-y-2">
                       <Label>สินค้าหรือบริการ</Label>
                       <ProductAutocomplete
-                        value={{
-                          id: item.productId ? parseInt(item.productId, 10) : 0,
-                          title: item.productTitle,
-                        }}
+                        value={
+                          item.productId && item.productTitle
+                            ? {
+                                id: parseInt(item.productId, 10),
+                                title: item.productTitle,
+                                description: item.description,
+                                property_info: item.description, // ใช้ description เป็น property_info
+                              }
+                            : null
+                        }
                         onChange={(product) =>
                           handleProductSelect(product, item.id)
                         }
