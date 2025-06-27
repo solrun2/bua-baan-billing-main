@@ -54,6 +54,8 @@ const createDocument = async (
 ): Promise<DocumentData> => {
   const backendData = prepareDocumentData(document);
 
+  console.log("[createDocument] backendData:", backendData);
+
   try {
     const response = await fetch(`${API_BASE_URL}/documents`, {
       method: "POST",
