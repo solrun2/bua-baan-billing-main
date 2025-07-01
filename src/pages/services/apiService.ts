@@ -51,6 +51,17 @@ const prepareDocumentData = (document: DocumentData): any => {
     description: item.description || "",
   }));
 
+  // Ensure summary fields are always present
+  const summary: any = document.summary || {};
+  const safeSummary = {
+    subtotal: typeof summary.subtotal === "number" ? summary.subtotal : 0,
+    discount: typeof summary.discount === "number" ? summary.discount : 0,
+    tax: typeof summary.tax === "number" ? summary.tax : 0,
+    total: typeof summary.total === "number" ? summary.total : 0,
+    withholdingTax:
+      typeof summary.withholdingTax === "number" ? summary.withholdingTax : 0,
+  };
+
   const baseData = {
     customer, // object
     document_type: document.documentType
@@ -61,7 +72,7 @@ const prepareDocumentData = (document: DocumentData): any => {
     issue_date: document.documentDate,
     notes: document.notes,
     items,
-    summary: document.summary,
+    summary: safeSummary,
   };
 
   if (document.documentType === "quotation") {

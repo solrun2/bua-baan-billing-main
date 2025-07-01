@@ -7,6 +7,8 @@ interface DocumentItem {
   quantity: number;
   unitPrice: number;
   amount: number;
+  product_name?: string;
+  productTitle?: string;
 }
 
 interface DocumentSummary {
@@ -218,7 +220,13 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
               return (
                 <tr key={idx} className="even:bg-blue-50">
                   <td className="border p-2 text-center">{idx + 1}</td>
-                  <td className="border p-2">{prod?.name || "-"}</td>
+                  <td className="border p-2">
+                    {prod?.name ||
+                      item.product_name ||
+                      item.productTitle ||
+                      item.description ||
+                      "-"}
+                  </td>
                   <td className="border p-2 text-right">
                     {Number(item.quantity)}
                   </td>

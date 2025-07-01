@@ -304,7 +304,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
           const newItem = {
             ...item,
             productId: String(product.id),
-            productTitle: product.name,
+            productTitle: product.title,
             description: product.description || "",
             unitPrice: typeof product.price === "number" ? product.price : 0,
             unit: product.unit || "ชิ้น",
