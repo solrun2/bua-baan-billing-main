@@ -9,6 +9,8 @@ interface DocumentItem {
   amount: number;
   product_name?: string;
   productTitle?: string;
+  discount?: number;
+  tax?: number;
 }
 
 interface DocumentSummary {
@@ -29,6 +31,7 @@ interface DocumentBase {
   notes?: string;
   items: DocumentItem[];
   summary: DocumentSummary;
+  reference?: string;
 }
 
 interface Quotation extends DocumentBase {
@@ -67,6 +70,21 @@ const typeLabels = {
 
 const KETSHOP_API_TOKEN =
   "eyJhbGciOiJFZERTQSIsImtpZCI6IjAxOTc2Nzg5LWNkODktNzYyZS1iMTM5LTFkZjIzZTUyYzQ3YiJ9.eyJjbGllbnRfaWQiOiIwMTk3Njc4OS1jZDg5LTc2MmUtYjEzOS0xZGYyM2U1MmM0N2IiLCJrZXRfd2ViX2lkIjoxMzE3LCJzY29wZXMiOlsiYWxsIl0sIm5hbWUiOiJJbnRlcm5zaGlwIiwiZG9tYWluIjoidWF0LmtldHNob3B0ZXN0LmNvbSIsInN1YiI6IjAxOTc2NzhiLTQ3YmUtNzA4YS04MTFkLWEwZWNiMDg1OTdiMCIsImlhdCI6MTc0OTc4ODg3MH0.OSbUayE_yS9IqOKLFrgsAGPJepiW7Otn3vzvE1SL9ijTpJmsGydGAP1_4AZA75cTmlXy583iS81EZxZszeYaBg"; // TODO: เปลี่ยนเป็น token จริง
+
+const SELLER_INFO = {
+  company: "บริษัท Tomato Ideas COMPANY LIMITED - UAT จำกัด",
+  address:
+    "เลขที่ 21 ซอย สุดสงวนท่าไม้ แขวงท่าข้าม เขตบางขุนเทียน กรุงเทพมหานคร 10130",
+  taxId: "0155562052664 (สำนักงานใหญ่)",
+  website: "www.tomato-ideas.com",
+  phone: "-",
+  bankAccounts: [
+    { bank: "ธ.กสิกรไทย", acc: "ออมทรัพย์ 123-456789-0", branch: "KB06" },
+    { bank: "ธ.กรุงศรี", acc: "ออมทรัพย์ 123-456789-0", branch: "KB06" },
+    { bank: "ธ.กรุงเทพ", acc: "ออมทรัพย์ 123-456789-0", branch: "KB06" },
+    { bank: "ธ.ไทยพาณิชย์", acc: "ออมทรัพย์ 1111111111", branch: "" },
+  ],
+};
 
 const DocumentModal: React.FC<DocumentModalProps> = ({
   type,
@@ -136,12 +154,20 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
     fetchProducts();
   }, [open, document]);
 
+  // Helper for date formatting
+  const formatDate = (dateStr?: string) => {
+    if (!dateStr) return "-";
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString("th-TH");
+  };
+
   if (!open) return null;
   const labels = typeLabels[type];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40 print:bg-transparent">
-      <div className="bg-white rounded shadow-lg p-8 w-full max-w-2xl print:relative print:shadow-none print:p-0 print:bg-white relative">
+      <div className="bg-white rounded shadow-lg p-8 w-full max-w-3xl print:relative print:shadow-none print:p-0 print:bg-white relative text-[14px]">
         {/* ปุ่มปิดขวาบน */}
         <button
           onClick={onClose}
@@ -151,92 +177,103 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
           &times;
         </button>
         {/* Header */}
-        <div className="mb-6 print:mb-2">
-          <h2 className="text-2xl font-bold text-blue-900 mb-2 text-left">
-            {labels.title}
-          </h2>
-          <div className="flex flex-wrap gap-x-8 gap-y-1 text-sm text-gray-700 mb-2 text-left">
-            <div>
-              <span className="font-semibold">เลขที่เอกสาร:</span>{" "}
-              {document?.document_number || "-"}
-            </div>
-            <div>
-              <span className="font-semibold">วันที่:</span>{" "}
-              {document?.issue_date
-                ? new Date(document.issue_date).toLocaleDateString("th-TH")
-                : "-"}
-            </div>
-            {document?.valid_until && (
+        <div className="flex justify-between items-start mb-4">
+          <div>
+            <div className="font-bold text-lg text-blue-900">ใบเสนอราคา</div>
+            <div className="mt-2">
               <div>
-                <span className="font-semibold">ยืนราคาถึง:</span>{" "}
-                {new Date(document.valid_until).toLocaleDateString("th-TH")}
+                <b>ผู้ขาย :</b> {SELLER_INFO.company}
               </div>
-            )}
-          </div>
-          {/* Customer Info */}
-          {document?.customer_name && (
-            <div className="bg-blue-50 rounded p-2 px-4 mb-2 w-full max-w-lg text-left">
-              <div className="font-semibold">
-                ลูกค้า: {document.customer_name}
+              <div>
+                <b>ที่อยู่ :</b> {SELLER_INFO.address}
               </div>
-              {document.customer_address && (
-                <div className="text-xs text-gray-600">
-                  ที่อยู่: {document.customer_address}
-                </div>
-              )}
-              {document.customer_phone && (
-                <div className="text-xs text-gray-600">
-                  โทร: {document.customer_phone}
-                </div>
-              )}
-              {document.customer_email && (
-                <div className="text-xs text-gray-600">
-                  อีเมล: {document.customer_email}
-                </div>
-              )}
-              {document.customer_tax_id && (
-                <div className="text-xs text-gray-600">
-                  เลขประจำตัวผู้เสียภาษี: {document.customer_tax_id}
-                </div>
-              )}
+              <div>
+                <b>เลขประจำตัวผู้เสียภาษี :</b> {SELLER_INFO.taxId}
+              </div>
+              <div>
+                <b>เว็บไซต์ :</b> {SELLER_INFO.website}
+              </div>
+              <div>
+                <b>โทร :</b> {SELLER_INFO.phone}
+              </div>
             </div>
-          )}
+          </div>
+          <div className="text-right">
+            <div>
+              <b>เลขที่เอกสาร :</b> {document.document_number}
+            </div>
+            <div>
+              <b>วันที่ :</b> {formatDate(document.issue_date)}
+            </div>
+            <div>
+              <b>วันถึงกำหนด :</b> {formatDate(document.valid_until)}
+            </div>
+            <div>
+              <b>อ้างอิง :</b> {document.reference || "-"}
+            </div>
+          </div>
         </div>
+
+        {/* Customer */}
+        <div className="bg-blue-50 rounded p-2 mb-4">
+          <div>
+            <b>ลูกค้า :</b> {document.customer_name}
+          </div>
+          <div>
+            <b>ที่อยู่ :</b> {document.customer_address}
+          </div>
+          <div>
+            <b>โทร :</b> {document.customer_phone}
+          </div>
+          <div>
+            <b>อีเมล :</b> {document.customer_email}
+          </div>
+          <div>
+            <b>เลขประจำตัวผู้เสียภาษี :</b> {document.customer_tax_id}
+          </div>
+        </div>
+
         {/* Table */}
-        <table className="w-full border mb-4 print:text-xs rounded-lg overflow-hidden">
+        <table className="w-full border mb-4 text-xs">
           <thead className="bg-blue-100 text-blue-900">
             <tr>
-              <th className="border p-2">#</th>
-              <th className="border p-2">{labels.itemLabel}</th>
-              <th className="border p-2">จำนวน</th>
-              <th className="border p-2">หน่วย</th>
-              <th className="border p-2">{labels.priceLabel}</th>
-              <th className="border p-2">ราคารวม</th>
+              <th className="border p-1">#</th>
+              <th className="border p-1">รายการ</th>
+              <th className="border p-1">จำนวน</th>
+              <th className="border p-1">หน่วย</th>
+              <th className="border p-1">ราคา</th>
+              <th className="border p-1">ส่วนลด</th>
+              <th className="border p-1">VAT</th>
+              <th className="border p-1">มูลค่าก่อนภาษี</th>
             </tr>
           </thead>
           <tbody>
-            {(document?.items || []).map((item, idx) => {
+            {(document.items || []).map((item, idx) => {
               const prod = productMap[item.product_id];
               return (
-                <tr key={idx} className="even:bg-blue-50">
-                  <td className="border p-2 text-center">{idx + 1}</td>
-                  <td className="border p-2">
+                <tr key={idx}>
+                  <td className="border p-1 text-center">{idx + 1}</td>
+                  <td className="border p-1">
                     {prod?.name ||
                       item.product_name ||
                       item.productTitle ||
                       item.description ||
                       "-"}
                   </td>
-                  <td className="border p-2 text-right">
-                    {Number(item.quantity)}
-                  </td>
-                  <td className="border p-2 text-center">
+                  <td className="border p-1 text-center">{item.quantity}</td>
+                  <td className="border p-1 text-center">
                     {prod?.unit || item.unit || "-"}
                   </td>
-                  <td className="border p-2 text-right">
+                  <td className="border p-1 text-right">
                     {item.unitPrice?.toLocaleString()}
                   </td>
-                  <td className="border p-2 text-right">
+                  <td className="border p-1 text-right">
+                    {item.discount?.toLocaleString() || "0.00"}
+                  </td>
+                  <td className="border p-1 text-center">
+                    {item.tax ? `${item.tax}%` : "-"}
+                  </td>
+                  <td className="border p-1 text-right">
                     {item.amount?.toLocaleString()}
                   </td>
                 </tr>
@@ -244,41 +281,48 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
             })}
           </tbody>
         </table>
+
         {/* Summary */}
         <div className="flex justify-end mb-2">
           <div className="w-full max-w-xs space-y-1">
             <div className="flex justify-between mb-1">
-              <span>{labels.summaryLabel}</span>
+              <span>มูลค่าสินค้าหรือค่าบริการ</span>
               <span>
-                {document?.summary?.subtotal?.toLocaleString() ?? 0} บาท
+                {document.summary?.subtotal?.toLocaleString() ?? 0} บาท
               </span>
             </div>
             <div className="flex justify-between mb-1">
-              <span>{labels.taxLabel}</span>
-              <span>{document?.summary?.tax?.toLocaleString() ?? 0} บาท</span>
+              <span>ภาษีมูลค่าเพิ่ม 7%</span>
+              <span>{document.summary?.tax?.toLocaleString() ?? 0} บาท</span>
             </div>
             <div className="flex justify-between font-bold text-lg">
-              <span>{labels.totalLabel}</span>
-              <span>{document?.summary?.total?.toLocaleString() ?? 0} บาท</span>
+              <span>จำนวนเงินทั้งสิ้น</span>
+              <span>{document.summary?.total?.toLocaleString() ?? 0} บาท</span>
             </div>
           </div>
         </div>
-        {/* Notes */}
-        {document?.notes && (
+
+        {/* Bank Accounts */}
+        <div className="mt-4">
+          <b>ชำระเงิน</b>
+          <div className="grid grid-cols-2 gap-2 mt-2">
+            {SELLER_INFO.bankAccounts.map((acc, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <span className="font-bold">{acc.bank}</span>
+                <span>{acc.acc}</span>
+                <span>{acc.branch}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* หมายเหตุ */}
+        {document.notes && (
           <div className="mt-4 p-3 bg-yellow-50 rounded text-sm text-yellow-900 border border-yellow-200">
             <span className="font-semibold">หมายเหตุ: </span>
             {document.notes}
           </div>
         )}
-        {/* Print Button (ล่างสุด) */}
-        <div className="flex justify-end gap-2 mt-6 print:hidden">
-          <button
-            onClick={() => window.print()}
-            className="text-blue-600 border border-blue-200 rounded px-3 py-1 text-sm hover:bg-blue-50 transition"
-          >
-            Print
-          </button>
-        </div>
       </div>
     </div>
   );
