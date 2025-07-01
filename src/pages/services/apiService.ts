@@ -1,6 +1,9 @@
 import { Customer } from "@/types/customer";
 import axios from "axios";
 import { Document, DocumentData } from "@/types/document";
+import { DocumentItem } from "@/types/document";
+import { Product } from "@/types/product";
+import { updateItemWithCalculations } from "@/calculate/documentCalculations";
 
 const API_BASE_URL = "http://localhost:3001/api";
 
@@ -256,6 +259,64 @@ const getDocumentNumbers = async (
   }
 };
 
+const getDocumentById = async (id: string): Promise<Document> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/documents/${id}`);
+    if (!response.ok) {
+      throw new Error("Failed to fetch document by ID");
+    }
+    return await response.json();
+  } catch (error) {
+    console.error("Error fetching document by ID:", error);
+    throw error;
+  }
+};
+
+const createDefaultItem = (): DocumentItem => ({
+  id: `item-${Date.now()}`,
+  productTitle: "",
+  description: "",
+  unit: "",
+  quantity: 1,
+  unitPrice: 0,
+  priceType: "exclusive",
+  discount: 0,
+  discountType: "thb",
+  tax: 7,
+  amountBeforeTax: 0,
+  withholdingTax: -1,
+  amount: 0,
+  isEditing: true,
+});
+
+const handleProductSelect = (
+  product: Product | null,
+  itemId: string,
+  items: DocumentItem[],
+  setItems: (items: DocumentItem[]) => void
+) => {
+  if (product) {
+    const updatedItems = items.map((item) => {
+      if (item.id === itemId) {
+        // อัปเดตค่าต่างๆ จากสินค้าใหม่
+        const newItem = {
+          ...item,
+          productId: String(product.id),
+          productTitle: product.name,
+          description: product.description || "",
+          unitPrice: product.price || 0,
+          unit: product.unit || "ชิ้น",
+          tax: product.vat_rate ?? 7, // หรือ field ที่ถูกต้อง
+          isEditing: false,
+        };
+        return updateItemWithCalculations(newItem);
+      }
+      return item;
+    });
+    setItems(updatedItems);
+  }
+};
+
 export const apiService = {
   getDocuments,
   createDocument,
@@ -264,6 +325,6 @@ export const apiService = {
   syncDocumentsToLocalStorage,
   getDocumentNumbers,
   createCustomer,
-  // getProducts, createProduct, updateProduct are now in productService.ts
   uploadImage,
+  getDocumentById,
 };

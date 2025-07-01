@@ -1,12 +1,12 @@
 export interface Product {
   id: number;
   title: string;
-  name?: string;  // From ProductFormData
+  name?: string; // From ProductFormData
   description: string;
   sku: string;
   price: number;
-  selling_price?: number;  // From ProductFormData
-  purchase_price?: number;  // From ProductFormData
+  selling_price?: number; // From ProductFormData
+  purchase_price?: number; // From ProductFormData
   instock: number;
   product_type: string;
   property_option: number;
@@ -16,9 +16,10 @@ export interface Product {
   property_info2: string;
   feature_img: string;
   status: number;
-  unit?: string;  // From ProductFormData
-  createdAt?: Date;  // Used in DocumentForm
-  updatedAt?: Date;  // Used in DocumentForm
+  unit?: string; // From ProductFormData
+  createdAt?: Date; // Used in DocumentForm
+  updatedAt?: Date; // Used in DocumentForm
+  vat_rate?: number; // Optional VAT rate for compatibility
 }
 
 export interface ProductListResponse {

@@ -205,12 +205,20 @@ export const DocumentForm: FC<DocumentFormProps> = ({
 
   useEffect(() => {
     const newSummary = calculateDocumentSummary(items);
-    setSummary(newSummary);
+    setSummary({
+      subtotal: isNaN(newSummary.subtotal) ? 0 : newSummary.subtotal,
+      discount: isNaN(newSummary.discount) ? 0 : newSummary.discount,
+      tax: isNaN(newSummary.tax) ? 0 : newSummary.tax,
+      total: isNaN(newSummary.total) ? 0 : newSummary.total,
+      withholdingTax: isNaN(newSummary.withholdingTax)
+        ? 0
+        : newSummary.withholdingTax,
+    });
   }, [items]);
 
   const handleCustomerSelect = (selectedCustomer: Customer) => {
     setCustomer({
-      id: selectedCustomer.id,
+      id: Number(selectedCustomer.id),
       name: selectedCustomer.name,
       tax_id: selectedCustomer.tax_id,
       phone: selectedCustomer.phone,
@@ -265,15 +273,24 @@ export const DocumentForm: FC<DocumentFormProps> = ({
   ) => {
     const updatedItems = items.map((item) => {
       if (item.id === id) {
-        const updatedItemState = { ...item, [field]: value };
-
+        // Ensure all relevant fields are numbers
+        let updatedItemState = { ...item, [field]: value };
+        if (
+          field === "quantity" ||
+          field === "unitPrice" ||
+          field === "discount" ||
+          field === "tax" ||
+          field === "customWithholdingTaxAmount"
+        ) {
+          updatedItemState[field] = Number(value) || 0;
+        }
         if (field === "withholdingTax" && value !== "custom") {
           delete updatedItemState.customWithholdingTaxAmount;
         } else if (field === "withholdingTax" && value === "custom") {
           updatedItemState.customWithholdingTaxAmount =
             item.customWithholdingTaxAmount ?? 0;
         }
-
+        // Always recalculate
         return updateItemWithCalculations(updatedItemState);
       }
       return item;
@@ -285,26 +302,22 @@ export const DocumentForm: FC<DocumentFormProps> = ({
     if (product) {
       const updatedItems = items.map((item) => {
         if (item.id === itemId) {
-          return {
+          const newItem = {
             ...item,
-            product_id: String(product.id),
+            productId: String(product.id),
             productTitle: product.name,
             description: product.description || "",
-            unitPrice: product.price || 0,
-            quantity: 1, // Set default quantity to 1
+            unitPrice: typeof product.price === "number" ? product.price : 0,
             unit: product.unit || "ชิ้น",
+            priceType: item.priceType || "exclusive",
+            tax: typeof product.vat_rate === "number" ? product.vat_rate : 7,
             isEditing: false,
           };
+          return updateItemWithCalculations(newItem);
         }
         return item;
       });
-      const itemToUpdate = updatedItems.find((i) => i.id === itemId);
-      if (itemToUpdate) {
-        const calculatedItem = updateItemWithCalculations(itemToUpdate);
-        setItems(
-          updatedItems.map((i) => (i.id === itemId ? calculatedItem : i))
-        );
-      }
+      setItems(updatedItems);
     }
   };
 
@@ -328,17 +341,6 @@ export const DocumentForm: FC<DocumentFormProps> = ({
       return;
     }
 
-    // เตรียมข้อมูล items ให้ตรงกับ backend schema ใหม่
-    const itemsToSave = items.map((item) => ({
-      product_id: item.product_id || item.productId || "",
-      productTitle: item.productTitle || "",
-      unit: item.unit || "",
-      quantity: item.quantity || 1,
-      unitPrice: item.unitPrice || 0,
-      amount: item.amount || 0,
-      description: item.description || "",
-    }));
-
     const dataToSave = {
       id: initialData.id,
       documentType: documentType,
@@ -355,7 +357,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
         address: customer.address,
         email: customer.email,
       },
-      items: itemsToSave,
+      items,
       summary: summary,
       notes: notes,
       priceType: priceType,
@@ -512,7 +514,11 @@ export const DocumentForm: FC<DocumentFormProps> = ({
               <div className="flex-grow">
                 <Label>ค้นหาลูกค้า</Label>
                 <CustomerAutocomplete
-                  value={customer}
+                  value={
+                    customer
+                      ? { ...customer, id: String(customer.id) }
+                      : undefined
+                  }
                   onCustomerSelect={handleCustomerSelect}
                 />
               </div>
@@ -696,12 +702,14 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                       <Label>จำนวน</Label>
                       <Input
                         type="number"
-                        value={item.quantity}
+                        value={
+                          typeof item.quantity === "number" ? item.quantity : 0
+                        }
                         onChange={(e) =>
                           handleInputChange(
                             item.id,
                             "quantity",
-                            parseInt(e.target.value) || 0
+                            Number(e.target.value) || 0
                           )
                         }
                       />
@@ -710,7 +718,11 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                       <Label>ราคาต่อหน่วย</Label>
                       <Input
                         type="number"
-                        value={item.unitPrice}
+                        value={
+                          typeof item.unitPrice === "number"
+                            ? item.unitPrice
+                            : 0
+                        }
                         readOnly
                         placeholder="0.00"
                         className="bg-gray-100 dark:bg-gray-800"
@@ -721,12 +733,16 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                       <div className="flex items-center gap-2">
                         <Input
                           type="number"
-                          value={item.discount}
+                          value={
+                            typeof item.discount === "number"
+                              ? item.discount
+                              : 0
+                          }
                           onChange={(e) =>
                             handleInputChange(
                               item.id,
                               "discount",
-                              parseFloat(e.target.value) || 0
+                              Number(e.target.value) || 0
                             )
                           }
                         />
@@ -768,9 +784,14 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                       <Input
                         type="text"
                         readOnly
-                        value={item.amountBeforeTax.toLocaleString("th-TH", {
-                          minimumFractionDigits: 2,
-                        })}
+                        value={
+                          typeof item.amountBeforeTax === "number" &&
+                          !isNaN(item.amountBeforeTax)
+                            ? item.amountBeforeTax.toLocaleString("th-TH", {
+                                minimumFractionDigits: 2,
+                              })
+                            : "0.00"
+                        }
                         className="font-semibold bg-muted"
                       />
                     </div>
@@ -808,12 +829,12 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                         <Input
                           type="number"
                           placeholder="ระบุจำนวนเงิน"
-                          value={item.customWithholdingTaxAmount || ""}
+                          value={item.customWithholdingTaxAmount ?? ""}
                           onChange={(e) =>
                             handleInputChange(
                               item.id,
                               "customWithholdingTaxAmount",
-                              parseFloat(e.target.value) || 0
+                              Number(e.target.value) || 0
                             )
                           }
                           className="mt-2"
@@ -967,9 +988,11 @@ export const DocumentForm: FC<DocumentFormProps> = ({
             <div className="flex justify-between">
               <span>รวมเป็นเงิน</span>
               <span>
-                {summary.subtotal.toLocaleString("th-TH", {
-                  minimumFractionDigits: 2,
-                })}{" "}
+                {typeof summary.subtotal === "number"
+                  ? summary.subtotal.toLocaleString("th-TH", {
+                      minimumFractionDigits: 2,
+                    })
+                  : "0"}{" "}
                 บาท
               </span>
             </div>
@@ -977,27 +1000,34 @@ export const DocumentForm: FC<DocumentFormProps> = ({
               <span>ส่วนลดรวม</span>
               <span>
                 -
-                {summary.discount.toLocaleString("th-TH", {
-                  minimumFractionDigits: 2,
-                })}{" "}
+                {typeof summary.discount === "number"
+                  ? summary.discount.toLocaleString("th-TH", {
+                      minimumFractionDigits: 2,
+                    })
+                  : "0"}{" "}
                 บาท
               </span>
             </div>
             <div className="border-t pt-3 mt-3 flex justify-between">
               <span>มูลค่าก่อนภาษี</span>
               <span>
-                {(summary.subtotal - summary.discount).toLocaleString("th-TH", {
-                  minimumFractionDigits: 2,
-                })}{" "}
+                {typeof (summary.subtotal - summary.discount) === "number"
+                  ? (summary.subtotal - summary.discount).toLocaleString(
+                      "th-TH",
+                      { minimumFractionDigits: 2 }
+                    )
+                  : "0"}{" "}
                 บาท
               </span>
             </div>
             <div className="flex justify-between">
               <span>ภาษีมูลค่าเพิ่ม 7%</span>
               <span>
-                {summary.tax.toLocaleString("th-TH", {
-                  minimumFractionDigits: 2,
-                })}{" "}
+                {typeof summary.tax === "number"
+                  ? summary.tax.toLocaleString("th-TH", {
+                      minimumFractionDigits: 2,
+                    })
+                  : "0"}{" "}
                 บาท
               </span>
             </div>
@@ -1005,18 +1035,22 @@ export const DocumentForm: FC<DocumentFormProps> = ({
               <Label>หัก ณ ที่จ่าย</Label>
               <span>
                 -
-                {summary.withholdingTax?.toLocaleString("th-TH", {
-                  minimumFractionDigits: 2,
-                })}{" "}
+                {typeof summary.withholdingTax === "number"
+                  ? summary.withholdingTax.toLocaleString("th-TH", {
+                      minimumFractionDigits: 2,
+                    })
+                  : "0"}{" "}
                 บาท
               </span>
             </div>
             <div className="border-t-2 border-primary pt-3 mt-3 flex justify-between font-bold text-lg">
               <span>จำนวนเงินทั้งสิ้น</span>
               <span>
-                {summary.total.toLocaleString("th-TH", {
-                  minimumFractionDigits: 2,
-                })}{" "}
+                {typeof summary.total === "number"
+                  ? summary.total.toLocaleString("th-TH", {
+                      minimumFractionDigits: 2,
+                    })
+                  : "0"}{" "}
                 บาท
               </span>
             </div>

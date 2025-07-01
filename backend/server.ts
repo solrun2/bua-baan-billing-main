@@ -604,6 +604,32 @@ app.delete("/api/documents/:id", async (req: Request, res: Response) => {
   }
 });
 
+// เพิ่ม route สำหรับดึงเอกสารตาม id
+app.get("/api/documents/:id", async (req, res) => {
+  const { id } = req.params;
+  try {
+    // ดึงข้อมูลเอกสารหลัก
+    const docRows = await pool.query("SELECT * FROM documents WHERE id = ?", [
+      id,
+    ]);
+    const doc = Array.isArray(docRows) ? docRows[0] : null;
+    if (!doc || (Array.isArray(doc) && doc.length === 0)) {
+      return res.status(404).json({ error: "Document not found" });
+    }
+    // ดึง items ของเอกสารนี้
+    const items = await pool.query(
+      "SELECT * FROM document_items WHERE document_id = ?",
+      [id]
+    );
+    // แนบ items เข้าไปใน doc
+    const documentWithItems = { ...(Array.isArray(doc) ? doc[0] : doc), items };
+    res.json(documentWithItems);
+  } catch (err) {
+    console.error("Failed to fetch document by id:", err);
+    res.status(500).json({ error: "Failed to fetch document" });
+  }
+});
+
 app.listen(port, () => {
   console.log(`Backend server is running on http://localhost:${port}`);
 });

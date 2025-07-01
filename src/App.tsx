@@ -14,6 +14,7 @@ import { Layout } from "./components/Layout";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import { useState, useEffect } from "react";
+import EditDocumentPage from "./pages/documents/EditDocument";
 
 // Document pages
 import Quotation from "./pages/documents/Quotation";
@@ -61,13 +62,14 @@ const App = () => {
 
       // Sync with localStorage to be safe and update the main app state
       documentService.save(savedInvoice);
-      
+
       // If the invoice is marked as paid, create a receipt
       if (savedInvoice.status === "ชำระแล้ว") {
         // Generate a new receipt number
-        const receiptNumber = await apiService.getDocumentNumbers("receipt")
-          .then(numbers => generateDocumentNumber("receipt", numbers));
-        
+        const receiptNumber = await apiService
+          .getDocumentNumbers("receipt")
+          .then((numbers) => generateDocumentNumber("receipt", numbers));
+
         const receiptData: DocumentData = {
           ...savedInvoice,
           id: `receipt_${Date.now()}`,
@@ -76,21 +78,21 @@ const App = () => {
           status: "ต้นฉบับ",
           reference: savedInvoice.documentNumber,
         };
-        
+
         // Save receipt to database and localStorage
         const savedReceipt = await apiService.createDocument(receiptData);
         documentService.save(savedReceipt);
-        
+
         toast({
           title: "สร้างใบเสร็จรับเงินเรียบร้อยแล้ว",
           description: `ใบเสร็จเลขที่ ${savedReceipt.documentNumber} ถูกสร้างขึ้นจากใบแจ้งหนี้ ${savedInvoice.documentNumber}`,
         });
       }
-      
+
       // Update the local documents state
       const updatedDocs = documentService.getAll();
       setDocuments(updatedDocs);
-      
+
       return savedInvoice;
     } catch (error) {
       console.error("Error in post-save hook:", error);
@@ -191,6 +193,16 @@ const App = () => {
                 element={
                   <ProductForm onSuccess={() => window.history.back()} />
                 }
+              />
+
+              {/* แก้ไขใบเสนอราคา */}
+              <Route
+                path="/quotations/edit/:id"
+                element={<EditDocumentPage />}
+              />
+              <Route
+                path="/documents/quotation/edit/:id"
+                element={<EditDocumentPage />}
               />
 
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
