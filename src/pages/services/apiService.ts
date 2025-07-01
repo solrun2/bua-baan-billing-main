@@ -46,6 +46,8 @@ const prepareDocumentData = (document: DocumentData): any => {
     unit: item.unit || "",
     quantity: item.quantity || 1,
     unitPrice: item.unitPrice || 0,
+    discount: item.discount || 0,
+    tax: item.tax || 0,
     amount: item.amount || 0,
     withholding_tax_amount: (item as any).withholding_tax_amount ?? 0,
     description: item.description || "",

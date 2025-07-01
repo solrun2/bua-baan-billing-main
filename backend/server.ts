@@ -420,6 +420,7 @@ app.get("/api/documents/next-number", async (req, res) => {
 
 // API route to create a new document
 app.post("/api/documents", async (req: Request, res: Response) => {
+  console.log("Received document data:", req.body);
   let conn;
   try {
     const {
@@ -483,19 +484,25 @@ app.post("/api/documents", async (req: Request, res: Response) => {
 
     // 3. Insert into main 'documents' table
     const docResult = await conn.query(
-      `INSERT INTO documents (customer_id, customer_name, document_type, document_number, status, issue_date, subtotal, tax_amount, total_amount, notes) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO documents (
+        customer_id, customer_name, document_number, document_type, status, issue_date,
+        subtotal, tax_amount, total_amount, notes,
+        customer_address, customer_phone, customer_email
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         customer.id,
         customer.name,
-        document_type,
         document_number,
+        document_type,
         status,
         issue_date,
         subtotal,
         tax_amount,
         total_amount,
         notes,
+        customer.address || "",
+        customer.phone || "",
+        customer.email || "",
       ]
     );
 
@@ -539,8 +546,9 @@ app.post("/api/documents", async (req: Request, res: Response) => {
     );
 
     for (const item of items) {
+      console.log("Saving item to document_items:", item);
       await conn.query(
-        "INSERT INTO document_items (document_id, product_id, product_name, unit, quantity, unit_price, amount, withholding_tax_amount, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO document_items (document_id, product_id, product_name, unit, quantity, unit_price, discount, tax, amount, withholding_tax_amount, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [
           documentId,
           item.product_id || null,
@@ -548,6 +556,8 @@ app.post("/api/documents", async (req: Request, res: Response) => {
           item.unit || "",
           item.quantity || 1,
           item.unitPrice || 0,
+          item.discount || 0,
+          item.tax || 0,
           item.amount || 0,
           item.withholding_tax_amount ?? item.withholdingTaxAmount ?? 0,
           item.description || "",
