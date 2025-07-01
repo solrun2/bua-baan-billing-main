@@ -332,8 +332,6 @@ app.get("/api/documents", async (req: Request, res: Response) => {
         `SELECT * FROM document_items WHERE document_id IN (${docIds.map(() => "?").join(",")})`,
         docIds
       );
-      // Log itemsRows from db
-      console.log("[GET /api/documents] itemsRows from db:", itemsRows);
       // group by document_id
       itemsByDoc = itemsRows.reduce((acc: Record<number, any[]>, item: any) => {
         if (!acc[item.document_id]) acc[item.document_id] = [];
@@ -531,9 +529,18 @@ app.post("/api/documents", async (req: Request, res: Response) => {
       );
     }
 
+    console.log(
+      "items to save:",
+      items.map((item) => ({
+        ...item,
+        withholding_tax_amount:
+          item.withholding_tax_amount ?? item.withholdingTaxAmount ?? 0,
+      }))
+    );
+
     for (const item of items) {
       await conn.query(
-        "INSERT INTO document_items (document_id, product_id, product_name, unit, quantity, unit_price, amount, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO document_items (document_id, product_id, product_name, unit, quantity, unit_price, amount, withholding_tax_amount, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [
           documentId,
           item.product_id || null,
@@ -542,6 +549,7 @@ app.post("/api/documents", async (req: Request, res: Response) => {
           item.quantity || 1,
           item.unitPrice || 0,
           item.amount || 0,
+          item.withholding_tax_amount ?? item.withholdingTaxAmount ?? 0,
           item.description || "",
         ]
       );

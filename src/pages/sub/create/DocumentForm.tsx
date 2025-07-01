@@ -176,7 +176,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
       unit: "",
       quantity: 1,
       unitPrice: 0,
-      priceType: "exclusive",
+      priceType: priceType,
       discount: 0,
       discountType: "thb",
       tax: 7,
@@ -246,7 +246,9 @@ export const DocumentForm: FC<DocumentFormProps> = ({
   };
 
   const addNewItem = () => {
-    setItems([...items, createDefaultItem()]);
+    const newItem = createDefaultItem();
+    const calculatedItem = updateItemWithCalculations(newItem);
+    setItems([...items, calculatedItem]);
   };
 
   const removeItem = (id: string) => {
@@ -257,10 +259,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
   const handlePriceTypeChange = (value: "exclusive" | "inclusive" | "none") => {
     setPriceType(value);
     const updatedItems = items.map((item) => {
-      const newItem = {
-        ...item,
-        priceType: value,
-      };
+      const newItem = { ...item, priceType: value };
       return updateItemWithCalculations(newItem);
     });
     setItems(updatedItems);
@@ -341,6 +340,8 @@ export const DocumentForm: FC<DocumentFormProps> = ({
       return;
     }
 
+    console.log("items before map", items);
+
     const dataToSave = {
       id: initialData.id,
       documentType: documentType,
@@ -357,7 +358,10 @@ export const DocumentForm: FC<DocumentFormProps> = ({
         address: customer.address,
         email: customer.email,
       },
-      items,
+      items: items.map((item) => ({
+        ...item,
+        withholding_tax_amount: (item as any).withholdingTaxAmount ?? 0,
+      })),
       summary: summary,
       notes: notes,
       priceType: priceType,
@@ -366,10 +370,10 @@ export const DocumentForm: FC<DocumentFormProps> = ({
         (documentType === "invoice" ? "รอชำระ" : "รอตอบรับ"),
       attachments: attachments,
     };
+
     try {
       await onSave(dataToSave);
     } catch (error) {
-      console.error("Error saving document:", error);
       toast.error("เกิดข้อผิดพลาดในการบันทึกเอกสาร");
     } finally {
       setIsSaving(false);

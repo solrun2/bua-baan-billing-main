@@ -110,6 +110,7 @@ CREATE TABLE `document_items` (
   `quantity` DECIMAL(10, 2) NOT NULL DEFAULT 1.00,
   `unit_price` DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
   `amount` DECIMAL(15, 2) NOT NULL DEFAULT 0.00,
+  `withholding_tax_amount` DECIMAL(15, 2) NOT NULL DEFAULT 0.00, -- จำนวนเงินหัก ณ ที่จ่าย (คำนวณแล้ว)
   `description` TEXT,
   FOREIGN KEY (`document_id`) REFERENCES `documents`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

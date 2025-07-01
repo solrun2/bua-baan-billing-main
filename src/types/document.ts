@@ -16,6 +16,7 @@ export interface DocumentItem {
   isEditing: boolean;
   productId?: string;
   isNew?: boolean;
+  withholding_tax_amount?: number;
 }
 
 export interface DocumentSummary {
@@ -38,12 +39,12 @@ export interface CustomerData {
 export type DocumentType = "quotation" | "invoice" | "receipt" | "tax_invoice";
 
 export type DocumentStatus =
-  | 'รอตอบรับ'
-  | 'ตอบรับแล้ว'
-  | 'พ้นกำหนด'
-  | 'รอชำระ'
-  | 'ชำระแล้ว'
-  | 'ยกเลิก';
+  | "รอตอบรับ"
+  | "ตอบรับแล้ว"
+  | "พ้นกำหนด"
+  | "รอชำระ"
+  | "ชำระแล้ว"
+  | "ยกเลิก";
 
 export interface DocumentData {
   id?: string;
@@ -59,7 +60,7 @@ export interface DocumentData {
   dueDate?: string; // Optional, for invoices
   reference: string;
   status: string;
-  priceType: 'inclusive' | 'exclusive' | 'none';
+  priceType: "inclusive" | "exclusive" | "none";
   updatedAt?: string;
   tags?: string[];
   issueTaxInvoice?: boolean;
