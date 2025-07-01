@@ -60,7 +60,11 @@ export function getSearchType(query: string): "id" | "phone" | "email" | null {
 /**
  * Search customers by id, phone, or email
  */
-export async function searchCustomers(query: string): Promise<Customer[]> {
+export async function searchCustomers(
+  query: string,
+  page = 1,
+  limit = 20
+): Promise<Customer[]> {
   try {
     // Validate query first
     if (!isValidCustomerQuery(query)) {
@@ -74,9 +78,11 @@ export async function searchCustomers(query: string): Promise<Customer[]> {
       return [];
     }
 
-    const requestBody = {
+    const requestBody: any = {
       type: searchType,
       value: query.trim(),
+      page,
+      limit,
     };
 
     console.log("Sending customer search request:", {
@@ -194,4 +200,19 @@ export async function getCustomerByEmail(
     console.error("Error getting customer by email:", error);
     throw new Error("Failed to get customer");
   }
+}
+
+export async function getAllCustomersInRange(): Promise<Customer[]> {
+  // Example: fetch all customers, then filter by id range
+  // Replace this with your actual API endpoint if available
+  const response = await fetch(`${API_BASE_URL}/customers/all`, {
+    headers: {
+      Authorization: `Bearer ${API_TOKEN}`,
+    },
+  });
+  const data = await response.json();
+  return (data as Customer[]).filter((customer) => {
+    const idNum = Number(customer.id);
+    return !isNaN(idNum) && idNum >= 370 && idNum <= 70000;
+  });
 }

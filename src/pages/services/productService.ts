@@ -8,11 +8,20 @@ const headers = {
   "Content-Type": "application/json",
 };
 
-export async function listAllProducts() {
-  const res = await fetch(`${BASE_URL}/product/list_all`, {
+export async function searchProducts(query = "", page = 1, limit = 100) {
+  let body: any = { page, limit };
+  if (query) {
+    if (/^\d+$/.test(query)) {
+      // If query is all digits, treat as product id
+      body.id = query;
+    } else {
+      body.keyword = query;
+    }
+  }
+  const res = await fetch(`${BASE_URL}/product/search`, {
     method: "POST",
     headers,
-    body: JSON.stringify({}),
+    body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error("Failed to fetch products");
   const data = await res.json();
@@ -49,15 +58,7 @@ export async function fetchAllProducts() {
   let hasMore = true;
 
   while (hasMore) {
-    const res = await fetch(`${BASE_URL}/product/list_all`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ page, limit }),
-    });
-    if (!res.ok) throw new Error("Failed to fetch products");
-    const data = await res.json();
-    const products = data.data || [];
-    console.log("page", page, "products.length", products.length, products);
+    const products = await searchProducts("", page, limit);
     allProducts.push(...products);
     if (products.length < limit) {
       hasMore = false;

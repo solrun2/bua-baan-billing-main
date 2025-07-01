@@ -16,7 +16,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { Plus, ChevronsUpDown, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { fetchAllProducts } from "@/pages/services/productService";
+import {
+  fetchAllProducts,
+  searchProducts,
+} from "@/pages/services/productService";
 import { toast } from "sonner";
 
 interface ProductAutocompleteProps {
@@ -55,34 +58,41 @@ const ProductAutocomplete = ({
   const [products, setProducts] = useState<Product[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [initialLoad, setInitialLoad] = useState(true);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const limit = 10; // ปรับจำนวนต่อ page ตามต้องการ
 
-  // Load products on mount and when search query changes
+  // Reset products and page when searchQuery or open changes
   useEffect(() => {
-    const fetchProducts = async () => {
-      try {
-        const products = await fetchAllProducts();
-        setProducts(products);
-      } catch (error) {
-        console.error("Error fetching products:", error);
-        toast.error("ไม่สามารถโหลดรายการสินค้าได้");
-        setProducts([]);
-      } finally {
-        setInitialLoad(false);
-      }
-    };
-
-    const timeoutId = setTimeout(() => {
-      fetchProducts();
-    }, 300);
-
-    return () => clearTimeout(timeoutId);
+    if (!open) return;
+    setProducts([]);
+    setPage(1);
+    setHasMore(true);
   }, [searchQuery, open]);
 
   useEffect(() => {
-    if (open) {
-      setSearchQuery("");
-    }
-  }, [open]);
+    if (!open) return;
+    const fetchProducts = async () => {
+      setIsLoading(true);
+      try {
+        const result = await searchProducts(searchQuery, page, limit);
+        setProducts((prev) => (page === 1 ? result : [...prev, ...result]));
+        setHasMore(result.length === limit);
+      } catch (error) {
+        setProducts([]);
+        setHasMore(false);
+      } finally {
+        setInitialLoad(false);
+        setIsLoading(false);
+      }
+    };
+    fetchProducts();
+  }, [page, searchQuery, open]);
+
+  const handleLoadMore = () => {
+    if (hasMore && !isLoading) setPage((p) => p + 1);
+  };
 
   return (
     <div className={cn("flex flex-col w-full space-y-2", className)}>
@@ -204,6 +214,21 @@ const ProductAutocomplete = ({
                       </div>
                     </CommandItem>
                   ))}
+                  {hasMore && (
+                    <div className="flex justify-center p-2">
+                      <Button
+                        onClick={handleLoadMore}
+                        disabled={isLoading}
+                        variant="outline"
+                        size="sm"
+                      >
+                        {isLoading ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin inline" />
+                        ) : null}
+                        โหลดเพิ่ม
+                      </Button>
+                    </div>
+                  )}
                 </CommandGroup>
               </CommandList>
             </Command>

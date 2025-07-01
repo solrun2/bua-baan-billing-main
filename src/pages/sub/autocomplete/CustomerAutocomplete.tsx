@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 import { Customer } from "@/types/customer";
-import { searchCustomers } from "@/pages/services/customerService";
+import {
+  searchCustomers,
+  getAllCustomersInRange,
+} from "@/pages/services/customerService";
 import {
   Command,
   CommandEmpty,
@@ -35,33 +38,38 @@ export const CustomerAutocomplete: React.FC<CustomerAutocompleteProps> = ({
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const limit = 10; // ปรับจำนวนต่อ page ตามต้องการ
 
   useEffect(() => {
+    if (!open) return;
+    setCustomers([]);
+    setPage(1);
+    setHasMore(true);
+  }, [searchQuery, open]);
+
+  useEffect(() => {
+    if (!open) return;
     const fetchCustomers = async () => {
       setIsLoading(true);
       try {
-        const fetchedCustomers = await searchCustomers(searchQuery);
-        setCustomers(fetchedCustomers);
+        const result = await searchCustomers(searchQuery, page, limit);
+        setCustomers((prev) => (page === 1 ? result : [...prev, ...result]));
+        setHasMore(result.length === limit);
       } catch (error) {
-        console.error("Error fetching customers:", error);
         setCustomers([]);
+        setHasMore(false);
       } finally {
         setIsLoading(false);
       }
     };
+    fetchCustomers();
+  }, [page, searchQuery, open]);
 
-    const timeoutId = setTimeout(() => {
-      fetchCustomers();
-    }, 300);
-
-    return () => clearTimeout(timeoutId);
-  }, [searchQuery, open]);
-
-  useEffect(() => {
-    if (open) {
-      setSearchQuery("");
-    }
-  }, [open]);
+  const handleLoadMore = () => {
+    if (hasMore && !isLoading) setPage((p) => p + 1);
+  };
 
   console.log("Customers for dropdown:", customers);
 
@@ -105,18 +113,38 @@ export const CustomerAutocomplete: React.FC<CustomerAutocompleteProps> = ({
                 )}
               </CommandEmpty>
               <CommandGroup>
-                {customers.map((customer) => (
-                  <CommandItem
-                    key={customer.id}
-                    value={`${customer.name}_${customer.id}`}
-                    onSelect={() => {
-                      onCustomerSelect(customer);
-                      setOpen(false);
-                    }}
-                  >
-                    {`${customer.name || ""}${customer.lastname ? " " + customer.lastname : ""}${customer.tel ? " (" + customer.tel + ")" : ""}`}
-                  </CommandItem>
-                ))}
+                {customers
+                  .filter((customer) => {
+                    const idNum = Number(customer.id);
+                    return !isNaN(idNum) && idNum >= 370 && idNum <= 70000;
+                  })
+                  .map((customer) => (
+                    <CommandItem
+                      key={customer.id}
+                      value={`${customer.name}_${customer.id}`}
+                      onSelect={() => {
+                        onCustomerSelect(customer);
+                        setOpen(false);
+                      }}
+                    >
+                      {`${customer.name || ""}${customer.lastname ? " " + customer.lastname : ""}${customer.tel ? " (" + customer.tel + ")" : ""}`}
+                    </CommandItem>
+                  ))}
+                {hasMore && (
+                  <div className="flex justify-center p-2">
+                    <Button
+                      onClick={handleLoadMore}
+                      disabled={isLoading}
+                      variant="outline"
+                      size="sm"
+                    >
+                      {isLoading ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin inline" />
+                      ) : null}
+                      โหลดเพิ่ม
+                    </Button>
+                  </div>
+                )}
               </CommandGroup>
             </CommandList>
           </Command>
