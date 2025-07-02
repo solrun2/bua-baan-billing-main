@@ -175,8 +175,6 @@ export async function getCustomerByEmail(
 }
 
 export async function getAllCustomersInRange(): Promise<Customer[]> {
-  // Example: fetch all customers, then filter by id range
-  // Replace this with your actual API endpoint if available
   const response = await fetch(`${API_BASE_URL}/customers/all`, {
     headers: {
       Authorization: `Bearer ${API_TOKEN}`,

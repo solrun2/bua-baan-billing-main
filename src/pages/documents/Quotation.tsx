@@ -213,7 +213,16 @@ const Quotation = () => {
                         {quotation.validUntil}
                       </td>
                       <td className="py-3 px-4 font-medium text-foreground">
-                        {quotation.total}
+                        <span>
+                          {typeof quotation.total === "string"
+                            ? quotation.total
+                            : typeof quotation.total === "number"
+                              ? quotation.total.toLocaleString("th-TH", {
+                                  minimumFractionDigits: 2,
+                                })
+                              : "0"}
+                          บาท
+                        </span>
                       </td>
                       <td className="py-3 px-4">
                         <span

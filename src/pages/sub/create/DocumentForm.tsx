@@ -121,23 +121,36 @@ export const DocumentForm: FC<DocumentFormProps> = ({
     };
   }
 
-  // รวม state หลักของฟอร์ม
-  const [form, setForm] = useState({
-    reference: initialData.reference,
-    documentNumber: initialData.documentNumber || "",
-    documentDate:
-      initialData.documentDate || new Date().toISOString().split("T")[0],
-    dueDate: initialData.dueDate || "",
-    validUntil: initialData.validUntil || "",
-    customer: initialData.customer,
-    issueTaxInvoice: initialData.issueTaxInvoice ?? true,
-    priceType: initialData.priceType || "exclusive",
-    tags: initialData.tags || [],
-    notes: initialData.notes,
-    items:
-      initialData.items.length > 0 ? initialData.items : [createDefaultItem()],
-    status: initialData.status || "รอตอบรับ",
-  });
+  // 1. สร้าง state ฟอร์มแบบ pre-fill ทุก field จาก initialData (editMode)
+  const [form, setForm] = useState(() => ({
+    ...initialData,
+    items: (initialData.items || []).map((item) => {
+      let withholdingTax: number | "custom" = 0;
+      if (item.withholding_tax_option === "กำหนดเอง") {
+        withholdingTax = "custom";
+      } else if (
+        typeof item.withholding_tax_option === "string" &&
+        item.withholding_tax_option.endsWith("%")
+      ) {
+        withholdingTax = parseFloat(item.withholding_tax_option);
+      } else if (
+        item.withholding_tax_option === "ไม่มี" ||
+        item.withholding_tax_option === "ไม่ระบุ"
+      ) {
+        withholdingTax = 0;
+      } else if (typeof item.withholdingTax === "number") {
+        withholdingTax = item.withholdingTax;
+      }
+      return {
+        ...item,
+        discountType: item.discountType ?? "thb",
+        withholding_tax_option: item.withholding_tax_option ?? "ไม่ระบุ",
+        withholdingTax,
+        withholdingTaxAmount: item.withholdingTaxAmount ?? 0,
+        customWithholdingTaxAmount: item.customWithholdingTaxAmount ?? 0,
+      };
+    }) as DocumentItem[],
+  }));
 
   // summary แยกไว้เพราะต้องคำนวณใหม่เมื่อ items เปลี่ยน
   const [summary, setSummary] = useState<DocumentSummary>({
@@ -147,10 +160,15 @@ export const DocumentForm: FC<DocumentFormProps> = ({
     total: 0,
     withholdingTax: 0,
   });
+  const [netTotal, setNetTotal] = useState(0);
 
   // handle เปลี่ยนค่าในฟอร์ม
   const handleFormChange = (field: string, value: any) => {
-    setForm((prev) => ({ ...prev, [field]: value }));
+    setForm((prev) => ({
+      ...prev,
+      [field]: value,
+      summary: prev.summary ?? summary,
+    }));
   };
 
   // handle เปลี่ยนค่าใน customer
@@ -165,6 +183,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
     setForm((prev) => ({
       ...prev,
       customer: { ...prev.customer, [field]: processedValue },
+      summary: prev.summary ?? summary,
     }));
   };
 
@@ -183,11 +202,13 @@ export const DocumentForm: FC<DocumentFormProps> = ({
           if (field === "withholding_tax_option") {
             updatedItemState.withholding_tax_option = value;
             // sync withholdingTax (number/custom) สำหรับ logic เดิม (ใช้สำหรับคำนวณเท่านั้น)
-            if (value === "ไม่ระบุ") updatedItemState.withholdingTax = -1;
+            if (value === "ไม่ระบุ") updatedItemState.withholdingTax = 0;
             else if (value === "ไม่มี") updatedItemState.withholdingTax = 0;
             else if (value === "กำหนดเอง")
               updatedItemState.withholdingTax = "custom";
-            else updatedItemState.withholdingTax = parseFloat(value);
+            else if (typeof value === "string" && value.endsWith("%"))
+              updatedItemState.withholdingTax = parseFloat(value);
+            else updatedItemState.withholdingTax = Number(value) || 0;
           }
           if (
             field === "quantity" ||
@@ -278,18 +299,11 @@ export const DocumentForm: FC<DocumentFormProps> = ({
     setAttachments((prev) => prev.filter((file) => file.name !== fileName));
   };
 
-  // คำนวณ summary ทุกครั้งที่ items เปลี่ยน
+  // 3. สรุปรายการคำนวณสดจาก form.items
   useEffect(() => {
     const newSummary = calculateDocumentSummary(form.items);
-    setSummary({
-      subtotal: isNaN(newSummary.subtotal) ? 0 : newSummary.subtotal,
-      discount: isNaN(newSummary.discount) ? 0 : newSummary.discount,
-      tax: isNaN(newSummary.tax) ? 0 : newSummary.tax,
-      total: isNaN(newSummary.total) ? 0 : newSummary.total,
-      withholdingTax: isNaN(newSummary.withholdingTax)
-        ? 0
-        : newSummary.withholdingTax,
-    });
+    setSummary(newSummary);
+    setNetTotal(newSummary.total - newSummary.withholdingTax);
   }, [form.items]);
 
   // Set initial document number when component mounts or document type changes
@@ -393,7 +407,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
               tax: item.tax ?? 0,
               amountBeforeTax:
                 item.amountBeforeTax ?? item.amount_before_tax ?? 0,
-              withholdingTax: item.withholdingTax ?? item.withholding_tax ?? -1,
+              withholdingTax: item.withholdingTax ?? item.withholding_tax ?? 0,
               customWithholdingTaxAmount:
                 item.customWithholdingTaxAmount ??
                 item.custom_withholding_tax_amount ??
@@ -403,14 +417,11 @@ export const DocumentForm: FC<DocumentFormProps> = ({
               taxAmount: item.taxAmount ?? item.tax_amount ?? 0,
               withholdingTaxAmount:
                 item.withholdingTaxAmount ?? item.withholding_tax_amount ?? 0,
-              withholding_tax_option:
-                item.withholding_tax_option !== undefined &&
-                item.withholding_tax_option !== null
-                  ? item.withholding_tax_option
-                  : "ไม่ระบุ",
+              withholding_tax_option: item.withholding_tax_option ?? "ไม่ระบุ",
             }))
-          : [createDefaultItem()],
-      status: initialData.status || "รอตอบรับ",
+          : [],
+      summary: initialData.summary ?? summary,
+      status: initialData.status,
     });
   }, [initialData]);
 
@@ -523,8 +534,9 @@ export const DocumentForm: FC<DocumentFormProps> = ({
     }
   };
 
-  console.log("items:", form.items);
+  console.log("form.items", form.items);
   console.log("summary:", summary);
+  console.log("initialData.summary.total", initialData.summary?.total);
 
   return (
     <>
@@ -1253,11 +1265,11 @@ export const DocumentForm: FC<DocumentFormProps> = ({
             <div className="flex justify-between">
               <span>รวมเป็นเงิน</span>
               <span>
-                {typeof summary.subtotal === "number"
-                  ? summary.subtotal.toLocaleString("th-TH", {
+                {typeof netTotal === "number"
+                  ? netTotal.toLocaleString("th-TH", {
                       minimumFractionDigits: 2,
                     })
-                  : "0"}{" "}
+                  : "0"}
                 บาท
               </span>
             </div>
@@ -1300,22 +1312,32 @@ export const DocumentForm: FC<DocumentFormProps> = ({
               <Label>หัก ณ ที่จ่าย</Label>
               <span>
                 -
-                {typeof summary.withholdingTax === "number"
-                  ? summary.withholdingTax.toLocaleString("th-TH", {
-                      minimumFractionDigits: 2,
-                    })
-                  : "0.00"}{" "}
+                {(() => {
+                  // รวม withholding_tax_amount ของทุก item (รองรับ custom)
+                  const totalWht = form.items.reduce((sum, item) => {
+                    if (item.withholding_tax_option === "กำหนดเอง") {
+                      return (
+                        sum + (Number(item.customWithholdingTaxAmount) || 0)
+                      );
+                    }
+                    // ถ้าไม่ใช่กำหนดเอง ให้ใช้ withholdingTaxAmount (ที่คำนวณไว้)
+                    return sum + (Number(item.withholdingTaxAmount) || 0);
+                  }, 0);
+                  return totalWht.toLocaleString("th-TH", {
+                    minimumFractionDigits: 2,
+                  });
+                })()}{" "}
                 บาท
               </span>
             </div>
             <div className="border-t-2 border-primary pt-3 mt-3 flex justify-between font-bold text-lg">
               <span>จำนวนเงินทั้งสิ้น</span>
               <span>
-                {typeof summary.total === "number"
-                  ? summary.total.toLocaleString("th-TH", {
+                {typeof netTotal === "number"
+                  ? netTotal.toLocaleString("th-TH", {
                       minimumFractionDigits: 2,
                     })
-                  : "0"}{" "}
+                  : "0"}
                 บาท
               </span>
             </div>
