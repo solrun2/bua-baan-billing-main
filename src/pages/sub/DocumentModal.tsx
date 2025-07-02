@@ -5,18 +5,27 @@ interface DocumentItem {
   unit?: string;
   description: string;
   quantity: number;
-  unitPrice: number;
-  amount: number;
+  unitPrice?: number;
+  unit_price?: number;
+  amount?: number;
   product_name?: string;
   productTitle?: string;
   discount?: number;
+  discount_type?: "thb" | "percentage";
+  discountType?: "thb" | "percentage";
   tax?: number;
+  amountBeforeTax?: number;
+  amount_before_tax?: number;
+  withholdingTaxAmount?: number;
+  withholding_tax_amount?: number;
 }
 
 interface DocumentSummary {
   subtotal: number;
   tax: number;
   total: number;
+  discount: number;
+  withholdingTax: number;
 }
 
 interface DocumentBase {
@@ -86,6 +95,45 @@ const SELLER_INFO = {
   ],
 };
 
+// Helper to calculate summary if missing or zero
+function calculateSummaryFromItems(items: DocumentItem[]) {
+  let subtotal = 0;
+  let discountTotal = 0;
+  let tax = 0;
+  let total = 0;
+  let withholdingTaxTotal = 0;
+  items.forEach((item) => {
+    const qty = item.quantity ?? 1;
+    const unitPrice = item.unitPrice ?? item.unit_price ?? 0;
+    const discount = item.discount ?? 0;
+    const discountType = item.discount_type ?? item.discountType ?? "thb";
+    const itemSubtotal = unitPrice * qty;
+    let itemDiscount = 0;
+    if (discountType === "percentage") {
+      itemDiscount = itemSubtotal * (discount / 100);
+    } else {
+      itemDiscount = discount * qty;
+    }
+    const amountBeforeTax = itemSubtotal - itemDiscount;
+    const itemTaxRate = item.tax ?? 0;
+    const itemTax = amountBeforeTax * (itemTaxRate / 100);
+    subtotal += itemSubtotal;
+    discountTotal += itemDiscount;
+    tax += itemTax;
+    total += amountBeforeTax + itemTax;
+    // Withholding tax (support both camelCase and snake_case)
+    const wht = item.withholdingTaxAmount ?? item.withholding_tax_amount ?? 0;
+    withholdingTaxTotal += wht;
+  });
+  return {
+    subtotal,
+    discount: discountTotal,
+    tax,
+    total,
+    withholdingTax: withholdingTaxTotal,
+  };
+}
+
 const DocumentModal: React.FC<DocumentModalProps> = ({
   type,
   document,
@@ -149,6 +197,12 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
 
   if (!open) return null;
   const labels = typeLabels[type];
+
+  // Use summary from document, or recalculate if missing/zero
+  const summary =
+    document.summary && document.summary.subtotal > 0
+      ? document.summary
+      : calculateSummaryFromItems(document.items || []);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40 print:bg-transparent">
@@ -250,16 +304,40 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
                     {prod?.unit || item.unit || "-"}
                   </td>
                   <td className="border p-1 text-right">
-                    {item.unitPrice?.toLocaleString()}
+                    {(item.unitPrice ?? item.unit_price ?? 0).toLocaleString(
+                      undefined,
+                      { minimumFractionDigits: 2, maximumFractionDigits: 2 }
+                    )}
                   </td>
                   <td className="border p-1 text-right">
-                    {item.discount?.toLocaleString() || "0.00"}
+                    {(() => {
+                      const discount = item.discount ?? 0;
+                      const qty = item.quantity ?? 1;
+                      const unitPrice = item.unitPrice ?? item.unit_price ?? 0;
+                      const discountType =
+                        item.discount_type ?? item.discountType ?? "thb";
+                      if (discountType === "percentage") {
+                        const discountAmount =
+                          unitPrice * qty * (discount / 100);
+                        return `${discountAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                      } else {
+                        const discountAmount = discount * qty;
+                        return `${discountAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                      }
+                    })()}
                   </td>
                   <td className="border p-1 text-center">
                     {item.tax ? `${item.tax}%` : "-"}
                   </td>
                   <td className="border p-1 text-right">
-                    {item.amount?.toLocaleString()}
+                    {(
+                      item.amountBeforeTax ??
+                      item.amount_before_tax ??
+                      0
+                    ).toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
                   </td>
                 </tr>
               );
@@ -273,16 +351,58 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
             <div className="flex justify-between mb-1">
               <span>มูลค่าสินค้าหรือค่าบริการ</span>
               <span>
-                {document.summary?.subtotal?.toLocaleString() ?? 0} บาท
+                {summary.subtotal.toLocaleString(undefined, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}{" "}
+                บาท
               </span>
             </div>
+            {summary.discount > 0 && (
+              <div className="flex justify-between mb-1 text-destructive">
+                <span>ส่วนลด</span>
+                <span>
+                  -
+                  {summary.discount.toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}{" "}
+                  บาท
+                </span>
+              </div>
+            )}
+            {summary.withholdingTax > 0 && (
+              <div className="flex justify-between mb-1 text-yellow-700">
+                <span>หัก ณ ที่จ่าย</span>
+                <span>
+                  -
+                  {summary.withholdingTax.toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}{" "}
+                  บาท
+                </span>
+              </div>
+            )}
             <div className="flex justify-between mb-1">
               <span>ภาษีมูลค่าเพิ่ม 7%</span>
-              <span>{document.summary?.tax?.toLocaleString() ?? 0} บาท</span>
+              <span>
+                {summary.tax.toLocaleString(undefined, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}{" "}
+                บาท
+              </span>
             </div>
             <div className="flex justify-between font-bold text-lg">
               <span>จำนวนเงินทั้งสิ้น</span>
-              <span>{document.summary?.total?.toLocaleString() ?? 0} บาท</span>
+              <span>
+                {summary.total.toLocaleString(undefined, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}{" "}
+                บาท
+              </span>
             </div>
           </div>
         </div>
