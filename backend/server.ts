@@ -546,22 +546,33 @@ app.post("/api/documents", async (req: Request, res: Response) => {
     );
 
     for (const item of items) {
-      console.log("Saving item to document_items:", item);
+      const params = [
+        documentId, // document_id
+        item.product_id ?? null, // product_id
+        item.productTitle ?? item.product_name ?? "", // product_name
+        item.unit ?? "", // unit
+        item.quantity ?? 1, // quantity
+        item.unitPrice ?? 0, // unit_price
+        item.amount ?? 0, // amount
+        item.description ?? "", // description
+        item.withholding_tax_amount ?? item.withholdingTaxAmount ?? 0, // withholding_tax_amount
+        item.amountBeforeTax ?? item.amount_before_tax ?? 0, // amount_before_tax
+        item.discount ?? 0, // discount
+        item.discountType ?? "thb", // discount_type
+        item.tax ?? 0, // tax
+        item.taxAmount ?? item.tax_amount ?? 0, // tax_amount
+      ];
+      console.log(
+        "Params for document_items:",
+        params,
+        "length:",
+        params.length
+      );
       await conn.query(
-        "INSERT INTO document_items (document_id, product_id, product_name, unit, quantity, unit_price, discount, tax, amount, withholding_tax_amount, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        [
-          documentId,
-          item.product_id || null,
-          item.productTitle || "",
-          item.unit || "",
-          item.quantity || 1,
-          item.unitPrice || 0,
-          item.discount || 0,
-          item.tax || 0,
-          item.amount || 0,
-          item.withholding_tax_amount ?? item.withholdingTaxAmount ?? 0,
-          item.description || "",
-        ]
+        `INSERT INTO document_items (
+          document_id, product_id, product_name, unit, quantity, unit_price, amount, description, withholding_tax_amount, amount_before_tax, discount, discount_type, tax, tax_amount
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        params
       );
     }
 

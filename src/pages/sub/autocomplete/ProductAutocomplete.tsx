@@ -40,20 +40,6 @@ const ProductAutocomplete = ({
   className,
   onAddNew,
 }: ProductAutocompleteProps) => {
-  // Log when value changes
-  useEffect(() => {
-    if (process.env.NODE_ENV === "development") {
-      console.log("ProductAutocomplete value changed:", value);
-      console.log("Value details:", {
-        hasValue: !!value,
-        hasId: value?.id,
-        hasTitle: value?.title,
-        title: value?.title,
-        name: value?.name,
-      });
-    }
-  }, [value]);
-
   const [open, setOpen] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [searchQuery, setSearchQuery] = useState("");

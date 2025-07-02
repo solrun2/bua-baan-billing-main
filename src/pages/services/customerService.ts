@@ -68,13 +68,11 @@ export async function searchCustomers(
   try {
     // Validate query first
     if (!isValidCustomerQuery(query)) {
-      console.log("Invalid customer query:", query);
       return [];
     }
 
     const searchType = getSearchType(query);
     if (!searchType) {
-      console.log("Could not determine search type for query:", query);
       return [];
     }
 
@@ -84,16 +82,6 @@ export async function searchCustomers(
       page,
       limit,
     };
-
-    console.log("Sending customer search request:", {
-      url: `${API_BASE_URL}/customer/search`,
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${API_TOKEN.substring(0, 50)}...`,
-      },
-      body: requestBody,
-    });
 
     const response = await fetch(`${API_BASE_URL}/customer/search`, {
       method: "POST",
@@ -107,19 +95,12 @@ export async function searchCustomers(
     if (!response.ok) {
       const errorData = await response.json();
 
-      console.log("Customer search API error response:", {
-        status: response.status,
-        statusText: response.statusText,
-        errorData: errorData,
-      });
-
       // Handle "Customer not found" as empty result, not error
       if (
         response.status === 400 &&
         errorData.message &&
         errorData.message.includes("Customer not found")
       ) {
-        console.log("No customers found for query:", query);
         return [];
       }
 
@@ -147,14 +128,8 @@ export async function searchCustomers(
       tel: customer.tel || "",
     }));
 
-    if (customers.length > 0) {
-      console.log("Customer object for UI:", customers[0]);
-    }
-
-    console.log(`Found ${customers.length} customers for query:`, query);
     return customers;
   } catch (error) {
-    console.error("Error searching customers:", error);
     throw new Error("Failed to search customers");
   }
 }
@@ -167,7 +142,6 @@ export async function getCustomerById(id: string): Promise<Customer | null> {
     const customers = await searchCustomers(id);
     return customers.length > 0 ? customers[0] : null;
   } catch (error) {
-    console.error("Error getting customer by ID:", error);
     throw new Error("Failed to get customer");
   }
 }
@@ -182,7 +156,6 @@ export async function getCustomerByPhone(
     const customers = await searchCustomers(phone);
     return customers.length > 0 ? customers[0] : null;
   } catch (error) {
-    console.error("Error getting customer by phone:", error);
     throw new Error("Failed to get customer");
   }
 }
@@ -197,7 +170,6 @@ export async function getCustomerByEmail(
     const customers = await searchCustomers(email);
     return customers.length > 0 ? customers[0] : null;
   } catch (error) {
-    console.error("Error getting customer by email:", error);
     throw new Error("Failed to get customer");
   }
 }

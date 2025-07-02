@@ -14,6 +14,8 @@ import {
   DocumentSummary,
   DocumentData,
   CustomerData,
+  DocumentPayload,
+  DocumentItemPayload,
 } from "@/types/document";
 
 import { Button } from "@/components/ui/button";
@@ -54,10 +56,11 @@ import { ProductForm } from "./ProductForm";
 
 export interface DocumentFormProps {
   onCancel: () => void;
-  onSave: (data: DocumentData) => Promise<void>;
+  onSave: (data: DocumentPayload) => Promise<void>;
   initialData: DocumentData;
   documentType: "quotation" | "invoice";
   isLoading: boolean;
+  editMode?: boolean;
 }
 
 export const DocumentForm: FC<DocumentFormProps> = ({
@@ -66,22 +69,206 @@ export const DocumentForm: FC<DocumentFormProps> = ({
   initialData,
   documentType,
   isLoading,
+  editMode = false,
 }: DocumentFormProps) => {
   const [isSaving, setIsSaving] = useState(false);
   const navigate = useNavigate();
 
   const [isProductFormOpen, setIsProductFormOpen] = useState(false);
-
-  const [reference, setReference] = useState(initialData.reference);
-  // Track documents and document number state
   const [documents, setDocuments] = useState<DocumentData[]>([]);
-  const [documentNumber, setDocumentNumber] = useState<string>(
-    initialData.documentNumber || ""
-  );
+  const [attachments, setAttachments] = useState<File[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Restore local state for create customer dialog
+  const [isCreateCustomerOpen, setIsCreateCustomerOpen] = useState(false);
+
+  // Move createDefaultItem above form state
+  const [priceType, setPriceType] = useState<
+    "inclusive" | "exclusive" | "none"
+  >(initialData.priceType || "exclusive");
+
+  function createDefaultItem(): DocumentItem {
+    return {
+      id: `item-${Date.now()}`,
+      productTitle: "",
+      description: "",
+      unit: "",
+      quantity: 1,
+      unitPrice: 0,
+      priceType: priceType,
+      discount: 0,
+      discountType: "thb",
+      tax: 7,
+      amountBeforeTax: 0,
+      withholdingTax: -1,
+      amount: 0,
+      isEditing: true,
+    };
+  }
+
+  // รวม state หลักของฟอร์ม
+  const [form, setForm] = useState({
+    reference: initialData.reference,
+    documentNumber: initialData.documentNumber || "",
+    documentDate:
+      initialData.documentDate || new Date().toISOString().split("T")[0],
+    dueDate: initialData.dueDate || "",
+    validUntil: initialData.validUntil || "",
+    customer: initialData.customer,
+    issueTaxInvoice: initialData.issueTaxInvoice ?? true,
+    priceType: initialData.priceType || "exclusive",
+    tags: initialData.tags || [],
+    notes: initialData.notes,
+    items:
+      initialData.items.length > 0 ? initialData.items : [createDefaultItem()],
+  });
+
+  // summary แยกไว้เพราะต้องคำนวณใหม่เมื่อ items เปลี่ยน
+  const [summary, setSummary] = useState<DocumentSummary>({
+    subtotal: 0,
+    discount: 0,
+    tax: 0,
+    total: 0,
+    withholdingTax: 0,
+  });
+
+  // handle เปลี่ยนค่าในฟอร์ม
+  const handleFormChange = (field: string, value: any) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  // handle เปลี่ยนค่าใน customer
+  const handleCustomerChange = (
+    field: keyof typeof form.customer,
+    value: string
+  ) => {
+    let processedValue = value;
+    if (field === "tax_id") {
+      processedValue = value.replace(/[^\d]/g, "").slice(0, 13);
+    }
+    setForm((prev) => ({
+      ...prev,
+      customer: { ...prev.customer, [field]: processedValue },
+    }));
+  };
+
+  // handle เปลี่ยนค่าใน items
+  const handleItemChange = (
+    id: string,
+    field: keyof DocumentItem,
+    value: any
+  ) => {
+    setForm((prev) => ({
+      ...prev,
+      items: prev.items.map((item) => {
+        if (item.id === id) {
+          let updatedItemState = { ...item, [field]: value };
+          if (
+            field === "quantity" ||
+            field === "unitPrice" ||
+            field === "discount" ||
+            field === "tax" ||
+            field === "customWithholdingTaxAmount"
+          ) {
+            updatedItemState[field] = Number(value) || 0;
+          }
+          if (field === "withholdingTax" && value !== "custom") {
+            delete updatedItemState.customWithholdingTaxAmount;
+          } else if (field === "withholdingTax" && value === "custom") {
+            updatedItemState.customWithholdingTaxAmount =
+              item.customWithholdingTaxAmount ?? 0;
+          }
+          return updateItemWithCalculations(updatedItemState);
+        }
+        return item;
+      }),
+    }));
+  };
+
+  // handle เพิ่ม/ลบ item
+  const addNewItem = () => {
+    const newItem = createDefaultItem();
+    const calculatedItem = updateItemWithCalculations(newItem);
+    setForm((prev) => ({ ...prev, items: [...prev.items, calculatedItem] }));
+  };
+  const removeItem = (id: string) => {
+    setForm((prev) => ({
+      ...prev,
+      items: prev.items.filter((item) => item.id !== id),
+    }));
+  };
+
+  // handle เลือกลูกค้า
+  const handleCustomerSelect = (selectedCustomer: Customer) => {
+    setForm((prev) => ({
+      ...prev,
+      customer: {
+        id: Number(selectedCustomer.id),
+        name: selectedCustomer.name,
+        tax_id: selectedCustomer.tax_id,
+        phone: selectedCustomer.phone,
+        address: selectedCustomer.address,
+        email: selectedCustomer.email,
+      },
+    }));
+  };
+  const handleCustomerCreated = (newCustomer: Customer) => {
+    handleCustomerSelect(newCustomer);
+  };
+
+  // handle เลือกสินค้า
+  const handleProductSelect = (product: Product | null, itemId: string) => {
+    if (product) {
+      setForm((prev) => ({
+        ...prev,
+        items: prev.items.map((item) => {
+          if (item.id === itemId) {
+            const newItem = {
+              ...item,
+              productId: String(product.id),
+              productTitle: product.title,
+              description: product.description || "",
+              unitPrice: typeof product.price === "number" ? product.price : 0,
+              unit: product.unit || "ชิ้น",
+              priceType: item.priceType || "exclusive",
+              tax: typeof product.vat_rate === "number" ? product.vat_rate : 7,
+              isEditing: false,
+            };
+            return updateItemWithCalculations(newItem);
+          }
+          return item;
+        }),
+      }));
+    }
+  };
+
+  // handle แนบไฟล์
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      setAttachments((prev) => [...prev, ...Array.from(e.target.files!)]);
+    }
+  };
+  const handleRemoveAttachment = (fileName: string) => {
+    setAttachments((prev) => prev.filter((file) => file.name !== fileName));
+  };
+
+  // คำนวณ summary ทุกครั้งที่ items เปลี่ยน
+  useEffect(() => {
+    const newSummary = calculateDocumentSummary(form.items);
+    setSummary({
+      subtotal: isNaN(newSummary.subtotal) ? 0 : newSummary.subtotal,
+      discount: isNaN(newSummary.discount) ? 0 : newSummary.discount,
+      tax: isNaN(newSummary.tax) ? 0 : newSummary.tax,
+      total: isNaN(newSummary.total) ? 0 : newSummary.total,
+      withholdingTax: isNaN(newSummary.withholdingTax)
+        ? 0
+        : newSummary.withholdingTax,
+    });
+  }, [form.items]);
 
   // Set initial document number when component mounts or document type changes
   useEffect(() => {
-    if (!initialData.id && !documentNumber) {
+    if (!initialData.id && !form.documentNumber) {
       try {
         // Get existing documents from localStorage
         const storedDocs = JSON.parse(
@@ -93,9 +280,8 @@ export const DocumentForm: FC<DocumentFormProps> = ({
 
         // Generate new document number using the utility function
         const newNumber = generateDocumentNumber(documentType, existingNumbers);
-        setDocumentNumber(newNumber);
+        handleFormChange("documentNumber", newNumber);
       } catch (error) {
-        console.error("Error generating document number:", error);
         // Fallback to simple number if error
         const prefix =
           documentType === "quotation"
@@ -105,10 +291,13 @@ export const DocumentForm: FC<DocumentFormProps> = ({
               : documentType === "receipt"
                 ? "RC"
                 : "TAX";
-        setDocumentNumber(`${prefix}-${new Date().getFullYear()}-0001`);
+        handleFormChange(
+          "documentNumber",
+          `${prefix}-${new Date().getFullYear()}-0001`
+        );
       }
     }
-  }, [documentType, initialData.id, documentNumber]);
+  }, [documentType, initialData.id, form.documentNumber]);
 
   // Sync document number with localStorage changes
   useEffect(() => {
@@ -127,8 +316,8 @@ export const DocumentForm: FC<DocumentFormProps> = ({
             documentType,
             existingNumbers
           );
-          if (newNumber && newNumber !== documentNumber) {
-            setDocumentNumber(newNumber);
+          if (newNumber && newNumber !== form.documentNumber) {
+            handleFormChange("documentNumber", newNumber);
           }
         } catch (error) {
           console.error("Error handling storage change:", error);
@@ -146,179 +335,26 @@ export const DocumentForm: FC<DocumentFormProps> = ({
         window.removeEventListener("storage", handleStorageChange);
       };
     }
-  }, [documentType, initialData.id, documentNumber]);
+  }, [documentType, initialData.id, form.documentNumber]);
 
-  const [documentDate, setDocumentDate] = useState(
-    initialData.documentDate || new Date().toISOString().split("T")[0]
-  );
-  const [dueDate, setDueDate] = useState(initialData.dueDate || "");
-  const [validUntil, setValidUntil] = useState(initialData.validUntil || "");
-
-  const [isTaxInvoice, setIsTaxInvoice] = useState(false);
-
-  const [customer, setCustomer] = useState<CustomerData>(initialData.customer);
-  const [isCreateCustomerOpen, setCreateCustomerOpen] = useState(false);
-  const [customerRefreshKey, setCustomerRefreshKey] = useState(0);
-
-  const [issueTaxInvoice, setIssueTaxInvoice] = useState(
-    initialData.issueTaxInvoice ?? true
-  );
-  const [priceType, setPriceType] = useState<
-    "inclusive" | "exclusive" | "none"
-  >(initialData.priceType || "exclusive");
-  const [tags, setTags] = useState<string[]>(initialData.tags || []);
-
-  const createDefaultItem = (): DocumentItem => {
-    return {
-      id: `item-${Date.now()}`,
-      productTitle: "",
-      description: "",
-      unit: "",
-      quantity: 1,
-      unitPrice: 0,
-      priceType: priceType,
-      discount: 0,
-      discountType: "thb",
-      tax: 7,
-      amountBeforeTax: 0,
-      withholdingTax: -1,
-      amount: 0,
-      isEditing: true,
-    };
-  };
-
-  const [items, setItems] = useState<DocumentItem[]>(() =>
-    initialData.items.length > 0 ? initialData.items : [createDefaultItem()]
-  );
-
-  const [summary, setSummary] = useState<DocumentSummary>({
-    subtotal: 0,
-    discount: 0,
-    tax: 0,
-    total: 0,
-    withholdingTax: 0,
-  });
-
-  const [notes, setNotes] = useState(initialData.notes);
-  const [attachments, setAttachments] = useState<File[]>([]);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    const newSummary = calculateDocumentSummary(items);
-    setSummary({
-      subtotal: isNaN(newSummary.subtotal) ? 0 : newSummary.subtotal,
-      discount: isNaN(newSummary.discount) ? 0 : newSummary.discount,
-      tax: isNaN(newSummary.tax) ? 0 : newSummary.tax,
-      total: isNaN(newSummary.total) ? 0 : newSummary.total,
-      withholdingTax: isNaN(newSummary.withholdingTax)
-        ? 0
-        : newSummary.withholdingTax,
-    });
-  }, [items]);
-
-  const handleCustomerSelect = (selectedCustomer: Customer) => {
-    setCustomer({
-      id: Number(selectedCustomer.id),
-      name: selectedCustomer.name,
-      tax_id: selectedCustomer.tax_id,
-      phone: selectedCustomer.phone,
-      address: selectedCustomer.address,
-      email: selectedCustomer.email,
-    });
-  };
-
-  const handleCustomerCreated = (newCustomer: Customer) => {
-    handleCustomerSelect(newCustomer);
-    setCreateCustomerOpen(false); // Close the dialog
-    setCustomerRefreshKey((prevKey) => prevKey + 1); // Trigger refresh
-  };
-
-  const handleCustomerChange = (field: keyof CustomerData, value: string) => {
-    let processedValue = value;
-    if (field === "tax_id") {
-      processedValue = value.replace(/[^\d]/g, "").slice(0, 13);
+  // ฟังก์ชันคำนวณ discount เป็นจำนวนเงินจริง
+  function getDiscountAmount(item: DocumentItem) {
+    if (item.discountType === "percentage") {
+      return item.unitPrice * item.quantity * (item.discount / 100);
     }
-    setCustomer((prev) => ({ ...prev, [field]: processedValue }));
-  };
+    return item.discount * item.quantity;
+  }
 
-  const handleReferenceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setReference(e.target.value);
-  };
-
-  const addNewItem = () => {
-    const newItem = createDefaultItem();
-    const calculatedItem = updateItemWithCalculations(newItem);
-    setItems([...items, calculatedItem]);
-  };
-
-  const removeItem = (id: string) => {
-    const updatedItems = items.filter((item) => item.id !== id);
-    setItems(updatedItems);
-  };
-
-  const handlePriceTypeChange = (value: "exclusive" | "inclusive" | "none") => {
-    setPriceType(value);
-    const updatedItems = items.map((item) => {
-      const newItem = { ...item, priceType: value };
-      return updateItemWithCalculations(newItem);
-    });
-    setItems(updatedItems);
-  };
-
-  const handleInputChange = (
-    id: string,
-    field: keyof DocumentItem,
-    value: any
-  ) => {
-    const updatedItems = items.map((item) => {
-      if (item.id === id) {
-        // Ensure all relevant fields are numbers
-        let updatedItemState = { ...item, [field]: value };
-        if (
-          field === "quantity" ||
-          field === "unitPrice" ||
-          field === "discount" ||
-          field === "tax" ||
-          field === "customWithholdingTaxAmount"
-        ) {
-          updatedItemState[field] = Number(value) || 0;
-        }
-        if (field === "withholdingTax" && value !== "custom") {
-          delete updatedItemState.customWithholdingTaxAmount;
-        } else if (field === "withholdingTax" && value === "custom") {
-          updatedItemState.customWithholdingTaxAmount =
-            item.customWithholdingTaxAmount ?? 0;
-        }
-        // Always recalculate
-        return updateItemWithCalculations(updatedItemState);
-      }
-      return item;
-    });
-    setItems(updatedItems);
-  };
-
-  const handleProductSelect = (product: Product | null, itemId: string) => {
-    if (product) {
-      const updatedItems = items.map((item) => {
-        if (item.id === itemId) {
-          const newItem = {
-            ...item,
-            productId: String(product.id),
-            productTitle: product.title,
-            description: product.description || "",
-            unitPrice: typeof product.price === "number" ? product.price : 0,
-            unit: product.unit || "ชิ้น",
-            priceType: item.priceType || "exclusive",
-            tax: typeof product.vat_rate === "number" ? product.vat_rate : 7,
-            isEditing: false,
-          };
-          return updateItemWithCalculations(newItem);
-        }
-        return item;
-      });
-      setItems(updatedItems);
-    }
-  };
+  const pageTitle =
+    documentType === "quotation"
+      ? "สร้างใบเสนอราคา"
+      : `สร้างใบแจ้งหนี้${form.issueTaxInvoice ? " / ใบกำกับภาษี" : ""}`;
+  const pageSubtitle =
+    documentType === "quotation"
+      ? "กรอกข้อมูลเพื่อสร้างใบเสนอราคาใหม่"
+      : `กรอกข้อมูลเพื่อสร้างใบแจ้งหนี้ใหม่${
+          form.issueTaxInvoice ? " / ใบกำกับภาษี" : ""
+        }`;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -326,45 +362,67 @@ export const DocumentForm: FC<DocumentFormProps> = ({
 
     setIsSaving(true);
 
-    if (!customer || !customer.id) {
+    if (!form.customer || !form.customer.id) {
       toast.error("กรุณาเลือกลูกค้า", {
         description: "คุณต้องเลือกลูกค้าก่อนทำการบันทึกเอกสาร",
       });
       return;
     }
 
-    if (items.length === 0) {
+    if (form.items.length === 0) {
       toast.error("ไม่มีรายการสินค้า", {
         description: "คุณต้องเพิ่มสินค้าอย่างน้อย 1 รายการ",
       });
       return;
     }
 
-    console.log("items before map", items);
+    // map items ให้ field ตรงกับ schema database
+    const itemsToSave: DocumentItemPayload[] = form.items.map((item) => ({
+      product_id: item.productId ?? null,
+      product_name: item.productTitle ?? "",
+      unit: item.unit ?? "",
+      quantity: item.quantity ?? 1,
+      unit_price: item.unitPrice ?? 0,
+      amount: item.amount ?? 0,
+      description: item.description ?? "",
+      withholding_tax_amount: item.withholdingTaxAmount ?? 0,
+      amount_before_tax: item.amountBeforeTax ?? 0,
+      discount: item.discount ?? 0,
+      discount_type: item.discountType ?? "thb",
+      tax: item.tax ?? 0,
+      tax_amount: item.taxAmount ?? 0,
+    }));
 
-    const dataToSave = {
+    // log เฉพาะ discount_type ของแต่ละ item ก่อนส่ง backend
+    console.log(
+      "itemsToSave (check discount_type):",
+      itemsToSave.map((i) => ({
+        discount_type: i.discount_type,
+        discount: i.discount,
+        product_name: i.product_name,
+      }))
+    );
+
+    const dataToSave: DocumentPayload = {
       id: initialData.id,
       documentType: documentType,
-      documentNumber: documentNumber,
-      documentDate: documentDate,
-      dueDate: documentType === "invoice" ? dueDate : undefined,
-      validUntil: documentType === "quotation" ? validUntil : undefined,
-      reference: reference,
+      documentNumber: form.documentNumber,
+      documentDate: form.documentDate,
+      dueDate: documentType === "invoice" ? form.dueDate : undefined,
+      validUntil: documentType === "quotation" ? form.validUntil : undefined,
+      reference: form.reference,
       customer: {
-        id: customer.id,
-        name: customer.name,
-        tax_id: customer.tax_id,
-        phone: customer.phone,
-        address: customer.address,
-        email: customer.email,
+        id: form.customer.id,
+        name: form.customer.name,
+        tax_id: form.customer.tax_id,
+        phone: form.customer.phone,
+        address: form.customer.address,
+        email: form.customer.email,
       },
-      items: items.map((item) => ({
-        ...item,
-        withholding_tax_amount: (item as any).withholdingTaxAmount ?? 0,
-      })),
+      items: itemsToSave,
       summary: summary,
-      notes: notes,
-      priceType: priceType,
+      notes: form.notes,
+      priceType: form.priceType,
       status:
         initialData.status ||
         (documentType === "invoice" ? "รอชำระ" : "รอตอบรับ"),
@@ -379,27 +437,6 @@ export const DocumentForm: FC<DocumentFormProps> = ({
       setIsSaving(false);
     }
   };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      setAttachments((prev) => [...prev, ...Array.from(e.target.files!)]);
-    }
-  };
-
-  const handleRemoveAttachment = (fileName: string) => {
-    setAttachments((prev) => prev.filter((file) => file.name !== fileName));
-  };
-
-  const pageTitle =
-    documentType === "quotation"
-      ? "สร้างใบเสนอราคา"
-      : `สร้างใบแจ้งหนี้${isTaxInvoice ? " / ใบกำกับภาษี" : ""}`;
-  const pageSubtitle =
-    documentType === "quotation"
-      ? "กรอกข้อมูลเพื่อสร้างใบเสนอราคาใหม่"
-      : `กรอกข้อมูลเพื่อสร้างใบแจ้งหนี้ใหม่${
-          isTaxInvoice ? " / ใบกำกับภาษี" : ""
-        }`;
 
   return (
     <>
@@ -456,7 +493,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                 <div className="relative">
                   <Input
                     id="documentNumber"
-                    value={documentNumber}
+                    value={form.documentNumber}
                     readOnly
                     className="font-mono bg-muted"
                     placeholder=""
@@ -470,9 +507,9 @@ export const DocumentForm: FC<DocumentFormProps> = ({
             <Label>วันที่</Label>
             <Input
               type="date"
-              value={documentDate}
+              value={form.documentDate}
               onChange={(e) => {
-                setDocumentDate(e.target.value);
+                handleFormChange("documentDate", e.target.value);
               }}
             />
           </div>
@@ -482,8 +519,8 @@ export const DocumentForm: FC<DocumentFormProps> = ({
               <Label>ยืนราคาถึงวันที่</Label>
               <Input
                 type="date"
-                value={validUntil}
-                onChange={(e) => setValidUntil(e.target.value)}
+                value={form.validUntil}
+                onChange={(e) => handleFormChange("validUntil", e.target.value)}
               />
             </div>
           ) : (
@@ -491,8 +528,8 @@ export const DocumentForm: FC<DocumentFormProps> = ({
               <Label>วันที่ครบกำหนดชำระ</Label>
               <Input
                 type="date"
-                value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
+                value={form.dueDate}
+                onChange={(e) => handleFormChange("dueDate", e.target.value)}
               />
             </div>
           )}
@@ -502,8 +539,8 @@ export const DocumentForm: FC<DocumentFormProps> = ({
           <div className="space-y-2">
             <Label>อ้างอิง</Label>
             <Input
-              value={reference}
-              onChange={handleReferenceChange}
+              value={form.reference}
+              onChange={(e) => handleFormChange("reference", e.target.value)}
               placeholder="อ้างอิง (ไม่บังคับ)"
             />
           </div>
@@ -519,8 +556,8 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                 <Label>ค้นหาลูกค้า</Label>
                 <CustomerAutocomplete
                   value={
-                    customer
-                      ? { ...customer, id: String(customer.id) }
+                    form.customer
+                      ? { ...form.customer, id: String(form.customer.id) }
                       : undefined
                   }
                   onCustomerSelect={handleCustomerSelect}
@@ -529,23 +566,23 @@ export const DocumentForm: FC<DocumentFormProps> = ({
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setCreateCustomerOpen(true)}
+                onClick={() => setIsCreateCustomerOpen(true)}
               >
                 สร้างใหม่
               </Button>
               <CreateCustomerDialog
                 open={isCreateCustomerOpen}
-                onOpenChange={setCreateCustomerOpen}
+                onOpenChange={setIsCreateCustomerOpen}
                 onCustomerCreated={handleCustomerCreated}
               />
             </div>
-            {customer && customer.id && (
+            {form.customer && form.customer.id && (
               <div className="mt-4 space-y-4 pt-4 border-t">
                 <div className="space-y-2">
                   <Label htmlFor="customer-address">ที่อยู่</Label>
                   <Textarea
                     id="customer-address"
-                    value={customer.address || ""}
+                    value={form.customer.address || ""}
                     onChange={(e) =>
                       handleCustomerChange("address", e.target.value)
                     }
@@ -560,7 +597,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                     </Label>
                     <Input
                       id="customer-tax-id"
-                      value={customer.tax_id || ""}
+                      value={form.customer.tax_id || ""}
                       onChange={(e) =>
                         handleCustomerChange("tax_id", e.target.value)
                       }
@@ -572,7 +609,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                     <Label htmlFor="customer-phone">โทรศัพท์</Label>
                     <Input
                       id="customer-phone"
-                      value={customer.phone || ""}
+                      value={form.customer.phone || ""}
                       onChange={(e) =>
                         handleCustomerChange("phone", e.target.value)
                       }
@@ -585,7 +622,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                   <Input
                     id="customer-email"
                     type="email"
-                    value={customer.email || ""}
+                    value={form.customer.email || ""}
                     onChange={(e) =>
                       handleCustomerChange("email", e.target.value)
                     }
@@ -607,9 +644,13 @@ export const DocumentForm: FC<DocumentFormProps> = ({
               <div className="space-y-2">
                 <Label>รูปแบบราคา</Label>
                 <Select
-                  value={items[0]?.priceType || "exclusive"}
-                  onValueChange={
-                    handlePriceTypeChange as (value: string) => void
+                  value={form.items[0]?.priceType || "exclusive"}
+                  onValueChange={(value) =>
+                    handleItemChange(
+                      form.items[0]?.id || "",
+                      "priceType",
+                      value
+                    )
                   }
                 >
                   <SelectTrigger>
@@ -638,8 +679,10 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                 <div className="flex items-center space-x-2">
                   <Switch
                     id="tax-invoice"
-                    checked={isTaxInvoice} // ต้องกำหนด state ไว้ด้านนอก เช่น useState
-                    onCheckedChange={setIsTaxInvoice}
+                    checked={form.issueTaxInvoice}
+                    onCheckedChange={(value) =>
+                      handleFormChange("issueTaxInvoice", value)
+                    }
                   />
                   <Label htmlFor="tax-invoice" className="text-blue-600">
                     ใบกำกับภาษี
@@ -656,7 +699,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {items.map((item) => (
+              {form.items.map((item) => (
                 <div
                   key={item.id}
                   className="flex flex-col space-y-2 p-4 border rounded-lg relative bg-background"
@@ -686,7 +729,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                             productTitle: "",
                             quantity: 1,
                             unitPrice: 0,
-                            priceType: priceType,
+                            priceType: form.priceType,
                             discount: 0,
                             discountType: "thb",
                             tax: 7,
@@ -697,8 +740,21 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                             amount: 0,
                             isEditing: true,
                           };
-                          setItems([...items, newItem]);
-                          setIsProductFormOpen(true);
+                          handleItemChange(newId, "isNew", true);
+                          handleItemChange(newId, "productTitle", "");
+                          handleItemChange(newId, "quantity", 1);
+                          handleItemChange(newId, "unitPrice", 0);
+                          handleItemChange(newId, "priceType", form.priceType);
+                          handleItemChange(newId, "discount", 0);
+                          handleItemChange(newId, "discountType", "thb");
+                          handleItemChange(newId, "tax", 7);
+                          handleItemChange(newId, "withholdingTax", -1);
+                          handleItemChange(newId, "description", "");
+                          handleItemChange(newId, "unit", "");
+                          handleItemChange(newId, "amountBeforeTax", 0);
+                          handleItemChange(newId, "amount", 0);
+                          handleItemChange(newId, "isEditing", true);
+                          handleItemChange(newId, "isNew", true);
                         }}
                       />
                     </div>
@@ -710,7 +766,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                           typeof item.quantity === "number" ? item.quantity : 0
                         }
                         onChange={(e) =>
-                          handleInputChange(
+                          handleItemChange(
                             item.id,
                             "quantity",
                             Number(e.target.value) || 0
@@ -743,7 +799,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                               : 0
                           }
                           onChange={(e) =>
-                            handleInputChange(
+                            handleItemChange(
                               item.id,
                               "discount",
                               Number(e.target.value) || 0
@@ -753,7 +809,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                         <Select
                           value={item.discountType}
                           onValueChange={(value) =>
-                            handleInputChange(item.id, "discountType", value)
+                            handleItemChange(item.id, "discountType", value)
                           }
                         >
                           <SelectTrigger className="w-[80px]">
@@ -771,7 +827,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                       <Select
                         value={String(item.tax)}
                         onValueChange={(value) =>
-                          handleInputChange(item.id, "tax", parseInt(value))
+                          handleItemChange(item.id, "tax", parseInt(value))
                         }
                       >
                         <SelectTrigger>
@@ -806,11 +862,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                         onValueChange={(value) => {
                           const whtValue =
                             value === "custom" ? "custom" : parseFloat(value);
-                          handleInputChange(
-                            item.id,
-                            "withholdingTax",
-                            whtValue
-                          );
+                          handleItemChange(item.id, "withholdingTax", whtValue);
                         }}
                       >
                         <SelectTrigger>
@@ -835,7 +887,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                           placeholder="ระบุจำนวนเงิน"
                           value={item.customWithholdingTaxAmount ?? ""}
                           onChange={(e) =>
-                            handleInputChange(
+                            handleItemChange(
                               item.id,
                               "customWithholdingTaxAmount",
                               Number(e.target.value) || 0
@@ -887,8 +939,8 @@ export const DocumentForm: FC<DocumentFormProps> = ({
           <div className="space-y-2">
             <Label>หมายเหตุ</Label>
             <Textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
+              value={form.notes}
+              onChange={(e) => handleFormChange("notes", e.target.value)}
               placeholder="ระบุหมายเหตุ (ถ้ามี)"
               className="h-32"
             />
@@ -906,7 +958,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
                         <ProductForm
                           onSuccess={(newProductData) => {
-                            const updatedItems = items.map((item) => {
+                            const updatedItems = form.items.map((item) => {
                               if (item.isNew) {
                                 const newItem = {
                                   ...item,
@@ -925,12 +977,90 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                               }
                               return item;
                             });
-                            setItems(updatedItems);
-                            setIsProductFormOpen(false);
+                            handleItemChange(
+                              form.items[form.items.length - 1].id,
+                              "isNew",
+                              false
+                            );
+                            handleItemChange(
+                              form.items[form.items.length - 1].id,
+                              "productId",
+                              newProductData.id
+                            );
+                            handleItemChange(
+                              form.items[form.items.length - 1].id,
+                              "productTitle",
+                              newProductData.name
+                            );
+                            handleItemChange(
+                              form.items[form.items.length - 1].id,
+                              "unitPrice",
+                              newProductData.selling_price
+                            );
+                            handleItemChange(
+                              form.items[form.items.length - 1].id,
+                              "unit",
+                              newProductData.unit
+                            );
+                            handleItemChange(
+                              form.items[form.items.length - 1].id,
+                              "description",
+                              newProductData.description
+                            );
+                            handleItemChange(
+                              form.items[form.items.length - 1].id,
+                              "tax",
+                              newProductData.selling_vat_rate !== null
+                                ? Number(newProductData.selling_vat_rate)
+                                : undefined
+                            );
+                            handleItemChange(
+                              form.items[form.items.length - 1].id,
+                              "isNew",
+                              false
+                            );
                           }}
                           onCancel={() => {
-                            setItems(items.filter((item) => !item.isNew));
-                            setIsProductFormOpen(false);
+                            handleItemChange(
+                              form.items[form.items.length - 1].id,
+                              "isNew",
+                              true
+                            );
+                            handleItemChange(
+                              form.items[form.items.length - 1].id,
+                              "productId",
+                              ""
+                            );
+                            handleItemChange(
+                              form.items[form.items.length - 1].id,
+                              "productTitle",
+                              ""
+                            );
+                            handleItemChange(
+                              form.items[form.items.length - 1].id,
+                              "unitPrice",
+                              0
+                            );
+                            handleItemChange(
+                              form.items[form.items.length - 1].id,
+                              "unit",
+                              ""
+                            );
+                            handleItemChange(
+                              form.items[form.items.length - 1].id,
+                              "description",
+                              ""
+                            );
+                            handleItemChange(
+                              form.items[form.items.length - 1].id,
+                              "tax",
+                              7
+                            );
+                            handleItemChange(
+                              form.items[form.items.length - 1].id,
+                              "isNew",
+                              true
+                            );
                           }}
                         />
                       </DialogContent>

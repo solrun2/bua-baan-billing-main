@@ -71,8 +71,6 @@ export const CustomerAutocomplete: React.FC<CustomerAutocompleteProps> = ({
     if (hasMore && !isLoading) setPage((p) => p + 1);
   };
 
-  console.log("Customers for dropdown:", customers);
-
   return (
     <div className={cn("flex w-full", className)}>
       <Popover open={open} onOpenChange={setOpen}>

@@ -17,6 +17,8 @@ export interface DocumentItem {
   productId?: string;
   isNew?: boolean;
   withholding_tax_amount?: number;
+  withholdingTaxAmount?: number;
+  taxAmount?: number;
 }
 
 export interface DocumentSummary {
@@ -81,4 +83,40 @@ export interface Document {
   items?: DocumentItem[];
   payment_method?: string;
   shipping_cost?: number;
+}
+
+export interface DocumentItemPayload {
+  product_id: string | null;
+  product_name: string;
+  unit: string;
+  quantity: number;
+  unit_price: number;
+  amount: number;
+  description: string;
+  withholding_tax_amount: number;
+  amount_before_tax: number;
+  discount: number;
+  discount_type: "thb" | "percentage";
+  tax: number;
+  tax_amount: number;
+}
+
+export interface DocumentPayload {
+  id?: string;
+  documentType?: DocumentType;
+  customer: CustomerData;
+  items: DocumentItemPayload[];
+  summary: DocumentSummary;
+  notes: string;
+  attachments?: any[];
+  documentNumber: string;
+  documentDate: string;
+  validUntil?: string;
+  dueDate?: string;
+  reference: string;
+  status: string;
+  priceType: "inclusive" | "exclusive" | "none";
+  updatedAt?: string;
+  tags?: string[];
+  issueTaxInvoice?: boolean;
 }

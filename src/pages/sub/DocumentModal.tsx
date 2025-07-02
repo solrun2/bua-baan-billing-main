@@ -92,27 +92,18 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
   open,
   onClose,
 }) => {
-  console.log("DocumentModal rendered", { open, document });
   const [productMap, setProductMap] = useState<Record<string, any>>({});
 
   useEffect(() => {
-    console.log("useEffect triggered", { open, document });
     if (!open || !document?.items) {
-      console.log("Modal not open or document.items missing", {
-        open,
-        document,
-      });
       return;
     }
-    console.log("document.items", document?.items);
     const ids = (document.items || [])
       .map((item: any) => String(item.product_id))
       .filter(
         (id: string) => !!id && id !== "" && id !== "undefined" && id !== "null"
       );
     const body = { id: ids };
-    console.log("product_ids to fetch", ids);
-    console.log("body to fetch", body);
     if (ids.length === 0) return;
     const fetchProducts = async () => {
       try {
@@ -128,26 +119,20 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
           }
         );
         if (!res.ok) {
-          console.error("OpenAPI fetch error", res.status, await res.text());
           setProductMap({});
           return;
         }
         const data = await res.json();
         if (!data.data || !Array.isArray(data.data)) {
-          console.error("OpenAPI response missing data", data);
           setProductMap({});
           return;
         }
-        console.log("search products:", data.data);
-        // สร้าง map id(string) -> product
         const map: Record<string, any> = {};
         (data.data || []).forEach((prod: any) => {
           map[String(prod.id)] = prod;
         });
-        console.log("productMap", map);
         setProductMap(map);
       } catch (e) {
-        console.error("OpenAPI fetch exception", e);
         setProductMap({});
       }
     };

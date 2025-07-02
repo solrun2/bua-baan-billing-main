@@ -38,7 +38,7 @@ const EditDocumentPage: React.FC = () => {
       onCancel={() => navigate(-1)}
       documentType={initialData.documentType}
       isLoading={false}
-      isEditMode
+      editMode={true}
     />
   );
 };
