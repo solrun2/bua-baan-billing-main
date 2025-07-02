@@ -60,6 +60,7 @@ CREATE TABLE `document_items` (
   `amount` decimal(15,2) NOT NULL DEFAULT 0.00,
   `description` text DEFAULT NULL,
   `withholding_tax_amount` decimal(10,2) DEFAULT 0.00,
+  `withholding_tax_option` varchar(32) DEFAULT NULL, -- ตัวเลือก: -1=ไม่ระบุ, 0=ไม่มี, 1=1%, 1.5=1.5%, 2=2%, 3=3%, 5=5%, 10=10%, 15=15%, custom=กำหนดเอง
   `amount_before_tax` decimal(15,2) DEFAULT 0.00,
   `discount` decimal(15,2) DEFAULT 0.00,
   `discount_type` enum('thb','percentage') DEFAULT 'thb',

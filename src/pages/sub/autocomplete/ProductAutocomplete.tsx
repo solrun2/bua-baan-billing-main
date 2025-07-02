@@ -92,24 +92,17 @@ const ProductAutocomplete = ({
               className="w-full justify-between"
             >
               <div className="flex-1 flex items-center">
-                {initialLoad ? (
-                  <span className="text-muted-foreground">
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin inline" />
-                    กำลังโหลด...
-                  </span>
-                ) : (
-                  <div className="flex-1 flex items-center">
-                    <div
-                      className={`w-full bg-transparent border-none outline-none text-left ${
-                        !value ? "text-muted-foreground" : ""
-                      }`}
-                    >
-                      {value && value.id && (value.title || value.name)
-                        ? `${value.title || value.name}`
-                        : placeholder || "เลือกสินค้าหรือบริการ"}
-                    </div>
+                <div className="flex-1 flex items-center">
+                  <div
+                    className={`w-full bg-transparent border-none outline-none text-left ${
+                      !value ? "text-muted-foreground" : ""
+                    }`}
+                  >
+                    {value && value.id && (value.title || value.name)
+                      ? `${value.title || value.name}`
+                      : placeholder || "เลือกสินค้าหรือบริการ"}
                   </div>
-                )}
+                </div>
               </div>
               <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
             </Button>

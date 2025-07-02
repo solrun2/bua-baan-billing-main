@@ -556,6 +556,7 @@ app.post("/api/documents", async (req: Request, res: Response) => {
         item.amount ?? 0, // amount
         item.description ?? "", // description
         item.withholding_tax_amount ?? 0, // withholding_tax_amount
+        item.withholding_tax_option ?? -1, // withholding_tax_option (ใหม่)
         item.amount_before_tax ?? 0, // amount_before_tax
         item.discount ?? 0, // discount
         item.discount_type ?? item.discountType ?? "thb", // discount_type
@@ -570,8 +571,8 @@ app.post("/api/documents", async (req: Request, res: Response) => {
       );
       await conn.query(
         `INSERT INTO document_items (
-          document_id, product_id, product_name, unit, quantity, unit_price, amount, description, withholding_tax_amount, amount_before_tax, discount, discount_type, tax, tax_amount
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          document_id, product_id, product_name, unit, quantity, unit_price, amount, description, withholding_tax_amount, withholding_tax_option, amount_before_tax, discount, discount_type, tax, tax_amount
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         params
       );
     }
@@ -646,10 +647,17 @@ app.get("/api/documents/:id", async (req, res) => {
       return res.status(404).json({ error: "Document not found" });
     }
     // ดึง items ของเอกสารนี้
-    const items = await pool.query(
+    let items = await pool.query(
       "SELECT * FROM document_items WHERE document_id = ?",
       [id]
     );
+    // map withholding_tax_option ให้เป็น -1 ถ้า null
+    if (Array.isArray(items)) {
+      items = items.map((item) => ({
+        ...item,
+        withholding_tax_option: item.withholding_tax_option ?? "-1",
+      }));
+    }
     // แนบ items เข้าไปใน doc
     const documentWithItems = { ...(Array.isArray(doc) ? doc[0] : doc), items };
     res.json(documentWithItems);

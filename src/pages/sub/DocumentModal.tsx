@@ -371,15 +371,23 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
                 </span>
               </div>
             )}
-            {summary.withholdingTax > 0 && (
+            {Number(summary.withholdingTax) !== 0 && (
               <div className="flex justify-between mb-1 text-yellow-700">
                 <span>หัก ณ ที่จ่าย</span>
                 <span>
                   -
-                  {summary.withholdingTax.toLocaleString(undefined, {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}{" "}
+                  {typeof summary.withholdingTax === "number"
+                    ? summary.withholdingTax.toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })
+                    : Number(summary.withholdingTax || 0).toLocaleString(
+                        undefined,
+                        {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        }
+                      )}{" "}
                   บาท
                 </span>
               </div>

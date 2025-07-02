@@ -121,6 +121,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
     notes: initialData.notes,
     items:
       initialData.items.length > 0 ? initialData.items : [createDefaultItem()],
+    status: initialData.status || "รอตอบรับ",
   });
 
   // summary แยกไว้เพราะต้องคำนวณใหม่เมื่อ items เปลี่ยน
@@ -344,6 +345,52 @@ export const DocumentForm: FC<DocumentFormProps> = ({
     }
   }, [documentType, initialData.id, form.documentNumber]);
 
+  // Sync form state with initialData when initialData changes (for edit mode)
+  useEffect(() => {
+    setForm({
+      reference: initialData.reference,
+      documentNumber: initialData.documentNumber || "",
+      documentDate:
+        initialData.documentDate || new Date().toISOString().split("T")[0],
+      dueDate: initialData.dueDate || "",
+      validUntil: initialData.validUntil || "",
+      customer: initialData.customer,
+      issueTaxInvoice: initialData.issueTaxInvoice ?? true,
+      priceType: initialData.priceType || "exclusive",
+      tags: initialData.tags || [],
+      notes: initialData.notes,
+      items:
+        initialData.items.length > 0
+          ? initialData.items.map((item: any) => ({
+              id: item.id ?? item.id?.toString() ?? `item-${Date.now()}`,
+              productId: item.productId ?? item.product_id ?? "",
+              productTitle: item.productTitle ?? item.product_name ?? "",
+              description: item.description ?? "",
+              unit: item.unit ?? "",
+              quantity: item.quantity ?? 1,
+              unitPrice: item.unitPrice ?? item.unit_price ?? 0,
+              priceType: item.priceType ?? "exclusive",
+              discount: item.discount ?? 0,
+              discountType: item.discountType ?? item.discount_type ?? "thb",
+              tax: item.tax ?? 0,
+              amountBeforeTax:
+                item.amountBeforeTax ?? item.amount_before_tax ?? 0,
+              withholdingTax: item.withholdingTax ?? item.withholding_tax ?? -1,
+              customWithholdingTaxAmount:
+                item.customWithholdingTaxAmount ??
+                item.custom_withholding_tax_amount ??
+                0,
+              amount: item.amount ?? 0,
+              isEditing: false,
+              taxAmount: item.taxAmount ?? item.tax_amount ?? 0,
+              withholdingTaxAmount:
+                item.withholdingTaxAmount ?? item.withholding_tax_amount ?? 0,
+            }))
+          : [createDefaultItem()],
+      status: initialData.status || "รอตอบรับ",
+    });
+  }, [initialData]);
+
   // ฟังก์ชันคำนวณ discount เป็นจำนวนเงินจริง
   function getDiscountAmount(item: DocumentItem) {
     if (item.discountType === "percentage") {
@@ -352,16 +399,20 @@ export const DocumentForm: FC<DocumentFormProps> = ({
     return item.discount * item.quantity;
   }
 
-  const pageTitle =
-    documentType === "quotation"
+  const pageTitle = editMode
+    ? documentType === "quotation"
+      ? "แก้ไขใบเสนอราคา"
+      : `แก้ไขใบแจ้งหนี้${form.issueTaxInvoice ? " / ใบกำกับภาษี" : ""}`
+    : documentType === "quotation"
       ? "สร้างใบเสนอราคา"
       : `สร้างใบแจ้งหนี้${form.issueTaxInvoice ? " / ใบกำกับภาษี" : ""}`;
-  const pageSubtitle =
-    documentType === "quotation"
+  const pageSubtitle = editMode
+    ? documentType === "quotation"
+      ? "แก้ไขข้อมูลใบเสนอราคา"
+      : `แก้ไขข้อมูลใบแจ้งหนี้${form.issueTaxInvoice ? " / ใบกำกับภาษี" : ""}`
+    : documentType === "quotation"
       ? "กรอกข้อมูลเพื่อสร้างใบเสนอราคาใหม่"
-      : `กรอกข้อมูลเพื่อสร้างใบแจ้งหนี้ใหม่${
-          form.issueTaxInvoice ? " / ใบกำกับภาษี" : ""
-        }`;
+      : `กรอกข้อมูลเพื่อสร้างใบแจ้งหนี้ใหม่${form.issueTaxInvoice ? " / ใบกำกับภาษี" : ""}`;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -373,6 +424,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
       toast.error("กรุณาเลือกลูกค้า", {
         description: "คุณต้องเลือกลูกค้าก่อนทำการบันทึกเอกสาร",
       });
+      setIsSaving(false);
       return;
     }
 
@@ -380,6 +432,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
       toast.error("ไม่มีรายการสินค้า", {
         description: "คุณต้องเพิ่มสินค้าอย่างน้อย 1 รายการ",
       });
+      setIsSaving(false);
       return;
     }
 
@@ -430,11 +483,12 @@ export const DocumentForm: FC<DocumentFormProps> = ({
       summary: summary,
       notes: form.notes,
       priceType: form.priceType,
-      status:
-        initialData.status ||
-        (documentType === "invoice" ? "รอชำระ" : "รอตอบรับ"),
+      status: form.status,
       attachments: attachments,
     };
+
+    // เพิ่ม log สำหรับ debug การอัปเดตเอกสาร
+    console.log("[DEBUG] Update Document Payload:", dataToSave);
 
     try {
       await onSave(dataToSave);
@@ -444,6 +498,9 @@ export const DocumentForm: FC<DocumentFormProps> = ({
       setIsSaving(false);
     }
   };
+
+  console.log("items:", form.items);
+  console.log("summary:", summary);
 
   return (
     <>
@@ -551,6 +608,36 @@ export const DocumentForm: FC<DocumentFormProps> = ({
               placeholder="อ้างอิง (ไม่บังคับ)"
             />
           </div>
+          {editMode && (
+            <div className="space-y-2">
+              <Label>สถานะเอกสาร</Label>
+              <Select
+                value={form.status || ""}
+                onValueChange={(value) => handleFormChange("status", value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="เลือกสถานะเอกสาร" />
+                </SelectTrigger>
+                <SelectContent>
+                  {documentType === "quotation" ? (
+                    <>
+                      <SelectItem value="รอตอบรับ">รอตอบรับ</SelectItem>
+                      <SelectItem value="ตอบรับแล้ว">ตอบรับแล้ว</SelectItem>
+                      <SelectItem value="พ้นกำหนด">พ้นกำหนด</SelectItem>
+                      <SelectItem value="ยกเลิก">ยกเลิก</SelectItem>
+                    </>
+                  ) : (
+                    <>
+                      <SelectItem value="รอชำระ">รอชำระ</SelectItem>
+                      <SelectItem value="ชำระแล้ว">ชำระแล้ว</SelectItem>
+                      <SelectItem value="พ้นกำหนด">พ้นกำหนด</SelectItem>
+                      <SelectItem value="ยกเลิก">ยกเลิก</SelectItem>
+                    </>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </div>
 
         <Card>
@@ -725,44 +812,54 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                               }
                             : null
                         }
-                        onChange={(product) =>
-                          handleProductSelect(product, item.id)
+                        onChange={
+                          editMode
+                            ? undefined
+                            : (product) => handleProductSelect(product, item.id)
                         }
-                        onAddNew={() => {
-                          const newId = `new-${Date.now()}`;
-                          const newItem: DocumentItem = {
-                            id: newId,
-                            isNew: true,
-                            productTitle: "",
-                            quantity: 1,
-                            unitPrice: 0,
-                            priceType: form.priceType,
-                            discount: 0,
-                            discountType: "thb",
-                            tax: 7,
-                            withholdingTax: -1,
-                            description: "",
-                            unit: "",
-                            amountBeforeTax: 0,
-                            amount: 0,
-                            isEditing: true,
-                          };
-                          handleItemChange(newId, "isNew", true);
-                          handleItemChange(newId, "productTitle", "");
-                          handleItemChange(newId, "quantity", 1);
-                          handleItemChange(newId, "unitPrice", 0);
-                          handleItemChange(newId, "priceType", form.priceType);
-                          handleItemChange(newId, "discount", 0);
-                          handleItemChange(newId, "discountType", "thb");
-                          handleItemChange(newId, "tax", 7);
-                          handleItemChange(newId, "withholdingTax", -1);
-                          handleItemChange(newId, "description", "");
-                          handleItemChange(newId, "unit", "");
-                          handleItemChange(newId, "amountBeforeTax", 0);
-                          handleItemChange(newId, "amount", 0);
-                          handleItemChange(newId, "isEditing", true);
-                          handleItemChange(newId, "isNew", true);
-                        }}
+                        onAddNew={
+                          editMode
+                            ? undefined
+                            : () => {
+                                const newId = `new-${Date.now()}`;
+                                const newItem: DocumentItem = {
+                                  id: newId,
+                                  isNew: true,
+                                  productTitle: "",
+                                  quantity: 1,
+                                  unitPrice: 0,
+                                  priceType: form.priceType,
+                                  discount: 0,
+                                  discountType: "thb",
+                                  tax: 7,
+                                  withholdingTax: -1,
+                                  description: "",
+                                  unit: "",
+                                  amountBeforeTax: 0,
+                                  amount: 0,
+                                  isEditing: true,
+                                };
+                                handleItemChange(newId, "isNew", true);
+                                handleItemChange(newId, "productTitle", "");
+                                handleItemChange(newId, "quantity", 1);
+                                handleItemChange(newId, "unitPrice", 0);
+                                handleItemChange(
+                                  newId,
+                                  "priceType",
+                                  form.priceType
+                                );
+                                handleItemChange(newId, "discount", 0);
+                                handleItemChange(newId, "discountType", "thb");
+                                handleItemChange(newId, "tax", 7);
+                                handleItemChange(newId, "withholdingTax", -1);
+                                handleItemChange(newId, "description", "");
+                                handleItemChange(newId, "unit", "");
+                                handleItemChange(newId, "amountBeforeTax", 0);
+                                handleItemChange(newId, "amount", 0);
+                                handleItemChange(newId, "isEditing", true);
+                                handleItemChange(newId, "isNew", true);
+                              }
+                        }
                       />
                     </div>
                     <div className="space-y-2">
@@ -1180,7 +1277,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                   ? summary.withholdingTax.toLocaleString("th-TH", {
                       minimumFractionDigits: 2,
                     })
-                  : "0"}{" "}
+                  : "0.00"}{" "}
                 บาท
               </span>
             </div>

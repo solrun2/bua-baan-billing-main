@@ -41,21 +41,25 @@ const prepareDocumentData = (document: DocumentData): any => {
 
   // เตรียม items array ให้ตรงกับ backend
   const items = (document.items || []).map((item) => ({
-    product_id: (item as any).product_id || item.productId || "",
-    product_name: item.productTitle || (item as any).product_name || "",
-    unit: item.unit || "",
-    quantity: item.quantity || 1,
-    unit_price: item.unitPrice || (item as any).unit_price || 0,
-    amount: item.amount || 0,
-    description: item.description || "",
-    withholding_tax_amount:
-      (item as any).withholding_tax_amount ?? item.withholdingTaxAmount ?? 0,
-    amount_before_tax:
-      item.amountBeforeTax ?? (item as any).amount_before_tax ?? 0,
-    discount: item.discount ?? 0,
-    discount_type: (item as any).discount_type ?? item.discountType ?? "thb",
-    tax: item.tax ?? 0,
-    tax_amount: item.taxAmount ?? (item as any).tax_amount ?? 0,
+    product_id: item.productId ?? (item as any).product_id ?? "",
+    product_name: item.productTitle ?? (item as any).product_name ?? "",
+    unit: item.unit ?? "",
+    quantity: Number(item.quantity ?? 1),
+    unit_price: Number(item.unitPrice ?? (item as any).unit_price ?? 0),
+    amount: Number(item.amount ?? 0),
+    description: item.description ?? "",
+    withholding_tax_amount: Number(
+      item.withholdingTaxAmount ?? (item as any).withholding_tax_amount ?? 0
+    ),
+    withholding_tax_option:
+      item.withholdingTax ?? (item as any).withholding_tax_option ?? -1,
+    amount_before_tax: Number(
+      item.amountBeforeTax ?? (item as any).amount_before_tax ?? 0
+    ),
+    discount: Number(item.discount ?? 0),
+    discount_type: item.discountType ?? (item as any).discount_type ?? "thb",
+    tax: Number(item.tax ?? 0),
+    tax_amount: Number(item.taxAmount ?? (item as any).tax_amount ?? 0),
   }));
 
   // Log discount_type and discount for each item before sending to backend
@@ -290,13 +294,89 @@ const getDocumentNumbers = async (
   }
 };
 
-const getDocumentById = async (id: string): Promise<Document> => {
+// Map backend document (snake_case) to frontend DocumentData (camelCase)
+function mapDocumentFromBackend(doc: any): DocumentData {
+  // Helper function to format date as yyyy-MM-dd
+  const formatDate = (dateStr: string | undefined) => {
+    if (!dateStr) return "";
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    // Return yyyy-MM-dd
+    return d.toISOString().split("T")[0];
+  };
+  return {
+    id: doc.id?.toString(),
+    documentType: doc.document_type?.toLowerCase(),
+    documentNumber: doc.document_number,
+    documentDate: formatDate(doc.issue_date),
+    dueDate: formatDate(doc.due_date),
+    validUntil: formatDate(doc.valid_until),
+    reference: doc.reference,
+    status: doc.status,
+    priceType: doc.price_type || "exclusive",
+    notes: doc.notes,
+    tags: doc.tags || [],
+    customer: {
+      id: doc.customer_id,
+      name: doc.customer_name,
+      tax_id: doc.customer_tax_id || "",
+      phone: doc.customer_phone || "",
+      address: doc.customer_address || "",
+      email: doc.customer_email || "",
+    },
+    items: (doc.items || []).map((item: any) => ({
+      id: item.id?.toString(),
+      productId: item.product_id ?? item.productId ?? "",
+      productTitle: item.product_name ?? item.productTitle ?? "",
+      description: item.description ?? "",
+      unit: item.unit ?? "",
+      quantity: Number(item.quantity ?? 1),
+      unitPrice: Number(item.unit_price ?? item.unitPrice ?? 0),
+      priceType: doc.price_type || "exclusive",
+      discount: Number(item.discount ?? 0),
+      discountType: item.discount_type ?? item.discountType ?? "thb",
+      tax: Number(item.tax ?? 0),
+      amountBeforeTax: Number(
+        item.amount_before_tax ?? item.amountBeforeTax ?? 0
+      ),
+      withholdingTax:
+        item.withholding_tax_option ??
+        item.withholding_tax ??
+        item.withholdingTax ??
+        -1,
+      customWithholdingTaxAmount: Number(
+        item.custom_withholding_tax_amount ??
+          item.customWithholdingTaxAmount ??
+          0
+      ),
+      amount: Number(item.amount ?? 0),
+      isEditing: false,
+      taxAmount: Number(item.tax_amount ?? item.taxAmount ?? 0),
+      withholdingTaxAmount: Number(
+        item.withholding_tax_amount ?? item.withholdingTaxAmount ?? 0
+      ),
+    })),
+    summary: {
+      subtotal: doc.subtotal,
+      discount: doc.discount || 0,
+      tax: doc.tax_amount,
+      total: doc.total_amount,
+      withholdingTax: doc.withholding_tax || 0,
+    },
+    attachments: doc.attachments || [],
+    issueTaxInvoice: doc.issue_tax_invoice ?? false,
+    updatedAt: doc.updated_at,
+  };
+}
+
+const getDocumentById = async (id: string): Promise<DocumentData> => {
   try {
     const response = await fetch(`${API_BASE_URL}/documents/${id}`);
     if (!response.ok) {
       throw new Error("Failed to fetch document by ID");
     }
-    return await response.json();
+    const doc = await response.json();
+    return mapDocumentFromBackend(doc);
   } catch (error) {
     console.error("Error fetching document by ID:", error);
     throw error;
