@@ -19,6 +19,7 @@ export interface DocumentItem {
   withholding_tax_amount?: number;
   withholdingTaxAmount?: number;
   taxAmount?: number;
+  withholding_tax_option?: WithholdingTaxOption;
 }
 
 export interface DocumentSummary {
@@ -99,6 +100,7 @@ export interface DocumentItemPayload {
   discount_type: "thb" | "percentage";
   tax: number;
   tax_amount: number;
+  withholding_tax_option?: WithholdingTaxOption;
 }
 
 export interface DocumentPayload {
@@ -120,3 +122,15 @@ export interface DocumentPayload {
   tags?: string[];
   issueTaxInvoice?: boolean;
 }
+
+export type WithholdingTaxOption =
+  | "ไม่ระบุ"
+  | "ไม่มี"
+  | "1%"
+  | "1.5%"
+  | "2%"
+  | "3%"
+  | "5%"
+  | "10%"
+  | "15%"
+  | "กำหนดเอง";

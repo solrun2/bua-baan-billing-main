@@ -87,6 +87,20 @@ export const DocumentForm: FC<DocumentFormProps> = ({
     "inclusive" | "exclusive" | "none"
   >(initialData.priceType || "exclusive");
 
+  // 1. เพิ่มตัวเลือก ENUM สำหรับ Withholding Tax Option
+  const WITHHOLDING_TAX_OPTIONS = [
+    "ไม่ระบุ",
+    "ไม่มี",
+    "1%",
+    "1.5%",
+    "2%",
+    "3%",
+    "5%",
+    "10%",
+    "15%",
+    "กำหนดเอง",
+  ] as const;
+
   function createDefaultItem(): DocumentItem {
     return {
       id: `item-${Date.now()}`,
@@ -100,9 +114,10 @@ export const DocumentForm: FC<DocumentFormProps> = ({
       discountType: "thb",
       tax: 7,
       amountBeforeTax: 0,
-      withholdingTax: -1,
       amount: 0,
       isEditing: true,
+      withholding_tax_option: "ไม่ระบุ",
+      withholdingTax: -1,
     };
   }
 
@@ -163,14 +178,17 @@ export const DocumentForm: FC<DocumentFormProps> = ({
       ...prev,
       items: prev.items.map((item) => {
         if (item.id === id) {
-          if (field === "discountType") {
-            console.log("[handleItemChange] discountType changed", {
-              id,
-              before: item.discountType,
-              after: value,
-            });
-          }
           let updatedItemState = { ...item, [field]: value };
+          // ถ้าเปลี่ยน withholding_tax_option ให้ sync กับ withholdingTax (สำหรับคำนวณเท่านั้น)
+          if (field === "withholding_tax_option") {
+            updatedItemState.withholding_tax_option = value;
+            // sync withholdingTax (number/custom) สำหรับ logic เดิม (ใช้สำหรับคำนวณเท่านั้น)
+            if (value === "ไม่ระบุ") updatedItemState.withholdingTax = -1;
+            else if (value === "ไม่มี") updatedItemState.withholdingTax = 0;
+            else if (value === "กำหนดเอง")
+              updatedItemState.withholdingTax = "custom";
+            else updatedItemState.withholdingTax = parseFloat(value);
+          }
           if (
             field === "quantity" ||
             field === "unitPrice" ||
@@ -385,6 +403,11 @@ export const DocumentForm: FC<DocumentFormProps> = ({
               taxAmount: item.taxAmount ?? item.tax_amount ?? 0,
               withholdingTaxAmount:
                 item.withholdingTaxAmount ?? item.withholding_tax_amount ?? 0,
+              withholding_tax_option:
+                item.withholding_tax_option !== undefined &&
+                item.withholding_tax_option !== null
+                  ? item.withholding_tax_option
+                  : "ไม่ระบุ",
             }))
           : [createDefaultItem()],
       status: initialData.status || "รอตอบรับ",
@@ -451,6 +474,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
       discount_type: item.discountType ?? "thb",
       tax: item.tax ?? 0,
       tax_amount: item.taxAmount ?? 0,
+      withholding_tax_option: item.withholding_tax_option || "ไม่ระบุ",
     }));
 
     // log เฉพาะ discount_type ของแต่ละ item ก่อนส่ง backend
@@ -838,6 +862,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                                   amountBeforeTax: 0,
                                   amount: 0,
                                   isEditing: true,
+                                  withholding_tax_option: "ไม่ระบุ",
                                 };
                                 handleItemChange(newId, "isNew", true);
                                 handleItemChange(newId, "productTitle", "");
@@ -858,6 +883,11 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                                 handleItemChange(newId, "amount", 0);
                                 handleItemChange(newId, "isEditing", true);
                                 handleItemChange(newId, "isNew", true);
+                                handleItemChange(
+                                  newId,
+                                  "withholding_tax_option",
+                                  "ไม่ระบุ"
+                                );
                               }
                         }
                       />
@@ -962,30 +992,27 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                     <div className="space-y-2">
                       <Label>หัก ณ ที่จ่าย</Label>
                       <Select
-                        value={String(item.withholdingTax)}
-                        onValueChange={(value) => {
-                          const whtValue =
-                            value === "custom" ? "custom" : parseFloat(value);
-                          handleItemChange(item.id, "withholdingTax", whtValue);
-                        }}
+                        value={item.withholding_tax_option || "ไม่ระบุ"}
+                        onValueChange={(value) =>
+                          handleItemChange(
+                            item.id,
+                            "withholding_tax_option",
+                            value as any
+                          )
+                        }
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="เลือก" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="-1">ไม่ระบุ</SelectItem>
-                          <SelectItem value="0">ไม่มี</SelectItem>
-                          <SelectItem value="1">1%</SelectItem>
-                          <SelectItem value="1.5">1.5%</SelectItem>
-                          <SelectItem value="2">2%</SelectItem>
-                          <SelectItem value="3">3%</SelectItem>
-                          <SelectItem value="5">5%</SelectItem>
-                          <SelectItem value="10">10%</SelectItem>
-                          <SelectItem value="15">15%</SelectItem>
-                          <SelectItem value="custom">กำหนดเอง</SelectItem>
+                          {WITHHOLDING_TAX_OPTIONS.map((option) => (
+                            <SelectItem key={option} value={option}>
+                              {option}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
-                      {item.withholdingTax === "custom" && (
+                      {item.withholding_tax_option === "กำหนดเอง" && (
                         <Input
                           type="number"
                           placeholder="ระบุจำนวนเงิน"

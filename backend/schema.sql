@@ -60,14 +60,13 @@ CREATE TABLE `document_items` (
   `amount` decimal(15,2) NOT NULL DEFAULT 0.00,
   `description` text DEFAULT NULL,
   `withholding_tax_amount` decimal(10,2) DEFAULT 0.00,
-  `withholding_tax_option` varchar(32) DEFAULT NULL, -- ตัวเลือก: -1=ไม่ระบุ, 0=ไม่มี, 1=1%, 1.5=1.5%, 2=2%, 3=3%, 5=5%, 10=10%, 15=15%, custom=กำหนดเอง
   `amount_before_tax` decimal(15,2) DEFAULT 0.00,
   `discount` decimal(15,2) DEFAULT 0.00,
   `discount_type` enum('thb','percentage') DEFAULT 'thb',
   `tax` decimal(5,2) DEFAULT 7.00,
   `tax_amount` decimal(15,2) DEFAULT 0.00,
+  `withholding_tax_option` enum('ไม่ระบุ','ไม่มี','1%','1.5%','2%','3%','5%','10%','15%','กำหนดเอง') NOT NULL DEFAULT 'ไม่ระบุ',
   PRIMARY KEY (`id`),
   KEY `document_id` (`document_id`),
   CONSTRAINT `document_items_ibfk_1` FOREIGN KEY (`document_id`) REFERENCES `documents` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=70 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci
-
+) ENGINE=InnoDB AUTO_INCREMENT=86 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci

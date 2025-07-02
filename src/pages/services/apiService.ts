@@ -324,38 +324,48 @@ function mapDocumentFromBackend(doc: any): DocumentData {
       address: doc.customer_address || "",
       email: doc.customer_email || "",
     },
-    items: (doc.items || []).map((item: any) => ({
-      id: item.id?.toString(),
-      productId: item.product_id ?? item.productId ?? "",
-      productTitle: item.product_name ?? item.productTitle ?? "",
-      description: item.description ?? "",
-      unit: item.unit ?? "",
-      quantity: Number(item.quantity ?? 1),
-      unitPrice: Number(item.unit_price ?? item.unitPrice ?? 0),
-      priceType: doc.price_type || "exclusive",
-      discount: Number(item.discount ?? 0),
-      discountType: item.discount_type ?? item.discountType ?? "thb",
-      tax: Number(item.tax ?? 0),
-      amountBeforeTax: Number(
-        item.amount_before_tax ?? item.amountBeforeTax ?? 0
-      ),
-      withholdingTax:
-        item.withholding_tax_option ??
-        item.withholding_tax ??
-        item.withholdingTax ??
-        -1,
-      customWithholdingTaxAmount: Number(
-        item.custom_withholding_tax_amount ??
-          item.customWithholdingTaxAmount ??
-          0
-      ),
-      amount: Number(item.amount ?? 0),
-      isEditing: false,
-      taxAmount: Number(item.tax_amount ?? item.taxAmount ?? 0),
-      withholdingTaxAmount: Number(
-        item.withholding_tax_amount ?? item.withholdingTaxAmount ?? 0
-      ),
-    })),
+    items: (doc.items || []).map((item: any) => {
+      console.log("[mapDocumentFromBackend] raw item:", {
+        id: item.id,
+        withholding_tax_option: item.withholding_tax_option,
+        withholdingTax: item.withholdingTax,
+        withholding_tax_amount: item.withholding_tax_amount,
+        withholdingTaxAmount: item.withholdingTaxAmount,
+      });
+      return {
+        id: item.id?.toString(),
+        productId: item.product_id ?? item.productId ?? "",
+        productTitle: item.product_name ?? item.productTitle ?? "",
+        description: item.description ?? "",
+        unit: item.unit ?? "",
+        quantity: Number(item.quantity ?? 1),
+        unitPrice: Number(item.unit_price ?? item.unitPrice ?? 0),
+        priceType: doc.price_type || "exclusive",
+        discount: Number(item.discount ?? 0),
+        discountType: item.discount_type ?? item.discountType ?? "thb",
+        tax: Number(item.tax ?? 0),
+        amountBeforeTax: Number(
+          item.amount_before_tax ?? item.amountBeforeTax ?? 0
+        ),
+        withholdingTax:
+          item.withholding_tax_option ??
+          item.withholding_tax ??
+          item.withholdingTax ??
+          -1,
+        customWithholdingTaxAmount: Number(
+          item.custom_withholding_tax_amount ??
+            item.customWithholdingTaxAmount ??
+            0
+        ),
+        amount: Number(item.amount ?? 0),
+        isEditing: false,
+        taxAmount: Number(item.tax_amount ?? item.taxAmount ?? 0),
+        withholdingTaxAmount: Number(
+          item.withholding_tax_amount ?? item.withholdingTaxAmount ?? 0
+        ),
+        withholding_tax_option: item.withholding_tax_option ?? "ไม่ระบุ",
+      };
+    }),
     summary: {
       subtotal: doc.subtotal,
       discount: doc.discount || 0,
