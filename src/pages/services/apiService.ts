@@ -42,16 +42,33 @@ const prepareDocumentData = (document: DocumentData): any => {
   // เตรียม items array ให้ตรงกับ backend
   const items = (document.items || []).map((item) => ({
     product_id: (item as any).product_id || item.productId || "",
-    productTitle: item.productTitle || "",
+    product_name: item.productTitle || (item as any).product_name || "",
     unit: item.unit || "",
     quantity: item.quantity || 1,
-    unitPrice: item.unitPrice || 0,
-    discount: item.discount || 0,
-    tax: item.tax || 0,
+    unit_price: item.unitPrice || (item as any).unit_price || 0,
     amount: item.amount || 0,
-    withholding_tax_amount: (item as any).withholding_tax_amount ?? 0,
     description: item.description || "",
+    withholding_tax_amount:
+      (item as any).withholding_tax_amount ?? item.withholdingTaxAmount ?? 0,
+    amount_before_tax:
+      item.amountBeforeTax ?? (item as any).amount_before_tax ?? 0,
+    discount: item.discount ?? 0,
+    discount_type: (item as any).discount_type ?? item.discountType ?? "thb",
+    tax: item.tax ?? 0,
+    tax_amount: item.taxAmount ?? (item as any).tax_amount ?? 0,
   }));
+
+  // Log discount_type and discount for each item before sending to backend
+  if (items.length > 0) {
+    console.log(
+      "[prepareDocumentData] items to backend:",
+      items.map((i) => ({
+        discount_type: i.discount_type,
+        discount: i.discount,
+        product_name: i.product_name,
+      }))
+    );
+  }
 
   // Ensure summary fields are always present
   const summary: any = document.summary || {};

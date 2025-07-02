@@ -162,6 +162,13 @@ export const DocumentForm: FC<DocumentFormProps> = ({
       ...prev,
       items: prev.items.map((item) => {
         if (item.id === id) {
+          if (field === "discountType") {
+            console.log("[handleItemChange] discountType changed", {
+              id,
+              before: item.discountType,
+              after: value,
+            });
+          }
           let updatedItemState = { ...item, [field]: value };
           if (
             field === "quantity" ||
