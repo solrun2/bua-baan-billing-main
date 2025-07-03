@@ -53,6 +53,9 @@ import {
   updateItemWithCalculations,
 } from "@/calculate/documentCalculations";
 import { ProductForm } from "./ProductForm";
+import { getCustomerById } from "@/pages/services/customerService";
+import { getProductById } from "@/pages/services/productService";
+import { documentService } from "@/pages/services/documentService";
 
 export interface DocumentFormProps {
   onCancel: () => void;
@@ -250,7 +253,10 @@ export const DocumentForm: FC<DocumentFormProps> = ({
     setForm((prev) => ({
       ...prev,
       customer: {
-        id: Number(selectedCustomer.id),
+        id:
+          typeof selectedCustomer.id === "string"
+            ? parseInt(selectedCustomer.id, 10)
+            : selectedCustomer.id,
         name: selectedCustomer.name,
         tax_id: selectedCustomer.tax_id,
         phone: selectedCustomer.phone,
@@ -270,18 +276,61 @@ export const DocumentForm: FC<DocumentFormProps> = ({
         ...prev,
         items: prev.items.map((item) => {
           if (item.id === itemId) {
-            const newItem = {
+            // normalize discountType ให้ถูกต้อง
+            let normalizedDiscountType: "thb" | "percentage" = "thb";
+            if (item.discountType === "percentage") {
+              normalizedDiscountType = "percentage";
+            }
+            // เตรียมข้อมูล item
+            const mergedItem = {
               ...item,
-              productId: String(product.id),
-              productTitle: product.title,
-              description: product.description || "",
-              unitPrice: typeof product.price === "number" ? product.price : 0,
-              unit: product.unit || "ชิ้น",
-              priceType: item.priceType || "exclusive",
-              tax: typeof product.vat_rate === "number" ? product.vat_rate : 7,
+              id: item.id ?? `item-${Date.now()}`,
+              productId: product.id
+                ? product.id.toString()
+                : (item.productId ?? ""),
+              productTitle: product.title ?? item.productTitle ?? "",
+              description: product.description ?? item.description ?? "",
+              unitPrice:
+                typeof product.price === "number"
+                  ? product.price
+                  : (item.unitPrice ?? 0),
+              unit: product.unit ?? item.unit ?? "",
+              tax:
+                typeof product.vat_rate === "number"
+                  ? product.vat_rate
+                  : (item.tax ?? 7),
+              discount: item.discount ?? 0,
+              discountType: normalizedDiscountType,
+              withholding_tax_option: item.withholding_tax_option ?? "ไม่ระบุ",
+              customWithholdingTaxAmount: item.customWithholdingTaxAmount ?? 0,
               isEditing: false,
             };
-            return updateItemWithCalculations(newItem);
+            // ลบ field ที่เกี่ยวกับผลลัพธ์การคำนวณ
+            delete mergedItem.amount;
+            delete mergedItem.amountBeforeTax;
+            delete mergedItem.taxAmount;
+            delete mergedItem.withholdingTaxAmount;
+            // Logic sync withholdingTax ตาม withholding_tax_option
+            if (mergedItem.withholding_tax_option === "กำหนดเอง") {
+              mergedItem.withholdingTax = "custom";
+            } else if (
+              typeof mergedItem.withholding_tax_option === "string" &&
+              mergedItem.withholding_tax_option.endsWith("%")
+            ) {
+              mergedItem.withholdingTax = parseFloat(
+                mergedItem.withholding_tax_option
+              );
+            } else if (
+              mergedItem.withholding_tax_option === "ไม่มี" ||
+              mergedItem.withholding_tax_option === "ไม่ระบุ"
+            ) {
+              mergedItem.withholdingTax = 0;
+            } else if (typeof mergedItem.withholdingTax !== "number") {
+              mergedItem.withholdingTax =
+                Number(mergedItem.withholdingTax) || 0;
+            }
+            // คำนวณใหม่
+            return updateItemWithCalculations(mergedItem) as DocumentItem;
           }
           return item;
         }),
@@ -379,51 +428,100 @@ export const DocumentForm: FC<DocumentFormProps> = ({
 
   // Sync form state with initialData when initialData changes (for edit mode)
   useEffect(() => {
-    setForm({
-      reference: initialData.reference,
-      documentNumber: initialData.documentNumber || "",
-      documentDate:
-        initialData.documentDate || new Date().toISOString().split("T")[0],
-      dueDate: initialData.dueDate || "",
-      validUntil: initialData.validUntil || "",
-      customer: initialData.customer,
-      issueTaxInvoice: initialData.issueTaxInvoice ?? true,
-      priceType: initialData.priceType || "exclusive",
-      tags: initialData.tags || [],
-      notes: initialData.notes,
-      items:
-        initialData.items.length > 0
-          ? initialData.items.map((item: any) => ({
-              id: item.id ?? item.id?.toString() ?? `item-${Date.now()}`,
-              productId: item.productId ?? item.product_id ?? "",
-              productTitle: item.productTitle ?? item.product_name ?? "",
-              description: item.description ?? "",
-              unit: item.unit ?? "",
-              quantity: item.quantity ?? 1,
-              unitPrice: item.unitPrice ?? item.unit_price ?? 0,
-              priceType: item.priceType ?? "exclusive",
+    async function fillEditData() {
+      if (editMode && initialData.customer?.id) {
+        // ดึงข้อมูลลูกค้า
+        const customer = await getCustomerById(String(initialData.customer.id));
+        // ดึงข้อมูลสินค้าแต่ละตัว
+        const items = await Promise.all(
+          (initialData.items || []).map(async (item) => {
+            let product = null;
+            if (item.productId) {
+              product = await getProductById(item.productId);
+            }
+            // normalize discountType ให้ถูกต้อง
+            let normalizedDiscountType: "thb" | "percentage" = "thb";
+            if (item.discountType === "percentage") {
+              normalizedDiscountType = "percentage";
+            }
+            // เตรียมข้อมูล item
+            const mergedItem = {
+              ...item,
+              id: item.id ?? `item-${Date.now()}`,
+              productId: product?.id
+                ? product.id.toString()
+                : (item.productId ?? ""),
+              productTitle: product?.title ?? item.productTitle ?? "",
+              description: product?.description ?? item.description ?? "",
+              unitPrice:
+                typeof product?.price === "number"
+                  ? product.price
+                  : (item.unitPrice ?? 0),
+              unit: product?.unit ?? item.unit ?? "",
+              tax:
+                typeof product?.vat_rate === "number"
+                  ? product.vat_rate
+                  : (item.tax ?? 7),
               discount: item.discount ?? 0,
-              discountType: item.discountType ?? item.discount_type ?? "thb",
-              tax: item.tax ?? 0,
-              amountBeforeTax:
-                item.amountBeforeTax ?? item.amount_before_tax ?? 0,
-              withholdingTax: item.withholdingTax ?? item.withholding_tax ?? 0,
-              customWithholdingTaxAmount:
-                item.customWithholdingTaxAmount ??
-                item.custom_withholding_tax_amount ??
-                0,
-              amount: item.amount ?? 0,
-              isEditing: false,
-              taxAmount: item.taxAmount ?? item.tax_amount ?? 0,
-              withholdingTaxAmount:
-                item.withholdingTaxAmount ?? item.withholding_tax_amount ?? 0,
+              discountType: normalizedDiscountType,
               withholding_tax_option: item.withholding_tax_option ?? "ไม่ระบุ",
-            }))
-          : [],
-      summary: initialData.summary ?? summary,
-      status: initialData.status,
-    });
-  }, [initialData]);
+              customWithholdingTaxAmount: item.customWithholdingTaxAmount ?? 0,
+              isEditing: false,
+            };
+            // ลบ field ที่เกี่ยวกับผลลัพธ์การคำนวณ
+            delete mergedItem.amount;
+            delete mergedItem.amountBeforeTax;
+            delete mergedItem.taxAmount;
+            delete mergedItem.withholdingTaxAmount;
+            // Logic sync withholdingTax ตาม withholding_tax_option
+            if (mergedItem.withholding_tax_option === "กำหนดเอง") {
+              mergedItem.withholdingTax = "custom";
+            } else if (
+              typeof mergedItem.withholding_tax_option === "string" &&
+              mergedItem.withholding_tax_option.endsWith("%")
+            ) {
+              mergedItem.withholdingTax = parseFloat(
+                mergedItem.withholding_tax_option
+              );
+            } else if (
+              mergedItem.withholding_tax_option === "ไม่มี" ||
+              mergedItem.withholding_tax_option === "ไม่ระบุ"
+            ) {
+              mergedItem.withholdingTax = 0;
+            } else if (typeof mergedItem.withholdingTax !== "number") {
+              mergedItem.withholdingTax =
+                Number(mergedItem.withholdingTax) || 0;
+            }
+            // คำนวณใหม่
+            return updateItemWithCalculations(mergedItem) as DocumentItem;
+          })
+        );
+        setForm((prev) => ({
+          ...prev,
+          customer: customer
+            ? {
+                id:
+                  typeof customer.id === "string"
+                    ? parseInt(customer.id, 10)
+                    : customer.id,
+                name: customer.name,
+                tax_id: customer.tax_id,
+                phone: customer.phone,
+                address: customer.address,
+                email: customer.email,
+              }
+            : prev.customer,
+          items,
+        }));
+        // คำนวณ summary ใหม่ทันทีหลัง normalize items
+        const newSummary = calculateDocumentSummary(items);
+        setSummary(newSummary);
+        setNetTotal(newSummary.total - newSummary.withholdingTax);
+      }
+    }
+    fillEditData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editMode, initialData]);
 
   // ฟังก์ชันคำนวณ discount เป็นจำนวนเงินจริง
   function getDiscountAmount(item: DocumentItem) {
@@ -507,7 +605,10 @@ export const DocumentForm: FC<DocumentFormProps> = ({
       validUntil: documentType === "quotation" ? form.validUntil : undefined,
       reference: form.reference,
       customer: {
-        id: form.customer.id,
+        id:
+          typeof form.customer.id === "string"
+            ? parseInt(form.customer.id, 10)
+            : form.customer.id,
         name: form.customer.name,
         tax_id: form.customer.tax_id,
         phone: form.customer.phone,
@@ -522,8 +623,30 @@ export const DocumentForm: FC<DocumentFormProps> = ({
       attachments: attachments,
     };
 
-    // เพิ่ม log สำหรับ debug การอัปเดตเอกสาร
-    console.log("[DEBUG] Update Document Payload:", dataToSave);
+    // แปลง DocumentPayload เป็น DocumentData สำหรับบันทึก localStorage
+    const itemsForSave: DocumentItem[] = form.items.map((item, idx) => ({
+      ...item,
+      id: item.id ?? `item-${idx}-${Date.now()}`,
+      productTitle: item.productTitle ?? "",
+      unitPrice: item.unitPrice ?? 0,
+      priceType: item.priceType ?? form.priceType ?? "exclusive",
+      discountType: item.discountType ?? "thb",
+      withholding_tax_option: item.withholding_tax_option ?? "ไม่ระบุ",
+      withholdingTax: item.withholdingTax ?? 0,
+      customWithholdingTaxAmount: item.customWithholdingTaxAmount ?? 0,
+      amount: item.amount ?? 0,
+      amountBeforeTax: item.amountBeforeTax ?? 0,
+      taxAmount: item.taxAmount ?? 0,
+      withholdingTaxAmount: item.withholdingTaxAmount ?? 0,
+      isEditing: false,
+    }));
+    const dataForLocal: DocumentData = {
+      ...dataToSave,
+      id: initialData.id,
+      items: itemsForSave,
+      summary: summary,
+    };
+    documentService.save(dataForLocal);
 
     try {
       await onSave(dataToSave);
@@ -1263,13 +1386,13 @@ export const DocumentForm: FC<DocumentFormProps> = ({
           </CardHeader>
           <CardContent className="p-4 space-y-3">
             <div className="flex justify-between">
-              <span>รวมเป็นเงิน</span>
+              <span>มูลค่าก่อนภาษี</span>
               <span>
-                {typeof netTotal === "number"
-                  ? netTotal.toLocaleString("th-TH", {
+                {typeof summary.subtotal === "number"
+                  ? summary.subtotal.toLocaleString("th-TH", {
                       minimumFractionDigits: 2,
                     })
-                  : "0"}
+                  : "0"}{" "}
                 บาท
               </span>
             </div>
@@ -1285,8 +1408,8 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                 บาท
               </span>
             </div>
-            <div className="border-t pt-3 mt-3 flex justify-between">
-              <span>มูลค่าก่อนภาษี</span>
+            <div className="flex justify-between">
+              <span>มูลค่าหลังหักส่วนลด</span>
               <span>
                 {typeof (summary.subtotal - summary.discount) === "number"
                   ? (summary.subtotal - summary.discount).toLocaleString(
@@ -1308,36 +1431,38 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                 บาท
               </span>
             </div>
-            <div className="border-t pt-3 mt-3 flex justify-between items-center">
-              <Label>หัก ณ ที่จ่าย</Label>
+            <div className="flex justify-between">
+              <span>รวมเป็นเงิน</span>
+              <span>
+                {typeof summary.total === "number"
+                  ? summary.total.toLocaleString("th-TH", {
+                      minimumFractionDigits: 2,
+                    })
+                  : "0"}{" "}
+                บาท
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span>หัก ณ ที่จ่าย</span>
               <span>
                 -
-                {(() => {
-                  // รวม withholding_tax_amount ของทุก item (รองรับ custom)
-                  const totalWht = form.items.reduce((sum, item) => {
-                    if (item.withholding_tax_option === "กำหนดเอง") {
-                      return (
-                        sum + (Number(item.customWithholdingTaxAmount) || 0)
-                      );
-                    }
-                    // ถ้าไม่ใช่กำหนดเอง ให้ใช้ withholdingTaxAmount (ที่คำนวณไว้)
-                    return sum + (Number(item.withholdingTaxAmount) || 0);
-                  }, 0);
-                  return totalWht.toLocaleString("th-TH", {
-                    minimumFractionDigits: 2,
-                  });
-                })()}{" "}
+                {typeof summary.withholdingTax === "number"
+                  ? summary.withholdingTax.toLocaleString("th-TH", {
+                      minimumFractionDigits: 2,
+                    })
+                  : "0"}{" "}
                 บาท
               </span>
             </div>
             <div className="border-t-2 border-primary pt-3 mt-3 flex justify-between font-bold text-lg">
               <span>จำนวนเงินทั้งสิ้น</span>
               <span>
-                {typeof netTotal === "number"
-                  ? netTotal.toLocaleString("th-TH", {
-                      minimumFractionDigits: 2,
-                    })
-                  : "0"}
+                {typeof (summary.total - summary.withholdingTax) === "number"
+                  ? (summary.total - summary.withholdingTax).toLocaleString(
+                      "th-TH",
+                      { minimumFractionDigits: 2 }
+                    )
+                  : "0"}{" "}
                 บาท
               </span>
             </div>

@@ -7,7 +7,7 @@ interface BaseItem {
   discount: number;
   discountType: "thb" | "percentage";
   tax?: number;
-  withholdingTax?: number | 'custom';
+  withholdingTax?: number | "custom";
   customWithholdingTaxAmount?: number;
 }
 
@@ -26,7 +26,7 @@ export interface CalculatedItem {
 export const calculateItemAmounts = (item: BaseItem): CalculatedItem => {
   const taxRate = item.tax !== undefined ? item.tax / 100 : 0;
   const withholdingTaxRate =
-    typeof item.withholdingTax === 'number' && item.withholdingTax > 0
+    typeof item.withholdingTax === "number" && item.withholdingTax > 0
       ? item.withholdingTax / 100
       : 0;
 
@@ -53,7 +53,7 @@ export const calculateItemAmounts = (item: BaseItem): CalculatedItem => {
 
   // Calculate withholding tax amount for the item
   let withholdingTaxAmount = 0;
-  if (item.withholdingTax === 'custom') {
+  if (item.withholdingTax === "custom") {
     withholdingTaxAmount = item.customWithholdingTaxAmount || 0;
   } else {
     withholdingTaxAmount = amountBeforeTax * withholdingTaxRate;
@@ -98,18 +98,15 @@ export const calculateDocumentSummary = <T extends BaseItem>(
     { subtotal: 0, discount: 0, tax: 0, total: 0, withholdingTax: 0 }
   );
 
-  return {
-    ...summary,
-    total: summary.total - summary.withholdingTax,
-  };
+  return summary;
 };
 
 /**
  * Update item with calculated amounts
  */
-export const updateItemWithCalculations = <
-  T extends BaseItem
->(item: T): T & CalculatedItem => {
+export const updateItemWithCalculations = <T extends BaseItem>(
+  item: T
+): T & CalculatedItem => {
   const calculations = calculateItemAmounts(item);
   return {
     ...item,

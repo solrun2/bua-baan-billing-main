@@ -154,10 +154,11 @@ const updateDocument = async (
   document: DocumentData
 ): Promise<DocumentData> => {
   try {
+    const backendData = prepareDocumentData(document);
     const response = await fetch(`${API_BASE_URL}/documents/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(document),
+      body: JSON.stringify(backendData),
     });
     if (!response.ok) {
       const errorData = await response.json();

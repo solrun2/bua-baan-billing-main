@@ -339,11 +339,24 @@ app.get("/api/documents", async (req: Request, res: Response) => {
         return acc;
       }, {});
     }
-    // แนบ items ให้แต่ละ document
-    const docsWithItems = rows.map((doc: any) => ({
-      ...doc,
-      items: itemsByDoc[doc.id] || [],
-    }));
+    // แนบ items และ summary ให้แต่ละ document
+    const docsWithItems = rows.map((doc: any) => {
+      const items = itemsByDoc[doc.id] || [];
+      const withholdingTax = items.reduce(
+        (sum, item) => sum + (item.withholding_tax_amount || 0),
+        0
+      );
+      return {
+        ...doc,
+        items,
+        summary: {
+          subtotal: doc.subtotal,
+          tax: doc.tax_amount,
+          total: doc.total_amount,
+          withholdingTax,
+        },
+      };
+    });
     res.json(docsWithItems);
   } catch (err) {
     console.error("Failed to fetch documents:", err);
@@ -664,6 +677,130 @@ app.get("/api/documents/:id", async (req, res) => {
   } catch (err) {
     console.error("Failed to fetch document by id:", err);
     res.status(500).json({ error: "Failed to fetch document" });
+  }
+});
+
+app.put("/api/documents/:id", async (req: Request, res: Response) => {
+  let conn;
+  const { id } = req.params;
+  try {
+    const {
+      customer,
+      document_type,
+      status,
+      issue_date,
+      notes,
+      items,
+      summary,
+      due_date,
+      valid_until,
+      payment_date,
+      payment_method,
+      payment_reference,
+    } = req.body;
+
+    if (
+      !customer ||
+      !customer.id ||
+      !customer.name ||
+      !document_type ||
+      !status ||
+      !issue_date ||
+      !items ||
+      !Array.isArray(items) ||
+      items.length === 0 ||
+      !summary
+    ) {
+      return res
+        .status(400)
+        .json({ error: "Missing required document fields." });
+    }
+
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
+
+    // 1. Update main document
+    await conn.query(
+      `UPDATE documents SET
+        customer_id = ?, customer_name = ?, document_type = ?, status = ?, issue_date = ?,
+        subtotal = ?, tax_amount = ?, total_amount = ?, notes = ?,
+        customer_address = ?, customer_phone = ?, customer_email = ?
+      WHERE id = ?`,
+      [
+        customer.id,
+        customer.name,
+        document_type,
+        status,
+        issue_date,
+        summary.subtotal,
+        summary.tax,
+        summary.total,
+        notes,
+        customer.address || "",
+        customer.phone || "",
+        customer.email || "",
+        id,
+      ]
+    );
+
+    // 2. Update document-specific details
+    if (document_type.toLowerCase() === "quotation" && valid_until) {
+      await conn.query(
+        "UPDATE quotation_details SET valid_until = ? WHERE document_id = ?",
+        [valid_until, id]
+      );
+    } else if (document_type.toLowerCase() === "invoice" && due_date) {
+      await conn.query(
+        "UPDATE invoice_details SET due_date = ? WHERE document_id = ?",
+        [due_date, id]
+      );
+    } else if (
+      document_type.toLowerCase() === "receipt" &&
+      payment_date &&
+      payment_method
+    ) {
+      await conn.query(
+        "UPDATE receipt_details SET payment_date = ?, payment_method = ?, payment_reference = ? WHERE document_id = ?",
+        [payment_date, payment_method, payment_reference, id]
+      );
+    }
+
+    // 3. ลบ items เดิม แล้ว insert ใหม่
+    await conn.query("DELETE FROM document_items WHERE document_id = ?", [id]);
+    for (const item of items) {
+      const params = [
+        id,
+        item.product_id ?? null,
+        item.product_name ?? "",
+        item.unit ?? "",
+        item.quantity ?? 1,
+        item.unit_price ?? 0,
+        item.amount ?? 0,
+        item.description ?? "",
+        item.withholding_tax_amount ?? 0,
+        item.withholding_tax_option ?? -1,
+        item.amount_before_tax ?? 0,
+        item.discount ?? 0,
+        item.discount_type ?? "thb",
+        item.tax ?? 0,
+        item.tax_amount ?? 0,
+      ];
+      await conn.query(
+        `INSERT INTO document_items (
+          document_id, product_id, product_name, unit, quantity, unit_price, amount, description, withholding_tax_amount, withholding_tax_option, amount_before_tax, discount, discount_type, tax, tax_amount
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        params
+      );
+    }
+
+    await conn.commit();
+    res.status(200).json({ message: "Document updated successfully." });
+  } catch (err) {
+    if (conn) await conn.rollback();
+    console.error("Failed to update document:", err);
+    res.status(500).json({ error: "Failed to update document" });
+  } finally {
+    if (conn) conn.release();
   }
 });
 

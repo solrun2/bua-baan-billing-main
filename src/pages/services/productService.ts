@@ -68,3 +68,8 @@ export async function fetchAllProducts() {
   }
   return allProducts;
 }
+
+export async function getProductById(id: string | number) {
+  const products = await searchProducts(String(id));
+  return products && products.length > 0 ? products[0] : null;
+}

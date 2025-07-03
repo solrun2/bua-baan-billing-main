@@ -371,6 +371,39 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
                 </span>
               </div>
             )}
+            <div className="flex justify-between mb-1">
+              <span>มูลค่าหลังหักส่วนลด</span>
+              <span>
+                {(summary.subtotal - summary.discount).toLocaleString(
+                  undefined,
+                  {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  }
+                )}{" "}
+                บาท
+              </span>
+            </div>
+            <div className="flex justify-between mb-1">
+              <span>ภาษีมูลค่าเพิ่ม 7%</span>
+              <span>
+                {summary.tax.toLocaleString(undefined, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}{" "}
+                บาท
+              </span>
+            </div>
+            <div className="flex justify-between mb-1">
+              <span>รวมเป็นเงิน</span>
+              <span>
+                {(summary.total ?? 0).toLocaleString(undefined, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}{" "}
+                บาท
+              </span>
+            </div>
             {Number(summary.withholdingTax) !== 0 && (
               <div className="flex justify-between mb-1 text-yellow-700">
                 <span>หัก ณ ที่จ่าย</span>
@@ -392,20 +425,12 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
                 </span>
               </div>
             )}
-            <div className="flex justify-between mb-1">
-              <span>ภาษีมูลค่าเพิ่ม 7%</span>
-              <span>
-                {summary.tax.toLocaleString(undefined, {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}{" "}
-                บาท
-              </span>
-            </div>
             <div className="flex justify-between font-bold text-lg">
               <span>จำนวนเงินทั้งสิ้น</span>
               <span>
-                {summary.total.toLocaleString(undefined, {
+                {(
+                  (summary.total ?? 0) - (summary.withholdingTax ?? 0)
+                ).toLocaleString(undefined, {
                   minimumFractionDigits: 2,
                   maximumFractionDigits: 2,
                 })}{" "}

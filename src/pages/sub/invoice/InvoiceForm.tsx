@@ -44,7 +44,7 @@ const InvoiceForm = ({
       discount: 0,
       tax: 0,
       total: 0,
-      withholding_tax_option: "ไม่ระบุ",
+      withholdingTax: 0,
     },
     notes: "",
     documentDate: new Date().toISOString().split("T")[0],
@@ -87,7 +87,7 @@ const InvoiceForm = ({
                 discount: 0,
                 tax: 0,
                 total: 0,
-                withholding_tax_option: doc.withholding_tax_option || "ไม่ระบุ",
+                withholdingTax: 0,
               },
               notes: doc.notes || "",
               documentNumber: doc.documentNumber || "",
@@ -172,7 +172,7 @@ const InvoiceForm = ({
           discount: 0,
           tax: 0,
           total: 0,
-          withholding_tax_option: data.withholding_tax_option || "ไม่ระบุ",
+          withholdingTax: 0,
         },
         notes: data.notes || "",
         documentNumber: data.documentNumber || "",
@@ -236,9 +236,11 @@ const InvoiceForm = ({
       <DocumentForm
         documentType="invoice"
         onCancel={handleCancel}
-        onSave={handleSave}
-        initialData={{ ...initialData, status: "รอชำระ" }}
-        isLoading={isLoading || externalIsLoading}
+        onSave={async (payload) => {
+          await handleSave(payload as unknown as DocumentData);
+        }}
+        initialData={initialData}
+        isLoading={isLoading}
       />
     </div>
   );
