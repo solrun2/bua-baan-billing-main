@@ -41,6 +41,7 @@ interface DocumentBase {
   items: DocumentItem[];
   summary: DocumentSummary;
   reference?: string;
+  total_amount?: number;
 }
 
 interface Quotation extends DocumentBase {
@@ -351,19 +352,19 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
             <div className="flex justify-between mb-1">
               <span>มูลค่าสินค้าหรือค่าบริการ</span>
               <span>
-                {summary.subtotal.toLocaleString(undefined, {
+                {document.summary.subtotal.toLocaleString(undefined, {
                   minimumFractionDigits: 2,
                   maximumFractionDigits: 2,
                 })}{" "}
                 บาท
               </span>
             </div>
-            {summary.discount > 0 && (
+            {document.summary.discount > 0 && (
               <div className="flex justify-between mb-1 text-destructive">
                 <span>ส่วนลด</span>
                 <span>
                   -
-                  {summary.discount.toLocaleString(undefined, {
+                  {document.summary.discount.toLocaleString(undefined, {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
                   })}{" "}
@@ -374,20 +375,19 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
             <div className="flex justify-between mb-1">
               <span>มูลค่าหลังหักส่วนลด</span>
               <span>
-                {(summary.subtotal - summary.discount).toLocaleString(
-                  undefined,
-                  {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  }
-                )}{" "}
+                {(
+                  document.summary.subtotal - document.summary.discount
+                ).toLocaleString(undefined, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}{" "}
                 บาท
               </span>
             </div>
             <div className="flex justify-between mb-1">
               <span>ภาษีมูลค่าเพิ่ม 7%</span>
               <span>
-                {summary.tax.toLocaleString(undefined, {
+                {document.summary.tax.toLocaleString(undefined, {
                   minimumFractionDigits: 2,
                   maximumFractionDigits: 2,
                 })}{" "}
@@ -397,30 +397,25 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
             <div className="flex justify-between mb-1">
               <span>รวมเป็นเงิน</span>
               <span>
-                {(summary.total ?? 0).toLocaleString(undefined, {
+                {document.summary.total.toLocaleString(undefined, {
                   minimumFractionDigits: 2,
                   maximumFractionDigits: 2,
                 })}{" "}
                 บาท
               </span>
             </div>
-            {Number(summary.withholdingTax) !== 0 && (
+            {Number(document.summary.withholdingTax) !== 0 && (
               <div className="flex justify-between mb-1 text-yellow-700">
                 <span>หัก ณ ที่จ่าย</span>
                 <span>
                   -
-                  {typeof summary.withholdingTax === "number"
-                    ? summary.withholdingTax.toLocaleString(undefined, {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })
-                    : Number(summary.withholdingTax || 0).toLocaleString(
-                        undefined,
-                        {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        }
-                      )}{" "}
+                  {Number(document.summary.withholdingTax ?? 0).toLocaleString(
+                    undefined,
+                    {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    }
+                  )}{" "}
                   บาท
                 </span>
               </div>
@@ -429,7 +424,8 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
               <span>จำนวนเงินทั้งสิ้น</span>
               <span>
                 {(
-                  (summary.total ?? 0) - (summary.withholdingTax ?? 0)
+                  document.total_amount ??
+                  document.summary.total - document.summary.withholdingTax
                 ).toLocaleString(undefined, {
                   minimumFractionDigits: 2,
                   maximumFractionDigits: 2,

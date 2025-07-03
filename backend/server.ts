@@ -342,10 +342,45 @@ app.get("/api/documents", async (req: Request, res: Response) => {
     // แนบ items และ summary ให้แต่ละ document
     const docsWithItems = rows.map((doc: any) => {
       const items = itemsByDoc[doc.id] || [];
-      const withholdingTax = items.reduce(
-        (sum, item) => sum + (item.withholding_tax_amount || 0),
-        0
-      );
+      // คำนวณ withholdingTax แบบ dynamic
+      const withholdingTax = items.reduce((sum, item) => {
+        // คำนวณ amount ก่อนหัก ณ ที่จ่าย
+        const quantity = Number(item.quantity ?? 1);
+        const unitPrice = Number(item.unit_price ?? 0);
+        const discount = Number(item.discount ?? 0);
+        const discountType = item.discount_type ?? "thb";
+        let amountBeforeTax = 0;
+        if (discountType === "percentage") {
+          amountBeforeTax = quantity * unitPrice * (1 - discount / 100);
+        } else {
+          amountBeforeTax = quantity * (unitPrice - discount);
+        }
+        let whtRate = 0;
+        if (typeof item.withholding_tax_option === "number") {
+          whtRate = item.withholding_tax_option / 100;
+        } else if (
+          typeof item.withholding_tax_option === "string" &&
+          item.withholding_tax_option.endsWith("%")
+        ) {
+          whtRate = parseFloat(item.withholding_tax_option) / 100;
+        } else if (
+          item.withholding_tax_option === "ไม่มี" ||
+          item.withholding_tax_option === "ไม่ระบุ"
+        ) {
+          whtRate = 0;
+        }
+        // รองรับ custom amount
+        let whtAmount = 0;
+        if (
+          item.withholding_tax_option === "กำหนดเอง" &&
+          item.customWithholdingTaxAmount
+        ) {
+          whtAmount = Number(item.customWithholdingTaxAmount);
+        } else {
+          whtAmount = amountBeforeTax * whtRate;
+        }
+        return sum + whtAmount;
+      }, 0);
       return {
         ...doc,
         items,
@@ -496,6 +531,46 @@ app.post("/api/documents", async (req: Request, res: Response) => {
     );
 
     // 3. Insert into main 'documents' table
+    // คำนวณยอดสุทธิหลังหัก ณ ที่จ่าย
+    const withholdingTax = items.reduce((sum, item) => {
+      // คำนวณ amount ก่อนหัก ณ ที่จ่าย
+      const quantity = Number(item.quantity ?? 1);
+      const unitPrice = Number(item.unit_price ?? 0);
+      const discount = Number(item.discount ?? 0);
+      const discountType = item.discount_type ?? "thb";
+      let amountBeforeTax = 0;
+      if (discountType === "percentage") {
+        amountBeforeTax = quantity * unitPrice * (1 - discount / 100);
+      } else {
+        amountBeforeTax = quantity * (unitPrice - discount);
+      }
+      let whtRate = 0;
+      if (typeof item.withholding_tax_option === "number") {
+        whtRate = item.withholding_tax_option / 100;
+      } else if (
+        typeof item.withholding_tax_option === "string" &&
+        item.withholding_tax_option.endsWith("%")
+      ) {
+        whtRate = parseFloat(item.withholding_tax_option) / 100;
+      } else if (
+        item.withholding_tax_option === "ไม่มี" ||
+        item.withholding_tax_option === "ไม่ระบุ"
+      ) {
+        whtRate = 0;
+      }
+      // รองรับ custom amount
+      let whtAmount = 0;
+      if (
+        item.withholding_tax_option === "กำหนดเอง" &&
+        item.customWithholdingTaxAmount
+      ) {
+        whtAmount = Number(item.customWithholdingTaxAmount);
+      } else {
+        whtAmount = amountBeforeTax * whtRate;
+      }
+      return sum + whtAmount;
+    }, 0);
+    const netTotalAmount = (summary.total ?? 0) - withholdingTax;
     const docResult = await conn.query(
       `INSERT INTO documents (
         customer_id, customer_name, document_number, document_type, status, issue_date,
@@ -511,7 +586,7 @@ app.post("/api/documents", async (req: Request, res: Response) => {
         issue_date,
         subtotal,
         tax_amount,
-        total_amount,
+        netTotalAmount, // ใช้ยอดสุทธิหลังหัก ณ ที่จ่าย
         notes,
         customer.address || "",
         customer.phone || "",
@@ -720,6 +795,44 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
     await conn.beginTransaction();
 
     // 1. Update main document
+    // คำนวณยอดสุทธิหลังหัก ณ ที่จ่าย
+    const withholdingTaxUpdate = items.reduce((sum, item) => {
+      const quantity = Number(item.quantity ?? 1);
+      const unitPrice = Number(item.unit_price ?? 0);
+      const discount = Number(item.discount ?? 0);
+      const discountType = item.discount_type ?? "thb";
+      let amountBeforeTax = 0;
+      if (discountType === "percentage") {
+        amountBeforeTax = quantity * unitPrice * (1 - discount / 100);
+      } else {
+        amountBeforeTax = quantity * (unitPrice - discount);
+      }
+      let whtRate = 0;
+      if (typeof item.withholding_tax_option === "number") {
+        whtRate = item.withholding_tax_option / 100;
+      } else if (
+        typeof item.withholding_tax_option === "string" &&
+        item.withholding_tax_option.endsWith("%")
+      ) {
+        whtRate = parseFloat(item.withholding_tax_option) / 100;
+      } else if (
+        item.withholding_tax_option === "ไม่มี" ||
+        item.withholding_tax_option === "ไม่ระบุ"
+      ) {
+        whtRate = 0;
+      }
+      let whtAmount = 0;
+      if (
+        item.withholding_tax_option === "กำหนดเอง" &&
+        item.customWithholdingTaxAmount
+      ) {
+        whtAmount = Number(item.customWithholdingTaxAmount);
+      } else {
+        whtAmount = amountBeforeTax * whtRate;
+      }
+      return sum + whtAmount;
+    }, 0);
+    const netTotalAmountUpdate = (summary.total ?? 0) - withholdingTaxUpdate;
     await conn.query(
       `UPDATE documents SET
         customer_id = ?, customer_name = ?, document_type = ?, status = ?, issue_date = ?,
@@ -734,7 +847,7 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
         issue_date,
         summary.subtotal,
         summary.tax,
-        summary.total,
+        netTotalAmountUpdate, // ใช้ยอดสุทธิหลังหัก ณ ที่จ่าย
         notes,
         customer.address || "",
         customer.phone || "",

@@ -36,50 +36,6 @@ const Quotation = () => {
         const quotationsData = data
           .filter((doc) => doc.document_type === "QUOTATION")
           .map((doc: any) => {
-            let netTotal = 0;
-            let netTotalDisplay = "-";
-            if (doc.summary) {
-              netTotal =
-                (Number(doc.summary.total) ?? Number(doc.total_amount) ?? 0) -
-                (Number(doc.summary.withholdingTax) ?? 0);
-              netTotalDisplay =
-                netTotal.toLocaleString("th-TH", {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                }) + " บาท";
-            } else if (
-              doc.items &&
-              Array.isArray(doc.items) &&
-              doc.items.length > 0
-            ) {
-              // Normalize items for calculateDocumentSummary
-              const normalizedItems = doc.items.map((item: any) => ({
-                quantity: Number(item.quantity ?? 1),
-                unitPrice: Number(item.unit_price ?? item.unitPrice ?? 0),
-                priceType: item.priceType ?? "exclusive",
-                discount: Number(item.discount ?? 0),
-                discountType: item.discount_type ?? item.discountType ?? "thb",
-                tax: Number(item.tax ?? 0),
-                withholdingTax:
-                  typeof item.withholding_tax_option === "number"
-                    ? item.withholding_tax_option
-                    : typeof item.withholdingTax === "number"
-                      ? item.withholdingTax
-                      : 0,
-                customWithholdingTaxAmount: Number(
-                  item.customWithholdingTaxAmount ?? 0
-                ),
-              }));
-              const summary = calculateDocumentSummary(normalizedItems);
-              netTotal =
-                (Number(summary.total) ?? 0) -
-                (Number(summary.withholdingTax) ?? 0);
-              netTotalDisplay =
-                netTotal.toLocaleString("th-TH", {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                }) + " บาท";
-            }
             return {
               id: doc.id,
               number: doc.document_number,
@@ -88,7 +44,11 @@ const Quotation = () => {
               validUntil: doc.valid_until
                 ? new Date(doc.valid_until).toLocaleDateString("th-TH")
                 : "-",
-              netTotal: netTotalDisplay,
+              netTotal:
+                Number(doc.total_amount ?? 0).toLocaleString("th-TH", {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                }) + " บาท",
               status: doc.status,
             };
           });
