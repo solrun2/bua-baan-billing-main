@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { formatCurrency } from "../../lib/utils";
 
 interface DocumentItem {
   product_id?: string;
@@ -351,86 +352,46 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
           <div className="w-full max-w-xs space-y-1">
             <div className="flex justify-between mb-1">
               <span>มูลค่าสินค้าหรือค่าบริการ</span>
-              <span>
-                {document.summary.subtotal.toLocaleString(undefined, {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}{" "}
-                บาท
-              </span>
+              <span>{formatCurrency(document.summary.subtotal)}</span>
             </div>
             {document.summary.discount > 0 && (
               <div className="flex justify-between mb-1 text-destructive">
                 <span>ส่วนลด</span>
-                <span>
-                  -
-                  {document.summary.discount.toLocaleString(undefined, {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}{" "}
-                  บาท
-                </span>
+                <span>-{formatCurrency(document.summary.discount)}</span>
               </div>
             )}
             <div className="flex justify-between mb-1">
               <span>มูลค่าหลังหักส่วนลด</span>
               <span>
-                {(
+                {formatCurrency(
                   document.summary.subtotal - document.summary.discount
-                ).toLocaleString(undefined, {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}{" "}
-                บาท
+                )}
               </span>
             </div>
             <div className="flex justify-between mb-1">
               <span>ภาษีมูลค่าเพิ่ม 7%</span>
-              <span>
-                {document.summary.tax.toLocaleString(undefined, {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}{" "}
-                บาท
-              </span>
+              <span>{formatCurrency(document.summary.tax)}</span>
             </div>
             <div className="flex justify-between mb-1">
               <span>รวมเป็นเงิน</span>
-              <span>
-                {document.summary.total.toLocaleString(undefined, {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}{" "}
-                บาท
-              </span>
+              <span>{formatCurrency(document.summary.total)}</span>
             </div>
             {Number(document.summary.withholdingTax) !== 0 && (
               <div className="flex justify-between mb-1 text-yellow-700">
                 <span>หัก ณ ที่จ่าย</span>
                 <span>
                   -
-                  {Number(document.summary.withholdingTax ?? 0).toLocaleString(
-                    undefined,
-                    {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    }
-                  )}{" "}
-                  บาท
+                  {formatCurrency(Number(document.summary.withholdingTax ?? 0))}
                 </span>
               </div>
             )}
             <div className="flex justify-between font-bold text-lg">
               <span>จำนวนเงินทั้งสิ้น</span>
               <span>
-                {(
+                {formatCurrency(
                   document.total_amount ??
-                  document.summary.total - document.summary.withholdingTax
-                ).toLocaleString(undefined, {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}{" "}
-                บาท
+                    document.summary.total - document.summary.withholdingTax
+                )}
               </span>
             </div>
           </div>

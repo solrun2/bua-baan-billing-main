@@ -2,10 +2,18 @@ import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Receipt, Plus, Search, Filter, AlertTriangle, Loader2 } from "lucide-react";
+import {
+  Receipt,
+  Plus,
+  Search,
+  Filter,
+  AlertTriangle,
+  Loader2,
+} from "lucide-react";
 import { apiService } from "@/pages/services/apiService";
 import { documentService } from "@/pages/services/documentService";
-import { toast } from 'sonner';
+import { toast } from "sonner";
+import { formatCurrency } from "../../lib/utils";
 
 const Invoice = () => {
   const navigate = useNavigate();
@@ -19,14 +27,16 @@ const Invoice = () => {
         setLoading(true);
         const data = await apiService.getDocuments();
         const invoicesData = data
-          .filter(doc => doc.document_type === 'INVOICE')
-          .map(doc => ({
+          .filter((doc) => doc.document_type === "INVOICE")
+          .map((doc) => ({
             id: doc.id,
             number: doc.document_number,
             customer: doc.customer_name,
-            date: new Date(doc.issue_date).toLocaleDateString('th-TH'),
-            dueDate: doc.due_date ? new Date(doc.due_date).toLocaleDateString('th-TH') : '-',
-            total: new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(doc.total_amount),
+            date: new Date(doc.issue_date).toLocaleDateString("th-TH"),
+            dueDate: doc.due_date
+              ? new Date(doc.due_date).toLocaleDateString("th-TH")
+              : "-",
+            total: formatCurrency(Number(doc.total_amount)),
             status: doc.status,
           }));
         setInvoices(invoicesData);
@@ -42,11 +52,16 @@ const Invoice = () => {
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'ชำระเงินแล้ว': return 'bg-green-100 text-green-700';
-      case 'ส่งแล้ว': return 'bg-blue-100 text-blue-700';
-      case 'เกินกำหนด': return 'bg-red-100 text-red-700';
-      case 'รอชำระ': return 'bg-gray-100 text-gray-700';
-      default: return 'bg-gray-100 text-gray-700';
+      case "ชำระเงินแล้ว":
+        return "bg-green-100 text-green-700";
+      case "ส่งแล้ว":
+        return "bg-blue-100 text-blue-700";
+      case "เกินกำหนด":
+        return "bg-red-100 text-red-700";
+      case "รอชำระ":
+        return "bg-gray-100 text-gray-700";
+      default:
+        return "bg-gray-100 text-gray-700";
     }
   };
 
@@ -63,11 +78,13 @@ const Invoice = () => {
     if (window.confirm("Are you sure you want to delete this invoice?")) {
       try {
         await apiService.deleteDocument(id.toString());
-        setInvoices(prevInvoices => prevInvoices.filter(invoice => invoice.id !== id));
-        toast.success('ลบใบแจ้งหนี้เรียบร้อยแล้ว');
+        setInvoices((prevInvoices) =>
+          prevInvoices.filter((invoice) => invoice.id !== id)
+        );
+        toast.success("ลบใบแจ้งหนี้เรียบร้อยแล้ว");
       } catch (error) {
         console.error("Failed to delete invoice:", error);
-        toast.error('เกิดข้อผิดพลาดในการลบใบแจ้งหนี้');
+        toast.error("เกิดข้อผิดพลาดในการลบใบแจ้งหนี้");
         setError((error as Error).message);
       }
     }
@@ -111,7 +128,6 @@ const Invoice = () => {
           <Filter className="w-4 h-4" />
           กรองข้อมูล
         </Button>
-
       </div>
 
       {/* Content */}
@@ -140,25 +156,54 @@ const Invoice = () => {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-border">
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">เลขที่</th>
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">ลูกค้า</th>
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">วันที่</th>
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">กำหนดชำระ</th>
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">จำนวนเงิน</th>
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">สถานะ</th>
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">การดำเนินการ</th>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">
+                      เลขที่
+                    </th>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">
+                      ลูกค้า
+                    </th>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">
+                      วันที่
+                    </th>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">
+                      กำหนดชำระ
+                    </th>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">
+                      จำนวนเงิน
+                    </th>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">
+                      สถานะ
+                    </th>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">
+                      การดำเนินการ
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {invoices.map((invoice) => (
-                    <tr key={invoice.id} className="border-b border-border/40 hover:bg-muted/30 transition-colors">
-                      <td className="py-3 px-4 font-medium text-foreground">{invoice.number}</td>
-                      <td className="py-3 px-4 text-foreground">{invoice.customer}</td>
-                      <td className="py-3 px-4 text-muted-foreground">{invoice.date}</td>
-                      <td className="py-3 px-4 text-muted-foreground">{invoice.dueDate}</td>
-                      <td className="py-3 px-4 font-medium text-foreground">{invoice.total}</td>
+                    <tr
+                      key={invoice.id}
+                      className="border-b border-border/40 hover:bg-muted/30 transition-colors"
+                    >
+                      <td className="py-3 px-4 font-medium text-foreground">
+                        {invoice.number}
+                      </td>
+                      <td className="py-3 px-4 text-foreground">
+                        {invoice.customer}
+                      </td>
+                      <td className="py-3 px-4 text-muted-foreground">
+                        {invoice.date}
+                      </td>
+                      <td className="py-3 px-4 text-muted-foreground">
+                        {invoice.dueDate}
+                      </td>
+                      <td className="py-3 px-4 font-medium text-foreground">
+                        {invoice.total}
+                      </td>
                       <td className="py-3 px-4">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(invoice.status)}`}>
+                        <span
+                          className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(invoice.status)}`}
+                        >
                           {invoice.status}
                         </span>
                       </td>

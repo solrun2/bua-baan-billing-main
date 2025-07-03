@@ -7,6 +7,7 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 import { format } from "date-fns";
+import { formatCurrency } from "../../lib/utils";
 
 interface ReceiptDetailsModalProps {
   open: boolean;
@@ -157,7 +158,7 @@ const ReceiptDetailsModal = ({
                     </div>
                     <div className="text-right">
                       <p className="text-gray-800">
-                        ฿{item.price.toLocaleString()}
+                        {formatCurrency(item.price)}
                       </p>
                     </div>
                   </div>
@@ -167,7 +168,7 @@ const ReceiptDetailsModal = ({
                 <div className="pt-2 border-t border-gray-100">
                   <div className="flex justify-between font-medium">
                     <p>รวมสินค้า</p>
-                    <p>฿{totalProductPrice.toLocaleString()}</p>
+                    <p>{formatCurrency(totalProductPrice)}</p>
                   </div>
                 </div>
 
@@ -206,7 +207,7 @@ const ReceiptDetailsModal = ({
                       <div className="flex justify-between">
                         <p className="text-gray-600">ค่าจัดส่ง</p>
                         <p className="text-gray-800">
-                          ฿{receipt.shippingCost.toLocaleString()}
+                          {formatCurrency(receipt.shippingCost)}
                         </p>
                       </div>
                     )}
@@ -219,7 +220,9 @@ const ReceiptDetailsModal = ({
                     {receipt.cod == 1 && (
                       <div className="flex justify-between text-sm text-gray-600">
                         <p>ค่าธรรมเนียม COD 5%</p>
-                        <p>฿{Math.round(totalProductPrice * 0.05)}</p>
+                        <p>
+                          {formatCurrency(Math.round(totalProductPrice * 0.05))}
+                        </p>
                       </div>
                     )}
                   </div>
@@ -256,12 +259,12 @@ const ReceiptDetailsModal = ({
                     receipt.status === "รอชำระเงิน"
                       ? "bg-blue-100 text-blue-700"
                       : receipt.status === "ชำระเงินแล้ว"
-                      ? "bg-green-100 text-green-700"
-                      : receipt.status === "ยกเลิก"
-                      ? "bg-red-100 text-red-700"
-                      : receipt.status === "คืนเงิน"
-                      ? "bg-orange-100 text-orange-700"
-                      : "bg-gray-100 text-gray-700"
+                        ? "bg-green-100 text-green-700"
+                        : receipt.status === "ยกเลิก"
+                          ? "bg-red-100 text-red-700"
+                          : receipt.status === "คืนเงิน"
+                            ? "bg-orange-100 text-orange-700"
+                            : "bg-gray-100 text-gray-700"
                   }`}
                 >
                   {receipt.status || "ไม่ระบุ"}

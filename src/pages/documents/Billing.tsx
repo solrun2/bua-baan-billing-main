@@ -1,8 +1,11 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { FileText, Plus } from "lucide-react";
+import { formatCurrency } from "../../lib/utils";
+
 const Billing = () => {
-  return <div className="space-y-6">
+  return (
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 rounded-xl bg-teal-100 flex items-center justify-center">
@@ -18,7 +21,7 @@ const Billing = () => {
           สร้างใบวางบิลใหม่
         </Button>
       </div>
-      
+
       <Card className="border border-border/40">
         <CardContent className="p-8">
           <div className="text-center text-muted-foreground">
@@ -28,6 +31,7 @@ const Billing = () => {
           </div>
         </CardContent>
       </Card>
-    </div>;
+    </div>
+  );
 };
 export default Billing;

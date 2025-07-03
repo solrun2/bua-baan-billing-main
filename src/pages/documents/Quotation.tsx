@@ -14,6 +14,7 @@ import { apiService } from "@/pages/services/apiService";
 import { toast } from "sonner";
 import QuotationModal from "@/pages/sub/quotation/QuotationModal";
 import { calculateDocumentSummary } from "@/calculate/documentCalculations";
+import { formatCurrency } from "../../lib/utils";
 
 const Quotation = () => {
   const navigate = useNavigate();
@@ -44,11 +45,7 @@ const Quotation = () => {
               validUntil: doc.valid_until
                 ? new Date(doc.valid_until).toLocaleDateString("th-TH")
                 : "-",
-              netTotal:
-                Number(doc.total_amount ?? 0).toLocaleString("th-TH", {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                }) + " บาท",
+              netTotal: formatCurrency(Number(doc.total_amount ?? 0)),
               status: doc.status,
             };
           });
