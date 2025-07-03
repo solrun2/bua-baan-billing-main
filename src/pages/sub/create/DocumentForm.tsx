@@ -971,60 +971,50 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                               }
                             : null
                         }
-                        onChange={
-                          editMode
-                            ? undefined
-                            : (product) => handleProductSelect(product, item.id)
+                        onChange={(product) =>
+                          handleProductSelect(product, item.id)
                         }
-                        onAddNew={
-                          editMode
-                            ? undefined
-                            : () => {
-                                const newId = `new-${Date.now()}`;
-                                const newItem: DocumentItem = {
-                                  id: newId,
-                                  isNew: true,
-                                  productTitle: "",
-                                  quantity: 1,
-                                  unitPrice: 0,
-                                  priceType: form.priceType,
-                                  discount: 0,
-                                  discountType: "thb",
-                                  tax: 7,
-                                  withholdingTax: -1,
-                                  description: "",
-                                  unit: "",
-                                  amountBeforeTax: 0,
-                                  amount: 0,
-                                  isEditing: true,
-                                  withholding_tax_option: "ไม่ระบุ",
-                                };
-                                handleItemChange(newId, "isNew", true);
-                                handleItemChange(newId, "productTitle", "");
-                                handleItemChange(newId, "quantity", 1);
-                                handleItemChange(newId, "unitPrice", 0);
-                                handleItemChange(
-                                  newId,
-                                  "priceType",
-                                  form.priceType
-                                );
-                                handleItemChange(newId, "discount", 0);
-                                handleItemChange(newId, "discountType", "thb");
-                                handleItemChange(newId, "tax", 7);
-                                handleItemChange(newId, "withholdingTax", -1);
-                                handleItemChange(newId, "description", "");
-                                handleItemChange(newId, "unit", "");
-                                handleItemChange(newId, "amountBeforeTax", 0);
-                                handleItemChange(newId, "amount", 0);
-                                handleItemChange(newId, "isEditing", true);
-                                handleItemChange(newId, "isNew", true);
-                                handleItemChange(
-                                  newId,
-                                  "withholding_tax_option",
-                                  "ไม่ระบุ"
-                                );
-                              }
-                        }
+                        onAddNew={() => {
+                          const newId = `new-${Date.now()}`;
+                          const newItem: DocumentItem = {
+                            id: newId,
+                            isNew: true,
+                            productTitle: "",
+                            quantity: 1,
+                            unitPrice: 0,
+                            priceType: form.priceType,
+                            discount: 0,
+                            discountType: "thb",
+                            tax: 7,
+                            withholdingTax: -1,
+                            description: "",
+                            unit: "",
+                            amountBeforeTax: 0,
+                            amount: 0,
+                            isEditing: true,
+                            withholding_tax_option: "ไม่ระบุ",
+                          };
+                          handleItemChange(newId, "isNew", true);
+                          handleItemChange(newId, "productTitle", "");
+                          handleItemChange(newId, "quantity", 1);
+                          handleItemChange(newId, "unitPrice", 0);
+                          handleItemChange(newId, "priceType", form.priceType);
+                          handleItemChange(newId, "discount", 0);
+                          handleItemChange(newId, "discountType", "thb");
+                          handleItemChange(newId, "tax", 7);
+                          handleItemChange(newId, "withholdingTax", -1);
+                          handleItemChange(newId, "description", "");
+                          handleItemChange(newId, "unit", "");
+                          handleItemChange(newId, "amountBeforeTax", 0);
+                          handleItemChange(newId, "amount", 0);
+                          handleItemChange(newId, "isEditing", true);
+                          handleItemChange(newId, "isNew", true);
+                          handleItemChange(
+                            newId,
+                            "withholding_tax_option",
+                            "ไม่ระบุ"
+                          );
+                        }}
                       />
                     </div>
                     <div className="space-y-2">
