@@ -903,12 +903,15 @@ app.delete("/api/documents/:id", async (req: Request, res: Response) => {
 app.get("/api/documents/:id", async (req, res) => {
   const { id } = req.params;
   try {
+    console.log("[GET /api/documents/:id] id param:", id);
     // ดึงข้อมูลเอกสารหลัก
     const docRows = await pool.query("SELECT * FROM documents WHERE id = ?", [
       id,
     ]);
+    console.log("[GET /api/documents/:id] docRows:", docRows);
     const doc = Array.isArray(docRows) ? docRows[0] : null;
     if (!doc || (Array.isArray(doc) && doc.length === 0)) {
+      console.log("[GET /api/documents/:id] Document not found for id:", id);
       return res.status(404).json({ error: "Document not found" });
     }
     // ดึง items ของเอกสารนี้

@@ -15,6 +15,7 @@ import { documentService } from "@/pages/services/documentService";
 import { toast } from "sonner";
 import { formatCurrency } from "../../lib/utils";
 import InvoiceModal from "../sub/invoice/InvoiceModal";
+import { DocumentForm } from "../sub/create/DocumentForm";
 
 const Invoice = () => {
   const navigate = useNavigate();
@@ -23,6 +24,8 @@ const Invoice = () => {
   const [error, setError] = useState<string | null>(null);
   const [selectedInvoice, setSelectedInvoice] = useState<any | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editInvoiceData, setEditInvoiceData] = useState<any | null>(null);
 
   useEffect(() => {
     const loadInvoices = async () => {
@@ -77,7 +80,39 @@ const Invoice = () => {
   };
 
   const handleEditClick = (invoice: any) => {
-    navigate(`/invoices/edit/${invoice.id}`);
+    navigate(`/invoice/edit/${invoice.id}`);
+  };
+
+  const handleEditSave = async (data: any) => {
+    try {
+      await apiService.updateDocument(data.id, data);
+      toast.success("บันทึกใบแจ้งหนี้สำเร็จ");
+      setIsEditModalOpen(false);
+      setEditInvoiceData(null);
+      // refresh รายการ
+      const docs = await apiService.getDocuments();
+      const invoicesData = docs
+        .filter((doc) => doc.document_type === "INVOICE")
+        .map((doc) => ({
+          id: doc.id,
+          number: doc.document_number,
+          customer: doc.customer_name,
+          date: new Date(doc.issue_date).toLocaleDateString("th-TH"),
+          dueDate: doc.due_date
+            ? new Date(doc.due_date).toLocaleDateString("th-TH")
+            : "-",
+          total: formatCurrency(Number(doc.total_amount)),
+          status: doc.status,
+        }));
+      setInvoices(invoicesData);
+    } catch (e) {
+      toast.error("บันทึกไม่สำเร็จ");
+    }
+  };
+
+  const handleEditCancel = () => {
+    setIsEditModalOpen(false);
+    setEditInvoiceData(null);
   };
 
   const handleDeleteClick = async (id: number) => {

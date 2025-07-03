@@ -74,6 +74,9 @@ export const DocumentForm: FC<DocumentFormProps> = ({
   isLoading,
   editMode = false,
 }: DocumentFormProps) => {
+  console.log('DocumentForm: initialData:', initialData);
+  console.log('DocumentForm: items:', initialData?.items);
+
   const [isSaving, setIsSaving] = useState(false);
   const navigate = useNavigate();
 
