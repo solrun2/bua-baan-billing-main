@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/dialog";
 import { format } from "date-fns";
 import { formatCurrency } from "../../lib/utils";
+import { calculateSummaryFromItems } from "../../utils/documentUtils";
 
 interface ReceiptDetailsModalProps {
   open: boolean;
@@ -68,6 +69,8 @@ const ReceiptDetailsModal = ({
 
   const totalProductPrice =
     receipt.items?.reduce((sum, item) => sum + item.price, 0) || 0;
+
+  const summary = calculateSummaryFromItems(receipt.items || []);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -247,27 +250,43 @@ const ReceiptDetailsModal = ({
             </div>
 
             {/* Summary */}
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-gray-600">ยอดรวม</span>
-                <span className="font-medium">{receipt.amount || "฿0.00"}</span>
+            <div className="bg-gray-50 p-4 rounded-lg mt-4">
+              <div className="flex justify-between mb-1">
+                <span>มูลค่าสินค้าหรือค่าบริการ</span>
+                <span>{formatCurrency(Number(summary.subtotal ?? 0))}</span>
               </div>
-              <div className="flex justify-between items-center">
-                <span className="text-gray-600">สถานะ</span>
-                <span
-                  className={`px-3 py-1 rounded-full text-xs font-medium ${
-                    receipt.status === "รอชำระเงิน"
-                      ? "bg-blue-100 text-blue-700"
-                      : receipt.status === "ชำระเงินแล้ว"
-                        ? "bg-green-100 text-green-700"
-                        : receipt.status === "ยกเลิก"
-                          ? "bg-red-100 text-red-700"
-                          : receipt.status === "คืนเงิน"
-                            ? "bg-orange-100 text-orange-700"
-                            : "bg-gray-100 text-gray-700"
-                  }`}
-                >
-                  {receipt.status || "ไม่ระบุ"}
+              <div className="flex justify-between mb-1">
+                <span>มูลค่าหลังหักส่วนลด</span>
+                <span>
+                  {formatCurrency(
+                    Number(summary.subtotal ?? 0) -
+                      Number(summary.discount ?? 0)
+                  )}
+                </span>
+              </div>
+              <div className="flex justify-between mb-1">
+                <span>ภาษีมูลค่าเพิ่ม 7%</span>
+                <span>{formatCurrency(Number(summary.tax ?? 0))}</span>
+              </div>
+              <div className="flex justify-between mb-1">
+                <span>รวมเป็นเงิน</span>
+                <span>{formatCurrency(Number(summary.total ?? 0))}</span>
+              </div>
+              {Number(summary.withholdingTax ?? 0) !== 0 && (
+                <div className="flex justify-between mb-1 text-yellow-700">
+                  <span>หัก ณ ที่จ่าย</span>
+                  <span>
+                    -{formatCurrency(Number(summary.withholdingTax ?? 0))}
+                  </span>
+                </div>
+              )}
+              <div className="flex justify-between font-bold text-lg">
+                <span>จำนวนเงินทั้งสิ้น</span>
+                <span>
+                  {formatCurrency(
+                    Number(summary.total ?? 0) -
+                      Number(summary.withholdingTax ?? 0)
+                  )}
                 </span>
               </div>
             </div>

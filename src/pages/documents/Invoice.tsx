@@ -14,12 +14,15 @@ import { apiService } from "@/pages/services/apiService";
 import { documentService } from "@/pages/services/documentService";
 import { toast } from "sonner";
 import { formatCurrency } from "../../lib/utils";
+import InvoiceModal from "../sub/invoice/InvoiceModal";
 
 const Invoice = () => {
   const navigate = useNavigate();
   const [invoices, setInvoices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedInvoice, setSelectedInvoice] = useState<any | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
     const loadInvoices = async () => {
@@ -65,9 +68,12 @@ const Invoice = () => {
     }
   };
 
-  const handleViewClick = (invoice: any) => {
-    // This can be changed to navigate to a dedicated view page if one is created
-    navigate(`/invoices/edit/${invoice.id}`);
+  const handleViewClick = async (invoice: any) => {
+    // ดึงข้อมูลเต็มของ invoice (เหมือน Quotation)
+    const allDocs = await apiService.getDocuments();
+    const fullDoc = allDocs.find((doc: any) => doc.id === invoice.id);
+    setSelectedInvoice(fullDoc);
+    setIsModalOpen(true);
   };
 
   const handleEditClick = (invoice: any) => {
@@ -238,6 +244,11 @@ const Invoice = () => {
               </table>
             </div>
           )}
+          <InvoiceModal
+            open={isModalOpen}
+            onClose={() => setIsModalOpen(false)}
+            invoice={selectedInvoice}
+          />
         </CardContent>
       </Card>
     </div>

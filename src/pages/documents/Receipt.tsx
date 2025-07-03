@@ -1,11 +1,17 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CreditCard, Search, Filter, AlertTriangle, Loader2 } from "lucide-react";
+import {
+  CreditCard,
+  Search,
+  Filter,
+  AlertTriangle,
+  Loader2,
+} from "lucide-react";
 import { apiService } from "@/pages/services/apiService";
 import type { Document } from "@/types/document";
 import ReceiptDetailsModal from "@/pages/documents/ReceiptDetailsModal";
-import { toast } from 'sonner';
+import { toast } from "sonner";
 
 const Receipt = () => {
   const [receipts, setReceipts] = useState<Document[]>([]);
@@ -45,14 +51,20 @@ const Receipt = () => {
     if (window.confirm("Are you sure you want to delete this receipt?")) {
       try {
         await apiService.deleteDocument(id.toString());
-        setReceipts(prevReceipts => prevReceipts.filter(receipt => receipt.id !== id));
-        toast.success('ลบใบเสร็จรับเงินเรียบร้อยแล้ว');
+        setReceipts((prevReceipts) =>
+          prevReceipts.filter((receipt) => receipt.id !== id)
+        );
+        toast.success("ลบใบเสร็จรับเงินเรียบร้อยแล้ว");
       } catch (error) {
         console.error("Failed to delete receipt:", error);
-        toast.error('เกิดข้อผิดพลาดในการลบใบเสร็จรับเงิน');
+        toast.error("เกิดข้อผิดพลาดในการลบใบเสร็จรับเงิน");
         setError((error as Error).message);
       }
     }
+  };
+
+  const handleEditClick = (receipt: Document) => {
+    window.location.href = `/receipts/edit/${receipt.id}`;
   };
 
   const mapApiStatusToModalStatus = (
@@ -123,7 +135,9 @@ const Receipt = () => {
             <CreditCard className="w-6 h-6 text-purple-600" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-foreground">ใบเสร็จรับเงิน</h1>
+            <h1 className="text-2xl font-bold text-foreground">
+              ใบเสร็จรับเงิน
+            </h1>
             <p className="text-gray-400">จัดการใบเสร็จรับเงินทั้งหมด</p>
           </div>
         </div>
@@ -233,6 +247,13 @@ const Receipt = () => {
                             onClick={() => handleViewClick(receipt)}
                           >
                             ดู
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEditClick(receipt)}
+                          >
+                            แก้ไข
                           </Button>
                           <Button
                             variant="destructive"

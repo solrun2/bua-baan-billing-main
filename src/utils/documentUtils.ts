@@ -55,3 +55,50 @@ export const generateClientDocumentNumber = (
   // For client-side, generate a temporary number that will be replaced on server-side
   return `${prefix}-${year}-0001`;
 };
+
+/**
+ * คำนวณ summary (subtotal, discount, tax, total, withholdingTax) จาก items
+ */
+export function calculateSummaryFromItems(items: any[]) {
+  let subtotal = 0;
+  let discountTotal = 0;
+  let tax = 0;
+  let total = 0;
+  let withholdingTaxTotal = 0;
+  items.forEach((item) => {
+    const qty = Number((item.quantity ?? 1).toString().replace(/,/g, ""));
+    const unitPrice = Number(
+      (item.unitPrice ?? item.unit_price ?? 0).toString().replace(/,/g, "")
+    );
+    const discount = Number((item.discount ?? 0).toString().replace(/,/g, ""));
+    const discountType = item.discount_type ?? item.discountType ?? "thb";
+    const itemSubtotal = unitPrice * qty;
+    let itemDiscount = 0;
+    if (discountType === "percentage") {
+      itemDiscount = itemSubtotal * (discount / 100);
+    } else {
+      itemDiscount = discount * qty;
+    }
+    const amountBeforeTax = itemSubtotal - itemDiscount;
+    const itemTaxRate = Number((item.tax ?? 0).toString().replace(/,/g, ""));
+    const itemTax = amountBeforeTax * (itemTaxRate / 100);
+    subtotal += itemSubtotal;
+    discountTotal += itemDiscount;
+    tax += itemTax;
+    total += amountBeforeTax + itemTax;
+    // Withholding tax (support both camelCase and snake_case)
+    const wht = Number(
+      (item.withholdingTaxAmount ?? item.withholding_tax_amount ?? 0)
+        .toString()
+        .replace(/,/g, "")
+    );
+    withholdingTaxTotal += wht;
+  });
+  return {
+    subtotal,
+    discount: discountTotal,
+    tax,
+    total,
+    withholdingTax: withholdingTaxTotal,
+  };
+}

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { formatCurrency } from "../../lib/utils";
+import { calculateSummaryFromItems } from "../../utils/documentUtils";
 
 interface DocumentItem {
   product_id?: string;
@@ -97,45 +98,6 @@ const SELLER_INFO = {
   ],
 };
 
-// Helper to calculate summary if missing or zero
-function calculateSummaryFromItems(items: DocumentItem[]) {
-  let subtotal = 0;
-  let discountTotal = 0;
-  let tax = 0;
-  let total = 0;
-  let withholdingTaxTotal = 0;
-  items.forEach((item) => {
-    const qty = item.quantity ?? 1;
-    const unitPrice = item.unitPrice ?? item.unit_price ?? 0;
-    const discount = item.discount ?? 0;
-    const discountType = item.discount_type ?? item.discountType ?? "thb";
-    const itemSubtotal = unitPrice * qty;
-    let itemDiscount = 0;
-    if (discountType === "percentage") {
-      itemDiscount = itemSubtotal * (discount / 100);
-    } else {
-      itemDiscount = discount * qty;
-    }
-    const amountBeforeTax = itemSubtotal - itemDiscount;
-    const itemTaxRate = item.tax ?? 0;
-    const itemTax = amountBeforeTax * (itemTaxRate / 100);
-    subtotal += itemSubtotal;
-    discountTotal += itemDiscount;
-    tax += itemTax;
-    total += amountBeforeTax + itemTax;
-    // Withholding tax (support both camelCase and snake_case)
-    const wht = item.withholdingTaxAmount ?? item.withholding_tax_amount ?? 0;
-    withholdingTaxTotal += wht;
-  });
-  return {
-    subtotal,
-    discount: discountTotal,
-    tax,
-    total,
-    withholdingTax: withholdingTaxTotal,
-  };
-}
-
 const DocumentModal: React.FC<DocumentModalProps> = ({
   type,
   document,
@@ -202,9 +164,30 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
 
   // Use summary from document, or recalculate if missing/zero
   const summary =
-    document.summary && document.summary.subtotal > 0
-      ? document.summary
+    document.summary &&
+    typeof document.summary.discount !== "undefined" &&
+    !isNaN(
+      Number((document.summary.discount ?? 0).toString().replace(/,/g, ""))
+    )
+      ? {
+          ...document.summary,
+          subtotal: Number(
+            (document.summary.subtotal ?? 0).toString().replace(/,/g, "")
+          ),
+          discount: Number(
+            (document.summary.discount ?? 0).toString().replace(/,/g, "")
+          ),
+          tax: Number((document.summary.tax ?? 0).toString().replace(/,/g, "")),
+          total: Number(
+            (document.summary.total ?? 0).toString().replace(/,/g, "")
+          ),
+          withholdingTax: Number(
+            (document.summary.withholdingTax ?? 0).toString().replace(/,/g, "")
+          ),
+        }
       : calculateSummaryFromItems(document.items || []);
+
+  console.log("summary", summary);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40 print:bg-transparent">
@@ -306,10 +289,7 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
                     {prod?.unit || item.unit || "-"}
                   </td>
                   <td className="border p-1 text-right">
-                    {(item.unitPrice ?? item.unit_price ?? 0).toLocaleString(
-                      undefined,
-                      { minimumFractionDigits: 2, maximumFractionDigits: 2 }
-                    )}
+                    {formatCurrency(item.unitPrice ?? item.unit_price ?? 0)}
                   </td>
                   <td className="border p-1 text-right">
                     {(() => {
@@ -318,28 +298,22 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
                       const unitPrice = item.unitPrice ?? item.unit_price ?? 0;
                       const discountType =
                         item.discount_type ?? item.discountType ?? "thb";
+                      let discountAmount = 0;
                       if (discountType === "percentage") {
-                        const discountAmount =
-                          unitPrice * qty * (discount / 100);
-                        return `${discountAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                        discountAmount = unitPrice * qty * (discount / 100);
                       } else {
-                        const discountAmount = discount * qty;
-                        return `${discountAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                        discountAmount = discount * qty;
                       }
+                      return formatCurrency(discountAmount);
                     })()}
                   </td>
                   <td className="border p-1 text-center">
                     {item.tax ? `${item.tax}%` : "-"}
                   </td>
                   <td className="border p-1 text-right">
-                    {(
-                      item.amountBeforeTax ??
-                      item.amount_before_tax ??
-                      0
-                    ).toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
+                    {formatCurrency(
+                      item.amountBeforeTax ?? item.amount_before_tax ?? 0
+                    )}
                   </td>
                 </tr>
               );
@@ -352,36 +326,36 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
           <div className="w-full max-w-xs space-y-1">
             <div className="flex justify-between mb-1">
               <span>มูลค่าสินค้าหรือค่าบริการ</span>
-              <span>{formatCurrency(document.summary.subtotal)}</span>
+              <span>{formatCurrency(summary.subtotal)}</span>
             </div>
-            {document.summary.discount > 0 && (
+            {summary.discount > 0 && (
               <div className="flex justify-between mb-1 text-destructive">
                 <span>ส่วนลด</span>
-                <span>-{formatCurrency(document.summary.discount)}</span>
+                <span>-{formatCurrency(summary.discount)}</span>
               </div>
             )}
             <div className="flex justify-between mb-1">
               <span>มูลค่าหลังหักส่วนลด</span>
               <span>
                 {formatCurrency(
-                  document.summary.subtotal - document.summary.discount
+                  Number(summary.subtotal ?? 0) - Number(summary.discount ?? 0)
                 )}
               </span>
             </div>
             <div className="flex justify-between mb-1">
               <span>ภาษีมูลค่าเพิ่ม 7%</span>
-              <span>{formatCurrency(document.summary.tax)}</span>
+              <span>{formatCurrency(summary.tax)}</span>
             </div>
             <div className="flex justify-between mb-1">
               <span>รวมเป็นเงิน</span>
-              <span>{formatCurrency(document.summary.total)}</span>
+              <span>{formatCurrency(summary.total)}</span>
             </div>
-            {Number(document.summary.withholdingTax) !== 0 && (
+            {Number(summary.withholdingTax) !== 0 && (
               <div className="flex justify-between mb-1 text-yellow-700">
                 <span>หัก ณ ที่จ่าย</span>
                 <span>
-                  -
-                  {formatCurrency(Number(document.summary.withholdingTax ?? 0))}
+                  {" "}
+                  -{formatCurrency(Number(summary.withholdingTax ?? 0))}
                 </span>
               </div>
             )}
@@ -390,7 +364,7 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
               <span>
                 {formatCurrency(
                   document.total_amount ??
-                    document.summary.total - document.summary.withholdingTax
+                    summary.total - summary.withholdingTax
                 )}
               </span>
             </div>
