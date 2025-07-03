@@ -432,70 +432,47 @@ export const DocumentForm: FC<DocumentFormProps> = ({
       if (editMode && initialData.customer?.id) {
         // ดึงข้อมูลลูกค้า
         const customer = await getCustomerById(String(initialData.customer.id));
-        // ดึงข้อมูลสินค้าแต่ละตัว
-        const items = await Promise.all(
-          (initialData.items || []).map(async (item) => {
-            let product = null;
-            if (item.productId) {
-              product = await getProductById(item.productId);
-            }
-            // normalize discountType ให้ถูกต้อง
-            let normalizedDiscountType: "thb" | "percentage" = "thb";
-            if (item.discountType === "percentage") {
-              normalizedDiscountType = "percentage";
-            }
-            // เตรียมข้อมูล item
-            const mergedItem = {
-              ...item,
-              id: item.id ?? `item-${Date.now()}`,
-              productId: product?.id
-                ? product.id.toString()
-                : (item.productId ?? ""),
-              productTitle: product?.title ?? item.productTitle ?? "",
-              description: product?.description ?? item.description ?? "",
-              unitPrice:
-                typeof product?.price === "number"
-                  ? product.price
-                  : (item.unitPrice ?? 0),
-              unit: product?.unit ?? item.unit ?? "",
-              tax:
-                typeof product?.vat_rate === "number"
-                  ? product.vat_rate
-                  : (item.tax ?? 7),
-              discount: item.discount ?? 0,
-              discountType: normalizedDiscountType,
-              withholding_tax_option: item.withholding_tax_option ?? "ไม่ระบุ",
-              customWithholdingTaxAmount: item.customWithholdingTaxAmount ?? 0,
-              isEditing: false,
-            };
-            // ลบ field ที่เกี่ยวกับผลลัพธ์การคำนวณ
-            delete mergedItem.amount;
-            delete mergedItem.amountBeforeTax;
-            delete mergedItem.taxAmount;
-            delete mergedItem.withholdingTaxAmount;
-            // Logic sync withholdingTax ตาม withholding_tax_option
-            if (mergedItem.withholding_tax_option === "กำหนดเอง") {
-              mergedItem.withholdingTax = "custom";
-            } else if (
-              typeof mergedItem.withholding_tax_option === "string" &&
-              mergedItem.withholding_tax_option.endsWith("%")
-            ) {
-              mergedItem.withholdingTax = parseFloat(
-                mergedItem.withholding_tax_option
-              );
-            } else if (
-              mergedItem.withholding_tax_option === "ไม่มี" ||
-              mergedItem.withholding_tax_option === "ไม่ระบุ"
-            ) {
-              mergedItem.withholdingTax = 0;
-            } else if (typeof mergedItem.withholdingTax !== "number") {
-              mergedItem.withholdingTax =
-                Number(mergedItem.withholdingTax) || 0;
-            }
-            // คำนวณใหม่
-            return updateItemWithCalculations(mergedItem) as DocumentItem;
-          })
-        );
+        // ใช้ข้อมูลสินค้าในเอกสาร ไม่ fetch product เพิ่ม
+        const items = (initialData.items || []).map((item) => {
+          // normalize discountType ให้ถูกต้อง
+          let normalizedDiscountType: "thb" | "percentage" = "thb";
+          if (item.discountType === "percentage") {
+            normalizedDiscountType = "percentage";
+          }
+          // เตรียมข้อมูล item
+          const mergedItem = {
+            ...item,
+            id: item.id ?? `item-${Date.now()}`,
+            discountType: normalizedDiscountType,
+            isEditing: false,
+          };
+          // ลบ field ที่เกี่ยวกับผลลัพธ์การคำนวณ
+          delete mergedItem.amount;
+          delete mergedItem.amountBeforeTax;
+          delete mergedItem.taxAmount;
+          delete mergedItem.withholdingTaxAmount;
+          // Logic sync withholdingTax ตาม withholding_tax_option
+          if (mergedItem.withholding_tax_option === "กำหนดเอง") {
+            mergedItem.withholdingTax = "custom";
+          } else if (
+            typeof mergedItem.withholding_tax_option === "string" &&
+            mergedItem.withholding_tax_option.endsWith("%")
+          ) {
+            mergedItem.withholdingTax = parseFloat(
+              mergedItem.withholding_tax_option
+            );
+          } else if (
+            mergedItem.withholding_tax_option === "ไม่มี" ||
+            mergedItem.withholding_tax_option === "ไม่ระบุ"
+          ) {
+            mergedItem.withholdingTax = 0;
+          } else if (typeof mergedItem.withholdingTax !== "number") {
+            mergedItem.withholdingTax =
+              Number(mergedItem.withholdingTax) || 0;
+          }
+          // คำนวณใหม่
+          return updateItemWithCalculations(mergedItem) as DocumentItem;
+        });
         setForm((prev) => ({
           ...prev,
           customer: customer
