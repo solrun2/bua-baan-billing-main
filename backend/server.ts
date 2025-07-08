@@ -1180,6 +1180,11 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
         [id]
       );
       // เตรียมข้อมูลสำหรับสร้างใบเสร็จ
+      // คำนวณยอดสุทธิหลังหัก ณ ที่จ่าย (ถ้ามี)
+      let netTotal = Number(invoiceDoc.total_amount ?? 0);
+      if (typeof invoiceDoc.withholdingTax !== "undefined") {
+        netTotal = netTotal - Number(invoiceDoc.withholdingTax ?? 0);
+      }
       const receiptData = {
         customer: {
           id: invoiceDoc.customer_id,
@@ -1189,7 +1194,7 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
           email: invoiceDoc.customer_email,
         },
         document_type: "RECEIPT",
-        status: "สมบูรณ์",
+        status: "ชำระแล้ว",
         issue_date: new Date().toISOString().slice(0, 10),
         notes: invoiceDoc.notes || "",
         items: invoiceItems.map((item: any) => ({
@@ -1212,7 +1217,7 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
         summary: {
           subtotal: invoiceDoc.subtotal,
           tax: invoiceDoc.tax_amount,
-          total: invoiceDoc.total_amount,
+          total: netTotal,
         },
         related_document_id: invoiceDoc.id,
         payment_date: new Date().toISOString().slice(0, 10),

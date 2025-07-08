@@ -61,6 +61,8 @@ const Invoice = () => {
     switch (status) {
       case "ชำระเงินแล้ว":
         return "bg-green-100 text-green-700";
+      case "ชำระแล้ว":
+        return "bg-green-100 text-green-700";
       case "ส่งแล้ว":
         return "bg-blue-100 text-blue-700";
       case "เกินกำหนด":
