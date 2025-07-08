@@ -688,6 +688,7 @@ app.post("/api/documents", async (req: Request, res: Response) => {
       payment_date, // For receipts
       payment_method, // For receipts
       payment_reference, // For receipts
+      related_document_id, // <-- เพิ่มบรรทัดนี้
     } = req.body;
 
     // Log items from frontend
@@ -734,6 +735,35 @@ app.post("/api/documents", async (req: Request, res: Response) => {
     conn = await pool.getConnection();
     await conn.beginTransaction();
 
+    // --- LOG ก่อนเช็คซ้ำ ---
+    console.log(
+      "DEBUG: related_document_id =",
+      related_document_id,
+      "document_type =",
+      document_type
+    );
+    if (
+      related_document_id &&
+      document_type &&
+      document_type.toLowerCase() === "invoice"
+    ) {
+      const [existing] = await conn.query(
+        `SELECT id FROM documents WHERE related_document_id = ? AND document_type = 'INVOICE'`,
+        [related_document_id]
+      );
+      console.log("DEBUG: existing invoices found =", existing);
+      if (Array.isArray(existing) && existing.length > 0) {
+        await conn.rollback();
+        console.error(
+          "BLOCKED: Duplicate invoice for related_document_id =",
+          related_document_id
+        );
+        return res
+          .status(400)
+          .json({ error: "มี Invoice ที่อ้างอิง Quotation นี้อยู่แล้ว" });
+      }
+    }
+
     // 2. Generate Document Number
     const document_number = await generateDocumentNumber(
       conn,
@@ -768,6 +798,7 @@ app.post("/api/documents", async (req: Request, res: Response) => {
     );
 
     const documentId = Number((docResult as any).insertId);
+    console.log("DEBUG: Created documentId =", documentId);
     if (!documentId) {
       await conn.rollback();
       return res
@@ -806,36 +837,37 @@ app.post("/api/documents", async (req: Request, res: Response) => {
       }))
     );
 
-    for (const item of items) {
-      const params = [
-        documentId, // document_id
-        item.product_id ?? null, // product_id
-        item.productTitle ?? item.product_name ?? "", // product_name
-        item.unit ?? "", // unit
-        item.quantity ?? 1, // quantity
-        item.unit_price ?? 0, // unit_price
-        item.amount ?? 0, // amount
-        item.description ?? "", // description
-        item.withholding_tax_amount ?? 0, // withholding_tax_amount
-        item.withholding_tax_option ?? -1, // withholding_tax_option (ใหม่)
-        item.amount_before_tax ?? 0, // amount_before_tax
-        item.discount ?? 0, // discount
-        item.discount_type ?? item.discountType ?? "thb", // discount_type
-        item.tax ?? 0, // tax
-        item.tax_amount ?? 0, // tax_amount
-      ];
-      console.log(
-        "Params for document_items:",
-        params,
-        "length:",
-        params.length
-      );
-      await conn.query(
-        `INSERT INTO document_items (
-          document_id, product_id, product_name, unit, quantity, unit_price, amount, description, withholding_tax_amount, withholding_tax_option, amount_before_tax, discount, discount_type, tax, tax_amount
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        params
-      );
+    // ถ้าเป็นเอกสารลูก (มี related_document_id และ document_type เป็น INVOICE หรือ RECEIPT) ไม่ต้อง insert document_items ใหม่
+    if (
+      !related_document_id ||
+      (document_type.toLowerCase() !== "invoice" &&
+        document_type.toLowerCase() !== "receipt")
+    ) {
+      for (const item of items) {
+        const params = [
+          documentId, // document_id
+          item.product_id ?? null, // product_id
+          item.productTitle ?? item.product_name ?? "", // product_name
+          item.unit ?? "", // unit
+          item.quantity ?? 1, // quantity
+          item.unit_price ?? 0, // unit_price
+          item.amount ?? 0, // amount
+          item.description ?? "", // description
+          item.withholding_tax_amount ?? 0, // withholding_tax_amount
+          item.withholding_tax_option ?? -1, // withholding_tax_option
+          item.amount_before_tax ?? 0, // amount_before_tax
+          item.discount ?? 0, // discount
+          item.discount_type ?? item.discountType ?? "thb", // discount_type
+          item.tax ?? 0, // tax
+          item.tax_amount ?? 0, // tax_amount
+        ];
+        await conn.query(
+          `INSERT INTO document_items (
+            document_id, product_id, product_name, unit, quantity, unit_price, amount, description, withholding_tax_amount, withholding_tax_option, amount_before_tax, discount, discount_type, tax, tax_amount
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          params
+        );
+      }
     }
 
     await conn.commit();
@@ -967,17 +999,14 @@ app.get("/api/documents/:id", async (req, res) => {
     }
     // === ดึง items ของต้นทางสุดท้ายแบบ recursive ===
     const items_recursive = await getDocumentItemsRecursive(id);
-    // ถ้า items ของตัวเองว่าง ให้ set items = items_recursive
-    const itemsToUse =
-      Array.isArray(items) && items.length > 0 ? items : items_recursive;
-    // คำนวณ summary จาก itemsToUse
-    const summary = calculateDocumentSummary(itemsToUse);
+    // ใช้ items_recursive ในการคำนวณ summary เสมอ
+    const summary = calculateDocumentSummary(items_recursive);
     // แนบ items (ที่เลือกแล้ว), items_recursive และ summary เข้าไปใน doc
     const documentWithItems = {
       ...(Array.isArray(doc) ? doc[0] : doc),
-      items: itemsToUse,
+      items: Array.isArray(items) && items.length > 0 ? items : items_recursive,
       items_recursive,
-      summary,
+      summary, // summary สดจาก items_recursive
     };
     res.json(documentWithItems);
   } catch (err) {
@@ -1024,6 +1053,31 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
 
     conn = await pool.getConnection();
     await conn.beginTransaction();
+
+    // --- เพิ่ม logic ตรวจสอบก่อนอัปเดตเอกสารต้นทาง (PUT) ---
+    // ดึงข้อมูลเอกสารต้นทาง
+    const [docRows] = await conn.query("SELECT * FROM documents WHERE id = ?", [
+      id,
+    ]);
+    const docData = docRows && docRows[0] ? docRows[0] : null;
+    if (
+      docData &&
+      docData.document_type &&
+      docData.document_type.toLowerCase() === "quotation"
+    ) {
+      // เช็คว่ามี Invoice ที่อ้างอิง Quotation นี้อยู่แล้วหรือไม่
+      const [existing] = await conn.query(
+        `SELECT id FROM documents WHERE related_document_id = ? AND document_type = 'INVOICE'`,
+        [id]
+      );
+      if (Array.isArray(existing) && existing.length > 0) {
+        await conn.rollback();
+        return res.status(400).json({
+          error:
+            "ไม่สามารถแก้ไข Quotation ที่ถูกอ้างอิงไปสร้าง Invoice แล้วได้",
+        });
+      }
+    }
 
     // 1. Update main document
     const summaryCalc = calculateDocumentSummary(items);
