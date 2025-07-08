@@ -318,24 +318,18 @@ function mapDocumentFromBackend(doc: any): DocumentData {
     notes: doc.notes,
     tags: doc.tags || [],
     customer: {
-      id: doc.customer_id,
-      name: doc.customer_name,
+      id: doc.customer_id?.toString() ?? "",
+      name: doc.customer_name ?? "",
       tax_id: doc.customer_tax_id || "",
       phone: doc.customer_phone || "",
       address: doc.customer_address || "",
       email: doc.customer_email || "",
     },
     items: (doc.items || []).map((item: any) => {
-      console.log("[mapDocumentFromBackend] raw item:", {
-        id: item.id,
-        withholding_tax_option: item.withholding_tax_option,
-        withholdingTax: item.withholdingTax,
-        withholding_tax_amount: item.withholding_tax_amount,
-        withholdingTaxAmount: item.withholdingTaxAmount,
-      });
       return {
-        id: item.id?.toString(),
-        productId: item.product_id ?? item.productId ?? "",
+        id: item.id?.toString() ?? `item-${Date.now()}`,
+        productId:
+          item.product_id?.toString() ?? item.productId?.toString() ?? "",
         productTitle: item.product_name ?? item.productTitle ?? "",
         description: item.description ?? "",
         unit: item.unit ?? "",
@@ -349,10 +343,12 @@ function mapDocumentFromBackend(doc: any): DocumentData {
           item.amount_before_tax ?? item.amountBeforeTax ?? 0
         ),
         withholdingTax:
-          item.withholding_tax_option ??
-          item.withholding_tax ??
-          item.withholdingTax ??
-          -1,
+          typeof item.withholdingTax === "number"
+            ? item.withholdingTax
+            : typeof item.withholding_tax_option === "string" &&
+                item.withholding_tax_option.endsWith("%")
+              ? parseFloat(item.withholding_tax_option)
+              : Number(item.withholding_tax_option ?? -1),
         customWithholdingTaxAmount: Number(
           item.custom_withholding_tax_amount ??
             item.customWithholdingTaxAmount ??
@@ -368,11 +364,11 @@ function mapDocumentFromBackend(doc: any): DocumentData {
       };
     }),
     summary: {
-      subtotal: doc.subtotal,
-      discount: doc.discount || 0,
-      tax: doc.tax_amount,
-      total: doc.total_amount,
-      withholdingTax: doc.withholding_tax || 0,
+      subtotal: Number(doc.subtotal ?? 0),
+      discount: Number(doc.discount ?? 0),
+      tax: Number(doc.tax_amount ?? 0),
+      total: Number(doc.total_amount ?? 0),
+      withholdingTax: Number(doc.withholding_tax ?? 0),
     },
     attachments: doc.attachments || [],
     issueTaxInvoice: doc.issue_tax_invoice ?? false,

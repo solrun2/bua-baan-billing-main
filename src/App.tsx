@@ -187,14 +187,6 @@ const App = () => {
       );
     }
 
-    if (!initialData) {
-      console.log(
-        "InvoiceFormWrapper: initialData ไม่เจอหรือ undefined:",
-        initialData
-      );
-      return <div>ไม่พบเอกสารที่ต้องการแก้ไข</div>;
-    }
-
     console.log(
       "InvoiceFormWrapper: initialData ที่จะส่งเข้า InvoiceForm:",
       initialData

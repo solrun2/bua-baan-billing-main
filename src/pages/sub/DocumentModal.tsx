@@ -44,6 +44,7 @@ interface DocumentBase {
   summary: DocumentSummary;
   reference?: string;
   total_amount?: number;
+  related_document_id?: number;
 }
 
 interface Quotation extends DocumentBase {
@@ -105,6 +106,7 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
   onClose,
 }) => {
   const [productMap, setProductMap] = useState<Record<string, any>>({});
+  const [relatedDocument, setRelatedDocument] = useState<any>(null);
 
   useEffect(() => {
     if (!open || !document?.items) {
@@ -151,6 +153,33 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
     fetchProducts();
   }, [open, document]);
 
+  // ดึงข้อมูลเอกสารที่เกี่ยวข้อง
+  useEffect(() => {
+    if (!open || !document?.related_document_id) {
+      setRelatedDocument(null);
+      return;
+    }
+
+    const fetchRelatedDocument = async () => {
+      try {
+        const res = await fetch(
+          `http://localhost:3001/api/documents/${document.related_document_id}`
+        );
+        if (!res.ok) {
+          setRelatedDocument(null);
+          return;
+        }
+        const data = await res.json();
+        setRelatedDocument(data);
+        console.log("relatedDocument", data);
+      } catch (e) {
+        setRelatedDocument(null);
+      }
+    };
+
+    fetchRelatedDocument();
+  }, [open, document?.related_document_id]);
+
   // Helper for date formatting
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return "-";
@@ -188,6 +217,7 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
       : calculateSummaryFromItems(document.items || []);
 
   console.log("summary", summary);
+  console.log("DocumentModal document:", document);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40 print:bg-transparent">
@@ -233,7 +263,10 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
               <b>วันถึงกำหนด :</b> {formatDate(document.valid_until)}
             </div>
             <div>
-              <b>อ้างอิง :</b> {document.reference || "-"}
+              <b>อ้างอิง :</b>{" "}
+              {relatedDocument && relatedDocument.document_number
+                ? relatedDocument.document_number
+                : document.reference || "-"}
             </div>
           </div>
         </div>

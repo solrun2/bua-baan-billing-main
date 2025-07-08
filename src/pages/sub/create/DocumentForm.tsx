@@ -66,6 +66,9 @@ export interface DocumentFormProps {
   editMode?: boolean;
 }
 
+// เพิ่ม related_document_id ใน type DocumentData (workaround)
+type DocumentDataWithRelated = DocumentData & { related_document_id?: number };
+
 export const DocumentForm: FC<DocumentFormProps> = ({
   onCancel,
   onSave,
@@ -74,8 +77,20 @@ export const DocumentForm: FC<DocumentFormProps> = ({
   isLoading,
   editMode = false,
 }: DocumentFormProps) => {
-  console.log('DocumentForm: initialData:', initialData);
-  console.log('DocumentForm: items:', initialData?.items);
+  console.log("DocumentForm: initialData:", initialData);
+  console.log(
+    "DocumentForm: items:",
+    initialData.items,
+    "typeof:",
+    typeof initialData.items,
+    "length:",
+    initialData.items?.length
+  );
+  if (Array.isArray(initialData.items)) {
+    initialData.items.forEach((item, idx) => {
+      console.log(`DocumentForm: items[${idx}]`, item);
+    });
+  }
 
   const [isSaving, setIsSaving] = useState(false);
   const navigate = useNavigate();
@@ -470,8 +485,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
           ) {
             mergedItem.withholdingTax = 0;
           } else if (typeof mergedItem.withholdingTax !== "number") {
-            mergedItem.withholdingTax =
-              Number(mergedItem.withholdingTax) || 0;
+            mergedItem.withholdingTax = Number(mergedItem.withholdingTax) || 0;
           }
           // คำนวณใหม่
           return updateItemWithCalculations(mergedItem) as DocumentItem;
@@ -502,6 +516,28 @@ export const DocumentForm: FC<DocumentFormProps> = ({
     fillEditData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editMode, initialData]);
+
+  // เพิ่ม useEffect สำหรับกรณี editMode และมี related_document_id
+  useEffect(() => {
+    if (
+      editMode &&
+      (initialData as DocumentDataWithRelated)?.related_document_id
+    ) {
+      fetch(
+        `http://localhost:3001/api/documents/${(initialData as DocumentDataWithRelated).related_document_id}`
+      )
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (data && data.document_number) {
+            setForm((prev) => ({
+              ...prev,
+              reference: data.document_number,
+            }));
+          }
+        });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editMode, (initialData as DocumentDataWithRelated)?.related_document_id]);
 
   // ฟังก์ชันคำนวณ discount เป็นจำนวนเงินจริง
   function getDiscountAmount(item: DocumentItem) {

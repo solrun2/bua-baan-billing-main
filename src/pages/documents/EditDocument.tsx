@@ -11,10 +11,18 @@ const EditDocumentPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!id) return; // ป้องกันกรณี id ยังไม่พร้อม
+    console.log("[EditDocument] id:", id);
     apiService
       .getDocumentById(id)
-      .then(setInitialData)
-      .catch(() => toast.error("ไม่พบเอกสาร"))
+      .then((data) => {
+        console.log("[EditDocument] loaded data:", data);
+        setInitialData(data);
+      })
+      .catch((err) => {
+        console.error("[EditDocument] error loading document:", err);
+        toast.error("ไม่พบเอกสาร");
+      })
       .finally(() => setLoading(false));
   }, [id]);
 
@@ -29,7 +37,8 @@ const EditDocumentPage: React.FC = () => {
   };
 
   if (loading) return <div>Loading...</div>;
-  if (!initialData) return <div>ไม่พบเอกสาร</div>;
+  console.log("[EditDocument] initialData ก่อน render:", initialData);
+  if (initialData == null) return <div>ไม่พบเอกสาร</div>;
 
   return (
     <DocumentForm

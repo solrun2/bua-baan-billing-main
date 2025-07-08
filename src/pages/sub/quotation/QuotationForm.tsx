@@ -71,7 +71,11 @@ const QuotationForm = ({
           // Try to load from document service (local storage)
           const doc = documentService.getById(id);
 
-          if (doc) {
+          if (doc == null) {
+            console.log("[QuotationForm] ไม่พบเอกสารที่ต้องการแก้ไข", doc);
+            toast.error("ไม่พบเอกสารที่ต้องการแก้ไข");
+            navigate("/documents/quotation");
+          } else {
             // Ensure all required fields are set
             const documentData: EnsureDocumentType<DocumentData> = {
               ...doc,
@@ -100,10 +104,6 @@ const QuotationForm = ({
             };
 
             setInitialData(documentData);
-          } else {
-            // If not found in local storage, show error
-            toast.error("ไม่พบเอกสารที่ต้องการแก้ไข");
-            navigate("/documents/quotation");
           }
         } else if (externalInitialData) {
           // Use provided initial data

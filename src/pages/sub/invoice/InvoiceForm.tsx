@@ -60,85 +60,31 @@ const InvoiceForm = ({
 
   // Load document data if editing
   useEffect(() => {
-    const loadDocument = async () => {
-      setIsLoading(true);
-      try {
-        if (id) {
-          setIsEditing(true);
-          // Try to load from document service (local storage)
-          const doc = documentService.getById(id);
-
-          if (doc) {
-            // Ensure all required fields are set
-            const documentData: EnsureDocumentType<DocumentData> = {
-              ...doc,
-              documentType: "invoice",
-              status: doc.status || "รอชำระ",
-              priceType: doc.priceType || "exclusive",
-              customer: doc.customer || {
-                name: "",
-                tax_id: "",
-                phone: "",
-                address: "",
-              },
-              items: doc.items || [],
-              summary: doc.summary || {
-                subtotal: 0,
-                discount: 0,
-                tax: 0,
-                total: 0,
-                withholdingTax: 0,
-              },
-              notes: doc.notes || "",
-              documentNumber: doc.documentNumber || "",
-              documentDate:
-                doc.documentDate || new Date().toISOString().split("T")[0],
-              reference: doc.reference || "",
-              dueDate:
-                doc.dueDate ||
-                new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-                  .toISOString()
-                  .split("T")[0],
-            };
-
-            setInitialData(documentData);
-          } else {
-            // If not found in local storage, show error
-            toast.error("ไม่พบเอกสารที่ต้องการแก้ไข");
-            navigate("/documents/invoice");
-          }
-        } else if (externalInitialData) {
-          // Use provided initial data
-          setInitialData({
-            ...externalInitialData,
-            documentType: "invoice",
-            status: externalInitialData.status || "รอชำระ",
-            priceType: externalInitialData.priceType || "exclusive",
-          });
-        } else {
-          // For new document, generate a document number
-          const newNumber =
-            documentService.generateNewDocumentNumber("invoice");
-          setInitialData((prev) => ({
-            ...prev,
-            documentNumber: newNumber,
-            documentType: "invoice",
-            status: "รอชำระ",
-            priceType: "exclusive",
-          }));
-        }
-      } catch (error) {
-        console.error("Error loading document:", error);
-        toast.error("ไม่สามารถโหลดข้อมูลเอกสารได้");
-        navigate("/documents/invoice");
-      } finally {
-        setIsLoading(false);
-        setIsClient(true);
-      }
-    };
-
-    loadDocument();
-  }, [id, externalInitialData, navigate]);
+    setIsLoading(true);
+    if (externalInitialData) {
+      setInitialData({
+        ...externalInitialData,
+        documentType: "invoice",
+        status: externalInitialData.status || "รอชำระ",
+        priceType: externalInitialData.priceType || "exclusive",
+      });
+      setIsEditing(true);
+      setIsLoading(false);
+      setIsClient(true);
+      return;
+    }
+    // For new document, generate a document number
+    const newNumber = documentService.generateNewDocumentNumber("invoice");
+    setInitialData((prev) => ({
+      ...prev,
+      documentNumber: newNumber,
+      documentType: "invoice",
+      status: "รอชำระ",
+      priceType: "exclusive",
+    }));
+    setIsLoading(false);
+    setIsClient(true);
+  }, [externalInitialData]);
 
   const handleCancel = () => {
     if (externalOnCancel) {
