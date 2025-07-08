@@ -466,6 +466,68 @@ app.get("/api/documents/next-number", async (req, res) => {
   }
 });
 
+// === ฟังก์ชันกลางสำหรับคำนวณ summary ของเอกสาร (quotation/invoice/receipt) ===
+function calculateDocumentSummary(items: any[]) {
+  let subtotal = 0;
+  let discountTotal = 0;
+  let tax = 0;
+  let withholdingTax = 0;
+  for (const item of items) {
+    const quantity = Number(item.quantity ?? 1);
+    const unitPrice = Number(item.unit_price ?? item.unitPrice ?? 0);
+    const discount = Number(item.discount ?? 0);
+    const discountType = item.discount_type ?? item.discountType ?? "thb";
+    let amountBeforeTax = 0;
+    if (discountType === "percentage") {
+      amountBeforeTax = quantity * unitPrice * (1 - discount / 100);
+      discountTotal += quantity * unitPrice * (discount / 100);
+    } else {
+      amountBeforeTax = quantity * (unitPrice - discount);
+      discountTotal += quantity * discount;
+    }
+    subtotal += amountBeforeTax;
+    // VAT
+    const taxRate = Number(item.tax ?? 0);
+    const taxAmount = amountBeforeTax * (taxRate / 100);
+    tax += taxAmount;
+    // หัก ณ ที่จ่าย
+    let whtRate = 0;
+    if (typeof item.withholding_tax_option === "number") {
+      whtRate = item.withholding_tax_option / 100;
+    } else if (
+      typeof item.withholding_tax_option === "string" &&
+      item.withholding_tax_option.endsWith("%")
+    ) {
+      whtRate = parseFloat(item.withholding_tax_option) / 100;
+    } else if (
+      item.withholding_tax_option === "ไม่มี" ||
+      item.withholding_tax_option === "ไม่ระบุ"
+    ) {
+      whtRate = 0;
+    }
+    let whtAmount = 0;
+    if (
+      item.withholding_tax_option === "กำหนดเอง" &&
+      item.customWithholdingTaxAmount
+    ) {
+      whtAmount = Number(item.customWithholdingTaxAmount);
+    } else {
+      whtAmount = amountBeforeTax * whtRate;
+    }
+    withholdingTax += whtAmount;
+  }
+  const total = subtotal + tax;
+  const netTotalAmount = total - withholdingTax;
+  return {
+    subtotal,
+    discount: discountTotal,
+    tax,
+    total,
+    withholdingTax,
+    netTotalAmount,
+  };
+}
+
 // ฟังก์ชัน reusable สำหรับสร้างเอกสารใหม่ใน backend (ใช้ใน auto-create invoice/receipt)
 async function createDocumentFromServer(data: any, pool: any) {
   let conn;
@@ -493,7 +555,12 @@ async function createDocumentFromServer(data: any, pool: any) {
     ) {
       throw new Error("Missing or invalid summary object.");
     }
-    const { subtotal, tax: tax_amount, total: total_amount } = summary;
+    const summaryCalc = calculateDocumentSummary(items);
+    const subtotal = summaryCalc.subtotal;
+    const tax_amount = summaryCalc.tax;
+    const total_amount = summaryCalc.netTotalAmount; // ใช้ยอดสุทธิหลังหัก ณ ที่จ่าย
+    const withholdingTax = summaryCalc.withholdingTax;
+    const netTotalAmount = summaryCalc.netTotalAmount;
     if (
       !customer ||
       !customer.id ||
@@ -516,47 +583,6 @@ async function createDocumentFromServer(data: any, pool: any) {
       issue_date
     );
     // Insert into main 'documents' table
-    const withholdingTax = items.reduce((sum: number, item: any) => {
-      const quantity = Number(item.quantity ?? 1);
-      const unitPrice = Number(item.unit_price ?? 0);
-      const discount = Number(item.discount ?? 0);
-      const discountType = item.discount_type ?? "thb";
-      let amountBeforeTax = 0;
-      if (discountType === "percentage") {
-        amountBeforeTax = quantity * unitPrice * (1 - discount / 100);
-      } else {
-        amountBeforeTax = quantity * (unitPrice - discount);
-      }
-      let whtRate = 0;
-      if (typeof item.withholding_tax_option === "number") {
-        whtRate = item.withholding_tax_option / 100;
-      } else if (
-        typeof item.withholding_tax_option === "string" &&
-        item.withholding_tax_option.endsWith("%")
-      ) {
-        whtRate = parseFloat(item.withholding_tax_option) / 100;
-      } else if (
-        item.withholding_tax_option === "ไม่มี" ||
-        item.withholding_tax_option === "ไม่ระบุ"
-      ) {
-        whtRate = 0;
-      }
-      let whtAmount = 0;
-      if (
-        item.withholding_tax_option === "กำหนดเอง" &&
-        item.customWithholdingTaxAmount
-      ) {
-        whtAmount = Number(item.customWithholdingTaxAmount);
-      } else {
-        whtAmount = amountBeforeTax * whtRate;
-      }
-      return sum + whtAmount;
-    }, 0);
-    // ถ้ามี forceTotalAmount ให้ใช้ค่านี้แทนการคำนวณใหม่
-    const netTotalAmount =
-      typeof data.forceTotalAmount === "number"
-        ? data.forceTotalAmount
-        : (summary.total ?? 0) - withholdingTax;
     const docResult = await conn.query(
       `INSERT INTO documents (
         customer_id, customer_name, document_number, document_type, status, issue_date,
@@ -573,7 +599,7 @@ async function createDocumentFromServer(data: any, pool: any) {
         issue_date,
         subtotal,
         tax_amount,
-        netTotalAmount,
+        total_amount, // ใช้ยอดสุทธิหลังหัก ณ ที่จ่าย
         notes,
         customer.address || "",
         customer.phone || "",
@@ -682,7 +708,12 @@ app.post("/api/documents", async (req: Request, res: Response) => {
         .status(400)
         .json({ error: "Missing or invalid summary object." });
     }
-    const { subtotal, tax: tax_amount, total: total_amount } = summary;
+    const summaryCalc = calculateDocumentSummary(items);
+    const subtotal = summaryCalc.subtotal;
+    const tax_amount = summaryCalc.tax;
+    const total_amount = summaryCalc.netTotalAmount; // ใช้ยอดสุทธิหลังหัก ณ ที่จ่าย
+    const withholdingTax = summaryCalc.withholdingTax;
+    const netTotalAmount = summaryCalc.netTotalAmount;
 
     if (
       !customer ||
@@ -711,52 +742,13 @@ app.post("/api/documents", async (req: Request, res: Response) => {
     );
 
     // 3. Insert into main 'documents' table
-    // คำนวณยอดสุทธิหลังหัก ณ ที่จ่าย
-    const withholdingTax = items.reduce((sum: number, item: any) => {
-      // คำนวณ amount ก่อนหัก ณ ที่จ่าย
-      const quantity = Number(item.quantity ?? 1);
-      const unitPrice = Number(item.unit_price ?? 0);
-      const discount = Number(item.discount ?? 0);
-      const discountType = item.discount_type ?? "thb";
-      let amountBeforeTax = 0;
-      if (discountType === "percentage") {
-        amountBeforeTax = quantity * unitPrice * (1 - discount / 100);
-      } else {
-        amountBeforeTax = quantity * (unitPrice - discount);
-      }
-      let whtRate = 0;
-      if (typeof item.withholding_tax_option === "number") {
-        whtRate = item.withholding_tax_option / 100;
-      } else if (
-        typeof item.withholding_tax_option === "string" &&
-        item.withholding_tax_option.endsWith("%")
-      ) {
-        whtRate = parseFloat(item.withholding_tax_option) / 100;
-      } else if (
-        item.withholding_tax_option === "ไม่มี" ||
-        item.withholding_tax_option === "ไม่ระบุ"
-      ) {
-        whtRate = 0;
-      }
-      // รองรับ custom amount
-      let whtAmount = 0;
-      if (
-        item.withholding_tax_option === "กำหนดเอง" &&
-        item.customWithholdingTaxAmount
-      ) {
-        whtAmount = Number(item.customWithholdingTaxAmount);
-      } else {
-        whtAmount = amountBeforeTax * whtRate;
-      }
-      return sum + whtAmount;
-    }, 0);
-    const netTotalAmount = (summary.total ?? 0) - withholdingTax;
     const docResult = await conn.query(
       `INSERT INTO documents (
         customer_id, customer_name, document_number, document_type, status, issue_date,
         subtotal, tax_amount, total_amount, notes,
-        customer_address, customer_phone, customer_email
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        customer_address, customer_phone, customer_email,
+        withholding_tax
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         customer.id,
         customer.name,
@@ -766,11 +758,12 @@ app.post("/api/documents", async (req: Request, res: Response) => {
         issue_date,
         subtotal,
         tax_amount,
-        netTotalAmount, // ใช้ยอดสุทธิหลังหัก ณ ที่จ่าย
+        total_amount, // ใช้ยอดสุทธิหลังหัก ณ ที่จ่าย
         notes,
         customer.address || "",
         customer.phone || "",
         customer.email || "",
+        withholdingTax,
       ]
     );
 
@@ -977,11 +970,14 @@ app.get("/api/documents/:id", async (req, res) => {
     // ถ้า items ของตัวเองว่าง ให้ set items = items_recursive
     const itemsToUse =
       Array.isArray(items) && items.length > 0 ? items : items_recursive;
-    // แนบ items (ที่เลือกแล้ว) และ items_recursive เข้าไปใน doc
+    // คำนวณ summary จาก itemsToUse
+    const summary = calculateDocumentSummary(itemsToUse);
+    // แนบ items (ที่เลือกแล้ว), items_recursive และ summary เข้าไปใน doc
     const documentWithItems = {
       ...(Array.isArray(doc) ? doc[0] : doc),
       items: itemsToUse,
       items_recursive,
+      summary,
     };
     res.json(documentWithItems);
   } catch (err) {
@@ -1030,44 +1026,12 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
     await conn.beginTransaction();
 
     // 1. Update main document
-    // คำนวณยอดสุทธิหลังหัก ณ ที่จ่าย
-    const withholdingTaxUpdate = items.reduce((sum: number, item: any) => {
-      const quantity = Number(item.quantity ?? 1);
-      const unitPrice = Number(item.unit_price ?? 0);
-      const discount = Number(item.discount ?? 0);
-      const discountType = item.discount_type ?? "thb";
-      let amountBeforeTax = 0;
-      if (discountType === "percentage") {
-        amountBeforeTax = quantity * unitPrice * (1 - discount / 100);
-      } else {
-        amountBeforeTax = quantity * (unitPrice - discount);
-      }
-      let whtRate = 0;
-      if (typeof item.withholding_tax_option === "number") {
-        whtRate = item.withholding_tax_option / 100;
-      } else if (
-        typeof item.withholding_tax_option === "string" &&
-        item.withholding_tax_option.endsWith("%")
-      ) {
-        whtRate = parseFloat(item.withholding_tax_option) / 100;
-      } else if (
-        item.withholding_tax_option === "ไม่มี" ||
-        item.withholding_tax_option === "ไม่ระบุ"
-      ) {
-        whtRate = 0;
-      }
-      let whtAmount = 0;
-      if (
-        item.withholding_tax_option === "กำหนดเอง" &&
-        item.customWithholdingTaxAmount
-      ) {
-        whtAmount = Number(item.customWithholdingTaxAmount);
-      } else {
-        whtAmount = amountBeforeTax * whtRate;
-      }
-      return sum + whtAmount;
-    }, 0);
-    const netTotalAmountUpdate = (summary.total ?? 0) - withholdingTaxUpdate;
+    const summaryCalc = calculateDocumentSummary(items);
+    const subtotal = summaryCalc.subtotal;
+    const tax_amount = summaryCalc.tax;
+    const total_amount = summaryCalc.netTotalAmount; // จะเป็นยอดสุทธิหลังหัก ณ ที่จ่าย
+    const withholdingTax = summaryCalc.withholdingTax;
+    const netTotalAmount = summaryCalc.netTotalAmount;
     await conn.query(
       `UPDATE documents SET
         customer_id = ?, customer_name = ?, document_type = ?, status = ?, issue_date = ?,
@@ -1080,9 +1044,9 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
         document_type,
         status,
         issue_date,
-        summary.subtotal,
-        summary.tax,
-        netTotalAmountUpdate, // ใช้ยอดสุทธิหลังหัก ณ ที่จ่าย
+        subtotal,
+        tax_amount,
+        total_amount, // จะเป็น summary.total - summary.withholdingTax
         notes,
         customer.address || "",
         customer.phone || "",

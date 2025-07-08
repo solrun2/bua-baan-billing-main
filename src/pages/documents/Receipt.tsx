@@ -30,6 +30,7 @@ const Receipt = () => {
           .filter((doc) => doc.document_type === "RECEIPT")
           .map((doc) => ({
             ...doc,
+            total_amount: Number(doc.total_amount),
           }));
         setReceipts(receiptsData);
       } catch (err) {

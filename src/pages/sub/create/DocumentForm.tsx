@@ -173,13 +173,16 @@ export const DocumentForm: FC<DocumentFormProps> = ({
     }) as DocumentItem[],
   }));
 
-  // summary แยกไว้เพราะต้องคำนวณใหม่เมื่อ items เปลี่ยน
-  const [summary, setSummary] = useState<DocumentSummary>({
+  // เพิ่ม netTotalAmount ใน state summary
+  const [summary, setSummary] = useState<
+    DocumentSummary & { netTotalAmount?: number }
+  >({
     subtotal: 0,
     discount: 0,
     tax: 0,
     total: 0,
     withholdingTax: 0,
+    netTotalAmount: 0,
   });
   const [netTotal, setNetTotal] = useState(0);
 
@@ -369,8 +372,9 @@ export const DocumentForm: FC<DocumentFormProps> = ({
   // 3. สรุปรายการคำนวณสดจาก form.items
   useEffect(() => {
     const newSummary = calculateDocumentSummary(form.items);
+    newSummary.netTotalAmount = newSummary.total - newSummary.withholdingTax;
     setSummary(newSummary);
-    setNetTotal(newSummary.total - newSummary.withholdingTax);
+    setNetTotal(newSummary.netTotalAmount);
   }, [form.items]);
 
   // Set initial document number when component mounts or document type changes
@@ -508,9 +512,11 @@ export const DocumentForm: FC<DocumentFormProps> = ({
           items,
         }));
         // คำนวณ summary ใหม่ทันทีหลัง normalize items
-        const newSummary = calculateDocumentSummary(items);
-        setSummary(newSummary);
-        setNetTotal(newSummary.total - newSummary.withholdingTax);
+        const newSummary2 = calculateDocumentSummary(items);
+        newSummary2.netTotalAmount =
+          newSummary2.total - newSummary2.withholdingTax;
+        setSummary(newSummary2);
+        setNetTotal(newSummary2.netTotalAmount);
       }
     }
     fillEditData();

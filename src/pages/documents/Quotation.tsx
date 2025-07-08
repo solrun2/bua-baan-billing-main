@@ -37,6 +37,9 @@ const Quotation = () => {
         const quotationsData = data
           .filter((doc) => doc.document_type === "QUOTATION")
           .map((doc: any) => {
+            // ใช้ยอดสุทธิหลังหัก ณ ที่จ่าย ถ้ามี
+            const netTotal =
+              doc.summary?.netTotalAmount ?? Number(doc.total_amount ?? 0);
             return {
               id: doc.id,
               number: doc.document_number,
@@ -45,7 +48,7 @@ const Quotation = () => {
               validUntil: doc.valid_until
                 ? new Date(doc.valid_until).toLocaleDateString("th-TH")
                 : "-",
-              netTotal: formatCurrency(Number(doc.total_amount ?? 0)),
+              netTotal: netTotal,
               status: doc.status,
             };
           });
@@ -214,7 +217,7 @@ const Quotation = () => {
                         {quotation.validUntil}
                       </td>
                       <td className="py-3 px-4 font-medium text-foreground">
-                        <span>{quotation.netTotal}</span>
+                        <span>{formatCurrency(quotation.netTotal)}</span>
                       </td>
                       <td className="py-3 px-4">
                         <span

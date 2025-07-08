@@ -28,6 +28,7 @@ export interface DocumentSummary {
   tax: number;
   total: number;
   withholdingTax: number;
+  netTotalAmount?: number;
 }
 
 export interface CustomerData {

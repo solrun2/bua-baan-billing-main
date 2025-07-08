@@ -43,7 +43,7 @@ const Invoice = () => {
             dueDate: doc.due_date
               ? new Date(doc.due_date).toLocaleDateString("th-TH")
               : "-",
-            total: formatCurrency(Number(doc.total_amount)),
+            total_amount: Number(doc.total_amount),
             status: doc.status,
           }));
         setInvoices(invoicesData);
@@ -102,7 +102,8 @@ const Invoice = () => {
           dueDate: doc.due_date
             ? new Date(doc.due_date).toLocaleDateString("th-TH")
             : "-",
-          total: formatCurrency(Number(doc.total_amount)),
+          total_amount: Number(doc.total_amount),
+          withholding_tax: Number((doc as any).withholding_tax ?? 0),
           status: doc.status,
         }));
       setInvoices(invoicesData);
@@ -239,7 +240,7 @@ const Invoice = () => {
                         {invoice.dueDate}
                       </td>
                       <td className="py-3 px-4 font-medium text-foreground">
-                        {invoice.total}
+                        <span>{formatCurrency(invoice.total_amount)}</span>
                       </td>
                       <td className="py-3 px-4">
                         <span
