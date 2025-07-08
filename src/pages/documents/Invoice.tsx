@@ -75,9 +75,8 @@ const Invoice = () => {
   };
 
   const handleViewClick = async (invoice: any) => {
-    // ดึงข้อมูลเต็มของ invoice (เหมือน Quotation)
-    const allDocs = await apiService.getDocuments();
-    const fullDoc = allDocs.find((doc: any) => doc.id === invoice.id);
+    // ดึงข้อมูลเต็มของ invoice จาก backend โดยตรง (ไม่ใช้ allDocs)
+    const fullDoc = await apiService.getDocumentById(invoice.id);
     setSelectedInvoice(fullDoc);
     setIsModalOpen(true);
   };

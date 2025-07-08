@@ -607,30 +607,33 @@ async function createDocumentFromServer(data: any, pool: any) {
         [documentId, payment_date, payment_method, payment_reference]
       );
     }
-    for (const item of items as any[]) {
-      const params = [
-        documentId,
-        item.product_id ?? null,
-        item.productTitle ?? item.product_name ?? "",
-        item.unit ?? "",
-        item.quantity ?? 1,
-        item.unit_price ?? 0,
-        item.amount ?? 0,
-        item.description ?? "",
-        item.withholding_tax_amount ?? 0,
-        item.withholding_tax_option ?? -1,
-        item.amount_before_tax ?? 0,
-        item.discount ?? 0,
-        item.discount_type ?? item.discountType ?? "thb",
-        item.tax ?? 0,
-        item.tax_amount ?? 0,
-      ];
-      await conn.query(
-        `INSERT INTO document_items (
-          document_id, product_id, product_name, unit, quantity, unit_price, amount, description, withholding_tax_amount, withholding_tax_option, amount_before_tax, discount, discount_type, tax, tax_amount
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        params
-      );
+    // ถ้าเป็นเอกสารลูก (มี related_document_id และไม่ใช่ QUOTATION) จะไม่ insert document_items ใหม่
+    if (!related_document_id || document_type.toLowerCase() === "quotation") {
+      for (const item of items as any[]) {
+        const params = [
+          documentId,
+          item.product_id ?? null,
+          item.productTitle ?? item.product_name ?? "",
+          item.unit ?? "",
+          item.quantity ?? 1,
+          item.unit_price ?? 0,
+          item.amount ?? 0,
+          item.description ?? "",
+          item.withholding_tax_amount ?? 0,
+          item.withholding_tax_option ?? -1,
+          item.amount_before_tax ?? 0,
+          item.discount ?? 0,
+          item.discount_type ?? item.discountType ?? "thb",
+          item.tax ?? 0,
+          item.tax_amount ?? 0,
+        ];
+        await conn.query(
+          `INSERT INTO document_items (
+            document_id, product_id, product_name, unit, quantity, unit_price, amount, description, withholding_tax_amount, withholding_tax_option, amount_before_tax, discount, discount_type, tax, tax_amount
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          params
+        );
+      }
     }
     await conn.commit();
     return documentId;
@@ -899,6 +902,49 @@ app.delete("/api/documents/:id", async (req: Request, res: Response) => {
   }
 });
 
+// === Helper: ดึง document_items แบบ recursive ===
+async function getDocumentItemsRecursive(documentId: string) {
+  console.log("[getDocumentItemsRecursive] documentId =", documentId);
+  const [docRows] = await pool.query("SELECT * FROM documents WHERE id = ?", [
+    documentId,
+  ]);
+  const doc = Array.isArray(docRows) ? docRows[0] : docRows;
+  if (!doc) {
+    console.log(
+      "[getDocumentItemsRecursive] Document not found for id",
+      documentId
+    );
+    return [];
+  }
+  if (doc.related_document_id) {
+    console.log(
+      "[getDocumentItemsRecursive] documentId",
+      documentId,
+      "has related_document_id =",
+      doc.related_document_id,
+      "→ go recursive"
+    );
+    return getDocumentItemsRecursive(String(doc.related_document_id));
+  }
+  const items = await pool.query(
+    "SELECT * FROM document_items WHERE document_id = ?",
+    [documentId]
+  );
+  console.log(
+    "[getDocumentItemsRecursive] Items found for documentId",
+    documentId,
+    ":",
+    items
+  );
+  if (Array.isArray(items)) {
+    return items.map((item) => ({
+      ...item,
+      withholding_tax_option: item.withholding_tax_option ?? "-1",
+    }));
+  }
+  return items;
+}
+
 // เพิ่ม route สำหรับดึงเอกสารตาม id
 app.get("/api/documents/:id", async (req, res) => {
   const { id } = req.params;
@@ -926,8 +972,17 @@ app.get("/api/documents/:id", async (req, res) => {
         withholding_tax_option: item.withholding_tax_option ?? "-1",
       }));
     }
-    // แนบ items เข้าไปใน doc
-    const documentWithItems = { ...(Array.isArray(doc) ? doc[0] : doc), items };
+    // === ดึง items ของต้นทางสุดท้ายแบบ recursive ===
+    const items_recursive = await getDocumentItemsRecursive(id);
+    // ถ้า items ของตัวเองว่าง ให้ set items = items_recursive
+    const itemsToUse =
+      Array.isArray(items) && items.length > 0 ? items : items_recursive;
+    // แนบ items (ที่เลือกแล้ว) และ items_recursive เข้าไปใน doc
+    const documentWithItems = {
+      ...(Array.isArray(doc) ? doc[0] : doc),
+      items: itemsToUse,
+      items_recursive,
+    };
     res.json(documentWithItems);
   } catch (err) {
     console.error("Failed to fetch document by id:", err);

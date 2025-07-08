@@ -191,6 +191,13 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
   if (!open) return null;
   const labels = typeLabels[type];
 
+  // ใช้ items_recursive ถ้า items ว่าง
+  const items =
+    document.items && document.items.length > 0
+      ? document.items
+      : (document as any).items_recursive || [];
+  console.log("DocumentModal items (with fallback):", items);
+
   // Use summary from document, or recalculate if missing/zero
   const summary =
     document.summary &&
@@ -214,10 +221,11 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
             (document.summary.withholdingTax ?? 0).toString().replace(/,/g, "")
           ),
         }
-      : calculateSummaryFromItems(document.items || []);
+      : calculateSummaryFromItems(items);
 
   console.log("summary", summary);
   console.log("DocumentModal document:", document);
+  console.log("DocumentModal items:", document.items);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40 print:bg-transparent">
@@ -233,7 +241,9 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
         {/* Header */}
         <div className="flex justify-between items-start mb-4">
           <div>
-            <div className="font-bold text-lg text-blue-900">ใบเสนอราคา</div>
+            <div className="font-bold text-lg text-blue-900">
+              {labels.title}
+            </div>
             <div className="mt-2">
               <div>
                 <b>ผู้ขาย :</b> {SELLER_INFO.company}
@@ -315,7 +325,7 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
             </tr>
           </thead>
           <tbody>
-            {(document.items || []).map((item, idx) => {
+            {items.map((item, idx) => {
               const prod = productMap[item.product_id];
               return (
                 <tr key={idx}>
@@ -327,7 +337,9 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
                       item.description ||
                       "-"}
                   </td>
-                  <td className="border p-1 text-center">{item.quantity}</td>
+                  <td className="border p-1 text-center">
+                    {(item as any).quantity ?? (item as any).qty ?? "-"}
+                  </td>
                   <td className="border p-1 text-center">
                     {prod?.unit || item.unit || "-"}
                   </td>
@@ -337,7 +349,8 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
                   <td className="border p-1 text-right">
                     {(() => {
                       const discount = item.discount ?? 0;
-                      const qty = item.quantity ?? 1;
+                      const qty =
+                        (item as any).quantity ?? (item as any).qty ?? 1;
                       const unitPrice = item.unitPrice ?? item.unit_price ?? 0;
                       const discountType =
                         item.discount_type ?? item.discountType ?? "thb";
@@ -351,7 +364,9 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
                     })()}
                   </td>
                   <td className="border p-1 text-center">
-                    {item.tax ? `${item.tax}%` : "-"}
+                    {((item as any).tax ?? (item as any).tax_amount)
+                      ? `${(item as any).tax ?? (item as any).tax_amount}%`
+                      : "-"}
                   </td>
                   <td className="border p-1 text-right">
                     {formatCurrency(
