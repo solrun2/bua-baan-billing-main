@@ -19,6 +19,7 @@ interface InvoiceFormProps {
   onCancel?: () => void;
   initialData?: DocumentData;
   isLoading?: boolean;
+  editMode?: boolean;
 }
 
 const InvoiceForm = ({
@@ -26,6 +27,7 @@ const InvoiceForm = ({
   onCancel: externalOnCancel,
   initialData: externalInitialData,
   isLoading: externalIsLoading = false,
+  editMode = false,
 }: InvoiceFormProps) => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
@@ -187,6 +189,7 @@ const InvoiceForm = ({
         }}
         initialData={initialData}
         isLoading={isLoading}
+        editMode={editMode}
       />
     </div>
   );

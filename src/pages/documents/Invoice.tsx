@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { formatCurrency } from "../../lib/utils";
 import InvoiceModal from "../sub/invoice/InvoiceModal";
 import { DocumentForm } from "../sub/create/DocumentForm";
+import InvoiceForm from "../sub/invoice/InvoiceForm";
 
 const Invoice = () => {
   const navigate = useNavigate();
@@ -24,7 +25,7 @@ const Invoice = () => {
   const [error, setError] = useState<string | null>(null);
   const [selectedInvoice, setSelectedInvoice] = useState<any | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isEditFormOpen, setIsEditFormOpen] = useState(false);
   const [editInvoiceData, setEditInvoiceData] = useState<any | null>(null);
 
   useEffect(() => {
@@ -87,7 +88,6 @@ const Invoice = () => {
     try {
       await apiService.updateDocument(data.id, data);
       toast.success("บันทึกใบแจ้งหนี้สำเร็จ");
-      setIsEditModalOpen(false);
       setEditInvoiceData(null);
       // refresh รายการ
       const docs = await apiService.getDocuments();
@@ -111,7 +111,6 @@ const Invoice = () => {
   };
 
   const handleEditCancel = () => {
-    setIsEditModalOpen(false);
     setEditInvoiceData(null);
   };
 

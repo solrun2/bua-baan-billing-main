@@ -105,104 +105,6 @@ const App = () => {
     }
   };
 
-  const InvoiceFormWrapper = () => {
-    const { id } = useParams<{ id?: string }>();
-    const navigate = useNavigate();
-    const [initialData, setInitialData] = useState<DocumentData | undefined>(
-      undefined
-    );
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-      if (id) {
-        console.log("InvoiceFormWrapper: กำลังหา invoice id:", id);
-        const localDoc = documents.find((d) => String(d.id) === String(id));
-        if (localDoc) {
-          console.log("InvoiceFormWrapper: เจอใน documents:", localDoc);
-          setInitialData(localDoc);
-          setLoading(false);
-        } else {
-          apiService
-            .getDocumentById(id)
-            .then((doc) => {
-              console.log(
-                "InvoiceFormWrapper: apiService.getDocumentById ได้:",
-                doc
-              );
-              setInitialData(doc);
-            })
-            .catch((e) => {
-              console.error(
-                "InvoiceFormWrapper: apiService.getDocumentById error:",
-                e
-              );
-              setInitialData(undefined);
-            })
-            .finally(() => setLoading(false));
-        }
-      } else {
-        setInitialData(undefined);
-        setLoading(false);
-      }
-    }, [id, documents]);
-
-    const newInvoiceData: DocumentData = {
-      id: `inv_${Date.now()}`,
-      documentNumber: "",
-      customer: { name: "", tax_id: "", phone: "", address: "" },
-      items: [],
-      summary: {
-        subtotal: 0,
-        discount: 0,
-        tax: 0,
-        total: 0,
-        withholdingTax: 0,
-      },
-      status: "รอชำระ",
-      documentDate: new Date().toISOString().split("T")[0],
-      dueDate: "",
-      reference: "",
-      notes: "",
-      priceType: "exclusive",
-      documentType: "invoice",
-    };
-
-    if (loading) return <div>Loading...</div>;
-
-    if (!id) {
-      // ไม่มี id = สร้างใหม่
-      console.log(
-        "InvoiceFormWrapper: initialData สำหรับสร้างใหม่:",
-        newInvoiceData
-      );
-      return (
-        <InvoiceForm
-          onSave={async (data) => {
-            await handleSaveInvoice(data);
-            navigate("/documents/invoice");
-          }}
-          initialData={newInvoiceData}
-          isLoading={isLoading}
-        />
-      );
-    }
-
-    console.log(
-      "InvoiceFormWrapper: initialData ที่จะส่งเข้า InvoiceForm:",
-      initialData
-    );
-    return (
-      <InvoiceForm
-        onSave={async (data) => {
-          await handleSaveInvoice(data);
-          navigate("/documents/invoice");
-        }}
-        initialData={initialData}
-        isLoading={isLoading}
-      />
-    );
-  };
-
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
@@ -223,11 +125,8 @@ const App = () => {
               />
 
               <Route path="/documents/invoice" element={<Invoice />} />
-              <Route path="/invoice/new" element={<InvoiceFormWrapper />} />
-              <Route
-                path="/invoice/edit/:id"
-                element={<InvoiceFormWrapper />}
-              />
+              <Route path="/invoice/new" element={<InvoiceForm />} />
+              <Route path="/invoice/edit/:id" element={<EditDocumentPage />} />
 
               <Route path="/documents/tax-invoice" element={<TaxInvoice />} />
               <Route path="/documents/receipt" element={<Receipt />} />
