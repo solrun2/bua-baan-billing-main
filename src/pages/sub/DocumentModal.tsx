@@ -259,9 +259,19 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
             <div>
               <b>วันที่ :</b> {formatDate(document.issue_date)}
             </div>
-            <div>
-              <b>วันถึงกำหนด :</b> {formatDate(document.valid_until)}
-            </div>
+            {type === "quotation" ? (
+              <div>
+                <b>วันถึงกำหนด :</b> {formatDate(document.valid_until)}
+              </div>
+            ) : null}
+            {type === "invoice" ? (
+              <div>
+                <b>วันถึงกำหนด :</b>{" "}
+                {formatDate(
+                  (document as any).due_date || (document as any).dueDate
+                )}
+              </div>
+            ) : null}
             <div>
               <b>อ้างอิง :</b>{" "}
               {relatedDocument && relatedDocument.document_number

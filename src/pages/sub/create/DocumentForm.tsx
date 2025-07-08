@@ -617,7 +617,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
       documentType: documentType,
       documentNumber: form.documentNumber,
       documentDate: form.documentDate,
-      dueDate: documentType === "invoice" ? form.dueDate : undefined,
+      dueDate: documentType === "invoice" ? form.dueDate : undefined, // ฝั่ง backend ต้องรองรับ dueDate (camelCase)
       validUntil: documentType === "quotation" ? form.validUntil : undefined,
       reference: form.reference,
       customer: {

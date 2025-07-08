@@ -1043,10 +1043,16 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
         [valid_until, id]
       );
     } else if (document_type.toLowerCase() === "invoice" && due_date) {
-      await conn.query(
+      const result = await conn.query(
         "UPDATE invoice_details SET due_date = ? WHERE document_id = ?",
         [due_date, id]
       );
+      if (result.affectedRows === 0) {
+        await conn.query(
+          "INSERT INTO invoice_details (document_id, due_date) VALUES (?, ?)",
+          [id, due_date]
+        );
+      }
     } else if (
       document_type.toLowerCase() === "receipt" &&
       payment_date &&
