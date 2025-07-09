@@ -32,8 +32,13 @@ interface DocumentSummary {
 
 interface DocumentBase {
   document_number?: string;
+  documentNumber?: string;
   issue_date?: string;
+  documentDate?: string;
   valid_until?: string;
+  validUntil?: string;
+  due_date?: string;
+  dueDate?: string;
   customer_name?: string;
   customer_address?: string;
   customer_phone?: string;
@@ -43,8 +48,17 @@ interface DocumentBase {
   items: DocumentItem[];
   summary: DocumentSummary;
   reference?: string;
+  referenceNumber?: string;
   total_amount?: number;
   related_document_id?: number;
+  customer?: {
+    id?: string;
+    name?: string;
+    tax_id?: string;
+    phone?: string;
+    address?: string;
+    email?: string;
+  };
 }
 
 interface Quotation extends DocumentBase {
@@ -56,7 +70,7 @@ interface Invoice extends DocumentBase {
 }
 
 interface DocumentModalProps {
-  type: "quotation" | "invoice";
+  type: "quotation" | "invoice" | "receipt";
   document: Quotation | Invoice;
   open: boolean;
   onClose: () => void;
@@ -264,21 +278,34 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
           </div>
           <div className="text-right">
             <div>
-              <b>เลขที่เอกสาร :</b> {document.document_number}
+              <b>เลขที่เอกสาร :</b>{" "}
+              {document.document_number || document.documentNumber || "-"}
             </div>
             <div>
-              <b>วันที่ :</b> {formatDate(document.issue_date)}
+              <b>วันที่ :</b>{" "}
+              {formatDate(document.issue_date || document.documentDate)}
             </div>
             {type === "quotation" ? (
               <div>
-                <b>วันถึงกำหนด :</b> {formatDate(document.valid_until)}
+                <b>วันถึงกำหนด :</b>{" "}
+                {formatDate(
+                  Array.isArray((document as any).quotation_details)
+                    ? (document as any).quotation_details[0]?.valid_until
+                    : (document as any).quotation_details?.valid_until ||
+                        document.valid_until ||
+                        document.validUntil
+                )}
               </div>
             ) : null}
             {type === "invoice" ? (
               <div>
                 <b>วันถึงกำหนด :</b>{" "}
                 {formatDate(
-                  (document as any).due_date || (document as any).dueDate
+                  Array.isArray((document as any).invoice_details)
+                    ? (document as any).invoice_details[0]?.due_date
+                    : (document as any).invoice_details?.due_date ||
+                        document.due_date ||
+                        document.dueDate
                 )}
               </div>
             ) : null}
@@ -286,7 +313,7 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
               <b>อ้างอิง :</b>{" "}
               {relatedDocument && relatedDocument.document_number
                 ? relatedDocument.document_number
-                : document.reference || "-"}
+                : document.reference || document.referenceNumber || "-"}
             </div>
           </div>
         </div>
@@ -294,19 +321,24 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
         {/* Customer */}
         <div className="bg-blue-50 rounded p-2 mb-4">
           <div>
-            <b>ลูกค้า :</b> {document.customer_name}
+            <b>ลูกค้า :</b>{" "}
+            {document.customer_name || document.customer?.name || "-"}
           </div>
           <div>
-            <b>ที่อยู่ :</b> {document.customer_address}
+            <b>ที่อยู่ :</b>{" "}
+            {document.customer_address || document.customer?.address || "-"}
           </div>
           <div>
-            <b>โทร :</b> {document.customer_phone}
+            <b>โทร :</b>{" "}
+            {document.customer_phone || document.customer?.phone || "-"}
           </div>
           <div>
-            <b>อีเมล :</b> {document.customer_email}
+            <b>อีเมล :</b>{" "}
+            {document.customer_email || document.customer?.email || "-"}
           </div>
           <div>
-            <b>เลขประจำตัวผู้เสียภาษี :</b> {document.customer_tax_id}
+            <b>เลขประจำตัวผู้เสียภาษี :</b>{" "}
+            {document.customer_tax_id || document.customer?.tax_id || "-"}
           </div>
         </div>
 

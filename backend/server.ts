@@ -985,6 +985,17 @@ app.get("/api/documents/:id", async (req, res) => {
       console.log("[GET /api/documents/:id] Document not found for id:", id);
       return res.status(404).json({ error: "Document not found" });
     }
+    // ดึง invoice_details ถ้าเป็น INVOICE
+    let invoice_details = null;
+    if (doc.document_type && doc.document_type.toLowerCase() === "invoice") {
+      const invoiceRows = await pool.query(
+        "SELECT * FROM invoice_details WHERE document_id = ?",
+        [id]
+      );
+      if (Array.isArray(invoiceRows) && invoiceRows.length > 0) {
+        invoice_details = invoiceRows[0];
+      }
+    }
     // ดึง items ของเอกสารนี้
     let items = await pool.query(
       "SELECT * FROM document_items WHERE document_id = ?",
@@ -1007,7 +1018,12 @@ app.get("/api/documents/:id", async (req, res) => {
       items: Array.isArray(items) && items.length > 0 ? items : items_recursive,
       items_recursive,
       summary, // summary สดจาก items_recursive
+      ...(invoice_details ? { invoice_details } : {}),
     };
+    // แนบ due_date ใน root object ด้วย ถ้ามี invoice_details
+    if (invoice_details && invoice_details.due_date) {
+      documentWithItems.due_date = invoice_details.due_date;
+    }
     res.json(documentWithItems);
   } catch (err) {
     console.error("Failed to fetch document by id:", err);
