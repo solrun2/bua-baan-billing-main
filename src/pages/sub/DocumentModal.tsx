@@ -51,6 +51,7 @@ interface DocumentBase {
   referenceNumber?: string;
   total_amount?: number;
   related_document_id?: number;
+  items_recursive?: DocumentItem[]; // เพิ่ม field นี้
   customer?: {
     id?: string;
     name?: string;
@@ -87,6 +88,14 @@ const typeLabels = {
   },
   invoice: {
     title: "ใบแจ้งหนี้",
+    itemLabel: "รายการ",
+    priceLabel: "หน่วยละ",
+    summaryLabel: "รวมเป็นเงิน",
+    taxLabel: "ภาษีมูลค่าเพิ่ม",
+    totalLabel: "รวมทั้งสิ้น",
+  },
+  receipt: {
+    title: "ใบเสร็จรับเงิน",
     itemLabel: "รายการ",
     priceLabel: "หน่วยละ",
     summaryLabel: "รวมเป็นเงิน",
@@ -179,10 +188,10 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
       setRelatedDocument(null);
       return;
     }
-    console.log(
-      "[useEffect] related_document_id:",
-      document.related_document_id
-    );
+    // console.log(
+    //   "[useEffect] related_document_id:",
+    //   document.related_document_id
+    // );
 
     const fetchRelatedDocument = async () => {
       try {
@@ -195,14 +204,15 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
         }
         const data = await res.json();
         setRelatedDocument(data);
-        console.log("relatedDocument response:", data);
+        // console.log("relatedDocument response:", data);
       } catch (e) {
         setRelatedDocument(null);
+        // ไม่ต้อง log error
       }
     };
 
     fetchRelatedDocument();
-  }, [open, document?.related_document_id]);
+  }, [open, document]);
 
   // Helper for date formatting
   const formatDate = (dateStr?: string) => {
@@ -215,12 +225,19 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
   if (!open) return null;
   const labels = typeLabels[type];
 
-  // ใช้ items_recursive ถ้า items ว่าง
-  const items =
-    document.items && document.items.length > 0
+  // เลือก items ที่จะแสดง (ถ้า items ว่าง ให้ใช้ items_recursive)
+  const items: DocumentItem[] =
+    Array.isArray(document.items) && document.items.length > 0
       ? document.items
-      : (document as any).items_recursive || [];
+      : Array.isArray(document.items_recursive)
+        ? document.items_recursive
+        : [];
   console.log("DocumentModal items (with fallback):", items);
+  console.log("DocumentModal document.items:", document.items);
+  console.log(
+    "DocumentModal document.items_recursive:",
+    document.items_recursive
+  );
 
   // Use summary from document, or recalculate if missing/zero
   const summary =
@@ -319,14 +336,19 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
                 )}
               </div>
             ) : null}
-            <div>
-              <b>อ้างอิง :</b>{" "}
-              {document.related_document_id &&
-              relatedDocument &&
-              relatedDocument.document_number
-                ? relatedDocument.document_number
-                : "-"}
-            </div>
+            {document.related_document_id && (
+              <div className="mt-2 text-xs text-muted-foreground">
+                {relatedDocument === null ? (
+                  "ไม่พบเอกสารอ้างอิง"
+                ) : (
+                  // แสดงข้อมูลเอกสารอ้างอิงตามปกติ (เช่น เลขที่, วันที่, ฯลฯ)
+                  <span>
+                    เลขที่เอกสารอ้างอิง:{" "}
+                    {relatedDocument?.document_number || "-"}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -369,57 +391,66 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
             </tr>
           </thead>
           <tbody>
-            {items.map((item, idx) => {
-              const prod = productMap[item.product_id];
-              return (
-                <tr key={idx}>
-                  <td className="border p-1 text-center">{idx + 1}</td>
-                  <td className="border p-1">
-                    {prod?.name ||
-                      item.product_name ||
-                      item.productTitle ||
-                      item.description ||
-                      "-"}
-                  </td>
-                  <td className="border p-1 text-center">
-                    {(item as any).quantity ?? (item as any).qty ?? "-"}
-                  </td>
-                  <td className="border p-1 text-center">
-                    {prod?.unit || item.unit || "-"}
-                  </td>
-                  <td className="border p-1 text-right">
-                    {formatCurrency(item.unitPrice ?? item.unit_price ?? 0)}
-                  </td>
-                  <td className="border p-1 text-right">
-                    {(() => {
-                      const discount = item.discount ?? 0;
-                      const qty =
-                        (item as any).quantity ?? (item as any).qty ?? 1;
-                      const unitPrice = item.unitPrice ?? item.unit_price ?? 0;
-                      const discountType =
-                        item.discount_type ?? item.discountType ?? "thb";
-                      let discountAmount = 0;
-                      if (discountType === "percentage") {
-                        discountAmount = unitPrice * qty * (discount / 100);
-                      } else {
-                        discountAmount = discount * qty;
-                      }
-                      return formatCurrency(discountAmount);
-                    })()}
-                  </td>
-                  <td className="border p-1 text-center">
-                    {((item as any).tax ?? (item as any).tax_amount)
-                      ? `${(item as any).tax ?? (item as any).tax_amount}%`
-                      : "-"}
-                  </td>
-                  <td className="border p-1 text-right">
-                    {formatCurrency(
-                      item.amountBeforeTax ?? item.amount_before_tax ?? 0
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
+            {items.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="text-center text-muted-foreground">
+                  ไม่มีรายการสินค้า/บริการ
+                </td>
+              </tr>
+            ) : (
+              items.map((item, idx) => {
+                const prod = productMap[item.product_id];
+                return (
+                  <tr key={idx}>
+                    <td className="border p-1 text-center">{idx + 1}</td>
+                    <td className="border p-1">
+                      {prod?.name ||
+                        item.product_name ||
+                        item.productTitle ||
+                        item.description ||
+                        "-"}
+                    </td>
+                    <td className="border p-1 text-center">
+                      {(item as any).quantity ?? (item as any).qty ?? "-"}
+                    </td>
+                    <td className="border p-1 text-center">
+                      {prod?.unit || item.unit || "-"}
+                    </td>
+                    <td className="border p-1 text-right">
+                      {formatCurrency(item.unitPrice ?? item.unit_price ?? 0)}
+                    </td>
+                    <td className="border p-1 text-right">
+                      {(() => {
+                        const discount = item.discount ?? 0;
+                        const qty =
+                          (item as any).quantity ?? (item as any).qty ?? 1;
+                        const unitPrice =
+                          item.unitPrice ?? item.unit_price ?? 0;
+                        const discountType =
+                          item.discount_type ?? item.discountType ?? "thb";
+                        let discountAmount = 0;
+                        if (discountType === "percentage") {
+                          discountAmount = unitPrice * qty * (discount / 100);
+                        } else {
+                          discountAmount = discount * qty;
+                        }
+                        return formatCurrency(discountAmount);
+                      })()}
+                    </td>
+                    <td className="border p-1 text-center">
+                      {((item as any).tax ?? (item as any).tax_amount)
+                        ? `${(item as any).tax ?? (item as any).tax_amount}%`
+                        : "-"}
+                    </td>
+                    <td className="border p-1 text-right">
+                      {formatCurrency(
+                        item.amountBeforeTax ?? item.amount_before_tax ?? 0
+                      )}
+                    </td>
+                  </tr>
+                );
+              })
+            )}
           </tbody>
         </table>
 

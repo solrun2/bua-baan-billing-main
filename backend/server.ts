@@ -927,16 +927,19 @@ app.delete("/api/documents/:id", async (req: Request, res: Response) => {
 
 // === Helper: ดึง document_items แบบ recursive ===
 async function getDocumentItemsRecursive(documentId: string) {
-  console.log("[getDocumentItemsRecursive] documentId =", documentId);
+  console.log("[getDocumentItemsRecursive] START documentId =", documentId);
   const [docRows] = await pool.query("SELECT * FROM documents WHERE id = ?", [
     documentId,
   ]);
+  console.log("[getDocumentItemsRecursive] docRows =", docRows);
   const doc = Array.isArray(docRows) ? docRows[0] : docRows;
+  console.log("[getDocumentItemsRecursive] doc =", doc);
   if (!doc) {
     console.log(
       "[getDocumentItemsRecursive] Document not found for id",
       documentId
     );
+    console.log("[getDocumentItemsRecursive] RETURN []");
     return [];
   }
   if (doc.related_document_id) {
@@ -960,11 +963,14 @@ async function getDocumentItemsRecursive(documentId: string) {
     items
   );
   if (Array.isArray(items)) {
-    return items.map((item) => ({
+    const mapped = items.map((item) => ({
       ...item,
       withholding_tax_option: item.withholding_tax_option ?? "-1",
     }));
+    console.log("[getDocumentItemsRecursive] RETURN mapped items =", mapped);
+    return mapped;
   }
+  console.log("[getDocumentItemsRecursive] RETURN items =", items);
   return items;
 }
 
@@ -999,6 +1005,7 @@ app.get("/api/documents/:id", async (req, res) => {
       "SELECT * FROM document_items WHERE document_id = ?",
       [id]
     );
+    console.log("[GET /api/documents/:id] items =", items);
     // map withholding_tax_option ให้เป็น -1 ถ้า null
     if (Array.isArray(items)) {
       items = items.map((item) => ({
@@ -1008,6 +1015,7 @@ app.get("/api/documents/:id", async (req, res) => {
     }
     // === ดึง items ของต้นทางสุดท้ายแบบ recursive ===
     const items_recursive = await getDocumentItemsRecursive(id);
+    console.log("[GET /api/documents/:id] items_recursive =", items_recursive);
     // ใช้ items_recursive ในการคำนวณ summary เสมอ
     const summary = calculateDocumentSummary(items_recursive);
     // แนบ items (ที่เลือกแล้ว), items_recursive และ summary เข้าไปใน doc
