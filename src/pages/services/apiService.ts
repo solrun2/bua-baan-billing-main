@@ -332,7 +332,7 @@ function mapDocumentFromBackend(doc: any): DocumentData {
       address: doc.customer_address || "",
       email: doc.customer_email || "",
     },
-    related_document_id: doc.related_document_id, // เพิ่มบรรทัดนี้
+    related_document_id: doc.related_document_id, // เดิม
     items: (doc.items || []).map((item: any) => {
       return {
         id: item.id?.toString() ?? `item-${Date.now()}`,
@@ -371,6 +371,7 @@ function mapDocumentFromBackend(doc: any): DocumentData {
         withholding_tax_option: item.withholding_tax_option ?? "ไม่ระบุ",
       };
     }),
+    items_recursive: doc.items_recursive || [], // <-- เพิ่มบรรทัดนี้
     summary: {
       subtotal: Number(doc.subtotal ?? 0),
       discount: Number(doc.discount ?? 0),

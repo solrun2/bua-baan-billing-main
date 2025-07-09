@@ -4,6 +4,7 @@ import { calculateSummaryFromItems } from "../../utils/documentUtils";
 
 interface DocumentItem {
   product_id?: string;
+  productId?: string;
   unit?: string;
   description: string;
   quantity: number;
@@ -18,6 +19,8 @@ interface DocumentItem {
   tax?: number;
   amountBeforeTax?: number;
   amount_before_tax?: number;
+  taxAmount?: number;
+  tax_amount?: number;
   withholdingTaxAmount?: number;
   withholding_tax_amount?: number;
 }
@@ -225,12 +228,23 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
   if (!open) return null;
   const labels = typeLabels[type];
 
-  // เลือก items ที่จะแสดง (ถ้า items ว่าง ให้ใช้ items_recursive)
+  // เลือก items ที่จะแสดง (logic เดียวกันทุก type)
   const items: DocumentItem[] =
     Array.isArray(document.items) && document.items.length > 0
       ? document.items
       : Array.isArray(document.items_recursive)
-        ? document.items_recursive
+        ? document.items_recursive.map((item) => ({
+            ...item,
+            productId: item.productId ?? item.product_id,
+            productTitle: item.productTitle ?? item.product_name,
+            unitPrice: item.unitPrice ?? item.unit_price,
+            amountBeforeTax: item.amountBeforeTax ?? item.amount_before_tax,
+            discountType: item.discountType ?? item.discount_type,
+            taxAmount: item.taxAmount ?? item.tax_amount,
+            withholdingTaxAmount:
+              item.withholdingTaxAmount ?? item.withholding_tax_amount,
+            // เพิ่ม field อื่นๆ ตามต้องการ
+          }))
         : [];
   console.log("DocumentModal items (with fallback):", items);
   console.log("DocumentModal document.items:", document.items);
@@ -312,19 +326,8 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
               <b>วันที่ :</b>{" "}
               {formatDate(document.issue_date || document.documentDate)}
             </div>
-            {type === "quotation" ? (
-              <div>
-                <b>วันถึงกำหนด :</b>{" "}
-                {formatDate(
-                  Array.isArray((document as any).quotation_details)
-                    ? (document as any).quotation_details[0]?.valid_until
-                    : (document as any).quotation_details?.valid_until ||
-                        document.valid_until ||
-                        document.validUntil
-                )}
-              </div>
-            ) : null}
-            {type === "invoice" ? (
+            {/* เฉพาะใบแจ้งหนี้ */}
+            {type === "invoice" && (
               <div>
                 <b>วันถึงกำหนด :</b>{" "}
                 {formatDate(
@@ -335,7 +338,14 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
                         document.dueDate
                 )}
               </div>
-            ) : null}
+            )}
+            {/* เฉพาะใบเสร็จ */}
+            {type === "receipt" && (
+              <div>
+                <b>วันที่ชำระเงิน :</b>{" "}
+                {formatDate((document as any).payment_date)}
+              </div>
+            )}
             {document.related_document_id && (
               <div className="mt-2 text-xs text-muted-foreground">
                 {relatedDocument === null ? (
@@ -518,10 +528,17 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
           </div>
         </div>
 
-        {/* หมายเหตุ */}
-        {document.notes && (
+        {/* หมายเหตุ เฉพาะใบเสร็จ */}
+        {type === "receipt" && document.notes && (
           <div className="mt-4 p-3 bg-yellow-50 rounded text-sm text-yellow-900 border border-yellow-200">
-            <span className="font-semibold">หมายเหตุ: </span>
+            <span className="font-semibold">หมายเหตุ (ใบเสร็จ): </span>
+            {document.notes}
+          </div>
+        )}
+        {/* หมายเหตุ เฉพาะใบแจ้งหนี้ */}
+        {type === "invoice" && document.notes && (
+          <div className="mt-4 p-3 bg-yellow-50 rounded text-sm text-yellow-900 border border-yellow-200">
+            <span className="font-semibold">หมายเหตุ (ใบแจ้งหนี้): </span>
             {document.notes}
           </div>
         )}

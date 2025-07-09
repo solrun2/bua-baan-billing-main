@@ -55,6 +55,7 @@ export interface DocumentData {
   documentType?: DocumentType;
   customer: CustomerData;
   items: DocumentItem[];
+  items_recursive?: DocumentItem[]; // เพิ่มบรรทัดนี้
   summary: DocumentSummary;
   notes: string;
   attachments?: any[];

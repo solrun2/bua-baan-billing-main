@@ -44,6 +44,7 @@ const ReceiptForm = ({
       if (editMode && id) {
         try {
           const data = await apiService.getDocumentById(id);
+          console.log("API response (ReceiptForm)", data); // เพิ่ม log ตรงนี้
           setInitialData({
             ...data,
             documentType: "receipt",
