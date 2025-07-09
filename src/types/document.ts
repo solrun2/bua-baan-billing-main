@@ -68,6 +68,7 @@ export interface DocumentData {
   updatedAt?: string;
   tags?: string[];
   issueTaxInvoice?: boolean;
+  related_document_id?: number;
 }
 
 export interface Document {
