@@ -39,6 +39,11 @@ const Receipt = () => {
             total_amount: Number(doc.total_amount),
           }));
         setReceipts(receiptsData);
+        // log all documentDate
+        console.log(
+          "ALL DOCS",
+          receiptsData.map((i) => i.issue_date)
+        );
       } catch (err) {
         setError((err as Error).message);
       } finally {
@@ -130,12 +135,31 @@ const Receipt = () => {
     }
   };
 
+  // Helper แปลง yyyy-MM-dd หรือ yyyy-MM-ddTHH:mm:ss.sssZ string เป็น Date แบบ local (robust)
+  function parseLocalDate(str: string): Date | null {
+    if (!str) return null;
+    // ตัดเวลาออกถ้ามี
+    const datePart = str.split("T")[0];
+    const [y, m, d] = datePart.split("-").map(Number);
+    if (!y || !m || !d) return null;
+    const date = new Date(y, m - 1, d);
+    return isNaN(date.getTime()) ? null : date;
+  }
+
   // Helper เปรียบเทียบวันที่แบบไม่สนใจเวลา (ปลอดภัยกับ invalid date)
-  const toDateString = (d: string | Date | undefined) => {
+  const toDateOnly = (d: string | Date | undefined) => {
     if (!d) return "";
-    const date = new Date(d);
-    if (isNaN(date.getTime())) return "";
-    return date.toISOString().slice(0, 10);
+    let dateObj = typeof d === "string" ? new Date(d) : d;
+    if (
+      typeof d === "string" &&
+      d.length === 10 &&
+      d.match(/^\d{4}-\d{2}-\d{2}$/)
+    ) {
+      const [y, m, day] = d.split("-");
+      dateObj = new Date(Number(y), Number(m) - 1, Number(day));
+    }
+    if (!dateObj || isNaN(dateObj.getTime())) return "";
+    return dateObj.toISOString().slice(0, 10);
   };
 
   const filteredReceipts = receipts.filter((r) => {
@@ -147,21 +171,46 @@ const Receipt = () => {
       return false;
     }
     // กรองวันที่สร้าง (>= dateFrom)
-    if (
-      filters.dateFrom &&
-      toDateString(r.issue_date) < toDateString(filters.dateFrom)
-    ) {
-      return false;
+    if (filters.dateFrom) {
+      const filterDate = new Date(
+        filters.dateFrom.getFullYear(),
+        filters.dateFrom.getMonth(),
+        filters.dateFrom.getDate()
+      );
+      const docDate = parseLocalDate(r.issue_date);
+      // debug log
+      console.log(
+        "docDate",
+        r.issue_date,
+        typeof r.issue_date,
+        "parsed",
+        docDate,
+        "filterDate",
+        filterDate,
+        typeof filterDate
+      );
+      if (!docDate) {
+        console.log("SKIP: docDate invalid", r.issue_date);
+        return false;
+      }
+      if (docDate.getTime() < filterDate.getTime()) {
+        console.log("SKIP: docDate", docDate, "< filterDate", filterDate);
+        return false;
+      }
     }
     // กรองวันที่สร้าง (<= dateTo)
     if (
       filters.dateTo &&
-      toDateString(r.issue_date) > toDateString(filters.dateTo)
+      toDateOnly(r.issue_date) > toDateOnly(filters.dateTo)
     ) {
       return false;
     }
     return true;
   });
+
+  // หลัง filter
+  console.log("FILTER", filters.dateFrom, typeof filters.dateFrom);
+  console.log("AFTER FILTER", filteredReceipts.length);
 
   return (
     <div className="space-y-6">

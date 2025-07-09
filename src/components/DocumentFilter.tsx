@@ -107,93 +107,123 @@ export const DocumentFilter: React.FC<DocumentFilterProps> = ({
           </DialogHeader>
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             <div>
-              <label style={{ fontWeight: 500 }}>วันที่</label>
               <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                <div style={{ position: "relative", display: "inline-block" }}>
-                  <input
-                    type="date"
-                    value={toDateInputValue(dateFrom)}
-                    onChange={(e) =>
-                      setDateFrom(
-                        e.target.value ? new Date(e.target.value) : undefined
-                      )
-                    }
-                    style={{
-                      border: "1px solid #ffe600",
-                      borderRadius: 8,
-                      padding: 8,
-                      width: 180,
-                    }}
-                  />
-                  {dateFrom && (
-                    <span
-                      onClick={() => setDateFrom(undefined)}
-                      style={{
-                        position: "absolute",
-                        right: 8,
-                        top: "50%",
-                        transform: "translateY(-50%)",
-                        cursor: "pointer",
-                        color: "#ff4d4f",
-                        fontWeight: "bold",
-                        fontSize: 18,
-                        background: "#fff",
-                        borderRadius: "50%",
-                        width: 20,
-                        height: 20,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    width: 180,
+                  }}
+                >
+                  <label style={{ fontWeight: 500 }}>วันที่สร้าง</label>
+                  <div
+                    style={{ position: "relative", display: "inline-block" }}
+                  >
+                    <input
+                      type="date"
+                      value={toDateInputValue(dateFrom)}
+                      onChange={(e) => {
+                        const val = e.target.value
+                          ? new Date(e.target.value)
+                          : undefined;
+                        if (val) val.setHours(0, 0, 0, 0);
+                        setDateFrom(val);
                       }}
-                      title="ล้างวันที่"
-                    >
-                      ×
-                    </span>
+                      style={{
+                        border: "1px solid #ffe600",
+                        borderRadius: 8,
+                        padding: 8,
+                        width: 180,
+                      }}
+                    />
+                    {dateFrom && (
+                      <span
+                        onClick={() => setDateFrom(undefined)}
+                        style={{
+                          position: "absolute",
+                          right: 8,
+                          top: "50%",
+                          transform: "translateY(-50%)",
+                          cursor: "pointer",
+                          color: "#ff4d4f",
+                          fontWeight: "bold",
+                          fontSize: 18,
+                          background: "#fff",
+                          borderRadius: "50%",
+                          width: 20,
+                          height: 20,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                        title="ล้างวันที่"
+                      >
+                        ×
+                      </span>
+                    )}
+                  </div>
+                  {dateFrom && (
+                    <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>
+                      วันที่ที่เลือก: {dateFrom.toLocaleDateString("en-GB")}
+                    </div>
                   )}
                 </div>
                 <span>ถึง</span>
-                <div style={{ position: "relative", display: "inline-block" }}>
-                  <input
-                    type="date"
-                    value={toDateInputValue(dateTo)}
-                    onChange={(e) =>
-                      setDateTo(
-                        e.target.value ? new Date(e.target.value) : undefined
-                      )
-                    }
-                    style={{
-                      border: "1px solid #ffe600",
-                      borderRadius: 8,
-                      padding: 8,
-                      width: 180,
-                    }}
-                    min={dateFrom ? toDateInputValue(dateFrom) : undefined}
-                  />
-                  {dateTo && (
-                    <span
-                      onClick={() => setDateTo(undefined)}
-                      style={{
-                        position: "absolute",
-                        right: 8,
-                        top: "50%",
-                        transform: "translateY(-50%)",
-                        cursor: "pointer",
-                        color: "#ff4d4f",
-                        fontWeight: "bold",
-                        fontSize: 18,
-                        background: "#fff",
-                        borderRadius: "50%",
-                        width: 20,
-                        height: 20,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    width: 180,
+                  }}
+                >
+                  <label style={{ fontWeight: 500 }}>วันที่กำหนด</label>
+                  <div
+                    style={{ position: "relative", display: "inline-block" }}
+                  >
+                    <input
+                      type="date"
+                      value={toDateInputValue(dateTo)}
+                      onChange={(e) => {
+                        const val = e.target.value
+                          ? new Date(e.target.value)
+                          : undefined;
+                        if (val) val.setHours(0, 0, 0, 0);
+                        setDateTo(val);
                       }}
-                      title="ล้างวันที่"
-                    >
-                      ×
-                    </span>
-                  )}
+                      style={{
+                        border: "1px solid #ffe600",
+                        borderRadius: 8,
+                        padding: 8,
+                        width: 180,
+                      }}
+                      min={dateFrom ? toDateInputValue(dateFrom) : undefined}
+                    />
+                    {dateTo && (
+                      <span
+                        onClick={() => setDateTo(undefined)}
+                        style={{
+                          position: "absolute",
+                          right: 8,
+                          top: "50%",
+                          transform: "translateY(-50%)",
+                          cursor: "pointer",
+                          color: "#ff4d4f",
+                          fontWeight: "bold",
+                          fontSize: 18,
+                          background: "#fff",
+                          borderRadius: "50%",
+                          width: 20,
+                          height: 20,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                        title="ล้างวันที่"
+                      >
+                        ×
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>

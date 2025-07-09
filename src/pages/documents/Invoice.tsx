@@ -45,6 +45,17 @@ const Invoice = () => {
     return `${year}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
   };
 
+  // Helper แปลง yyyy-MM-dd หรือ yyyy-MM-ddTHH:mm:ss.sssZ string เป็น Date แบบ local (robust)
+  function parseLocalDate(str: string): Date | null {
+    if (!str) return null;
+    // ตัดเวลาออกถ้ามี
+    const datePart = str.split("T")[0];
+    const [y, m, d] = datePart.split("-").map(Number);
+    if (!y || !m || !d) return null;
+    const date = new Date(y, m - 1, d);
+    return isNaN(date.getTime()) ? null : date;
+  }
+
   useEffect(() => {
     const loadInvoices = async () => {
       try {
@@ -56,12 +67,17 @@ const Invoice = () => {
             ...doc,
             number: doc.document_number,
             customer: doc.customer_name,
-            documentDate: toISO(doc.issue_date),
-            dueDate: toISO(doc.due_date),
+            documentDate: doc.issue_date,
+            dueDate: doc.due_date,
             total_amount: Number(doc.total_amount),
             status: doc.status,
           }));
         setInvoices(invoicesData);
+        // log all documentDate
+        console.log(
+          "ALL DOCS",
+          invoicesData.map((i) => i.documentDate)
+        );
       } catch (err) {
         setError((err as Error).message);
       } finally {
@@ -143,11 +159,21 @@ const Invoice = () => {
   };
 
   // Helper เปรียบเทียบวันที่แบบไม่สนใจเวลา (ปลอดภัยกับ invalid date)
-  const toDateString = (d: string | Date | undefined) => {
+  const toDateOnly = (d: string | Date | undefined) => {
     if (!d) return "";
-    const date = new Date(d);
-    if (isNaN(date.getTime())) return "";
-    return date.toISOString().slice(0, 10);
+    // รองรับทั้ง string และ Date object
+    let dateObj = typeof d === "string" ? new Date(d) : d;
+    if (
+      typeof d === "string" &&
+      d.length === 10 &&
+      d.match(/^\d{4}-\d{2}-\d{2}$/)
+    ) {
+      // ถ้าเป็น yyyy-mm-dd string ให้สร้าง Date แบบ local
+      const [y, m, day] = d.split("-");
+      dateObj = new Date(Number(y), Number(m) - 1, Number(day));
+    }
+    if (!dateObj || isNaN(dateObj.getTime())) return "";
+    return dateObj.toISOString().slice(0, 10);
   };
 
   // Helper แปลงวันที่ พ.ศ. (dd/mm/yyyy) เป็น ค.ศ. (yyyy-mm-dd)
@@ -171,19 +197,47 @@ const Invoice = () => {
       return false;
     }
     // กรองวันที่สร้าง (>= dateFrom)
-    if (filters.dateFrom && new Date(inv.documentDate) < filters.dateFrom) {
-      return false;
+    if (filters.dateFrom) {
+      const filterDate = new Date(
+        filters.dateFrom.getFullYear(),
+        filters.dateFrom.getMonth(),
+        filters.dateFrom.getDate()
+      );
+      const docDate = parseLocalDate(inv.documentDate);
+      // debug log
+      console.log(
+        "docDate",
+        inv.documentDate,
+        typeof inv.documentDate,
+        "parsed",
+        docDate,
+        "filterDate",
+        filterDate,
+        typeof filterDate
+      );
+      if (!docDate) {
+        console.log("SKIP: docDate invalid", inv.documentDate);
+        return false;
+      }
+      if (docDate.getTime() < filterDate.getTime()) {
+        console.log("SKIP: docDate", docDate, "< filterDate", filterDate);
+        return false;
+      }
     }
-    // กรองกำหนดชำระ (<= dateTo) เปรียบเทียบเฉพาะวันที่
+    // กรองวันที่กำหนด (<= dateTo)
     if (
       filters.dateTo &&
       inv.dueDate &&
-      toDateString(inv.dueDate) > toDateString(filters.dateTo)
+      toDateOnly(inv.dueDate) > toDateOnly(filters.dateTo)
     ) {
       return false;
     }
     return true;
   });
+
+  // หลัง filter
+  console.log("FILTER", filters.dateFrom, typeof filters.dateFrom);
+  console.log("AFTER FILTER", filteredInvoices.length);
 
   return (
     <div className="space-y-6">

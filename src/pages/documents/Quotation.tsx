@@ -60,6 +60,11 @@ const Quotation = () => {
             };
           });
         setQuotations(quotationsData);
+        // log all documentDate
+        console.log(
+          "ALL DOCS",
+          quotationsData.map((i) => i.documentDate)
+        );
       } catch (err) {
         setError((err as Error).message);
       } finally {
@@ -116,11 +121,19 @@ const Quotation = () => {
   };
 
   // Helper เปรียบเทียบวันที่แบบไม่สนใจเวลา (ปลอดภัยกับ invalid date)
-  const toDateString = (d: string | Date | undefined) => {
+  const toDateOnly = (d: string | Date | undefined) => {
     if (!d) return "";
-    const date = new Date(d);
-    if (isNaN(date.getTime())) return "";
-    return date.toISOString().slice(0, 10);
+    let dateObj = typeof d === "string" ? new Date(d) : d;
+    if (
+      typeof d === "string" &&
+      d.length === 10 &&
+      d.match(/^\d{4}-\d{2}-\d{2}$/)
+    ) {
+      const [y, m, day] = d.split("-");
+      dateObj = new Date(Number(y), Number(m) - 1, Number(day));
+    }
+    if (!dateObj || isNaN(dateObj.getTime())) return "";
+    return dateObj.toISOString().slice(0, 10);
   };
 
   // Helper แปลงวันที่ พ.ศ. (dd/mm/yyyy) เป็น ค.ศ. (yyyy-mm-dd)
@@ -134,6 +147,17 @@ const Quotation = () => {
     return `${year}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
   };
 
+  // Helper แปลง yyyy-MM-dd หรือ yyyy-MM-ddTHH:mm:ss.sssZ string เป็น Date แบบ local (robust)
+  function parseLocalDate(str: string): Date | null {
+    if (!str) return null;
+    // ตัดเวลาออกถ้ามี
+    const datePart = str.split("T")[0];
+    const [y, m, d] = datePart.split("-").map(Number);
+    if (!y || !m || !d) return null;
+    const date = new Date(y, m - 1, d);
+    return isNaN(date.getTime()) ? null : date;
+  }
+
   const filteredQuotations = quotations.filter((q) => {
     if (
       filters.status &&
@@ -143,19 +167,47 @@ const Quotation = () => {
       return false;
     }
     // กรองวันที่สร้าง (>= dateFrom)
-    if (filters.dateFrom && new Date(q.documentDate) < filters.dateFrom) {
-      return false;
+    if (filters.dateFrom) {
+      const filterDate = new Date(
+        filters.dateFrom.getFullYear(),
+        filters.dateFrom.getMonth(),
+        filters.dateFrom.getDate()
+      );
+      const docDate = parseLocalDate(q.documentDate);
+      // debug log
+      console.log(
+        "docDate",
+        q.documentDate,
+        typeof q.documentDate,
+        "parsed",
+        docDate,
+        "filterDate",
+        filterDate,
+        typeof filterDate
+      );
+      if (!docDate) {
+        console.log("SKIP: docDate invalid", q.documentDate);
+        return false;
+      }
+      if (docDate.getTime() < filterDate.getTime()) {
+        console.log("SKIP: docDate", docDate, "< filterDate", filterDate);
+        return false;
+      }
     }
-    // กรอง validUntil (<= dateTo) เปรียบเทียบเฉพาะวันที่
+    // กรองวันที่กำหนด (<= dateTo)
     if (
       filters.dateTo &&
       q.validUntil &&
-      toDateString(q.validUntil) > toDateString(filters.dateTo)
+      toDateOnly(q.validUntil) > toDateOnly(filters.dateTo)
     ) {
       return false;
     }
     return true;
   });
+
+  // หลัง filter
+  console.log("FILTER", filters.dateFrom, typeof filters.dateFrom);
+  console.log("AFTER FILTER", filteredQuotations.length);
 
   return (
     <div className="space-y-6">
