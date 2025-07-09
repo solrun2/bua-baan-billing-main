@@ -17,6 +17,7 @@ import { formatCurrency } from "../../lib/utils";
 import InvoiceModal from "../sub/invoice/InvoiceModal";
 import { DocumentForm } from "../sub/create/DocumentForm";
 import InvoiceForm from "../sub/invoice/InvoiceForm";
+import DocumentFilter from "../../components/DocumentFilter";
 
 const Invoice = () => {
   const navigate = useNavigate();
@@ -27,6 +28,22 @@ const Invoice = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditFormOpen, setIsEditFormOpen] = useState(false);
   const [editInvoiceData, setEditInvoiceData] = useState<any | null>(null);
+  const [filters, setFilters] = useState<{
+    status?: string;
+    dateFrom?: Date;
+    dateTo?: Date;
+  }>({});
+
+  // Helper แปลงวันที่ dd/mm/yyyy (พ.ศ./ค.ศ.) เป็น yyyy-mm-dd (ค.ศ.)
+  const toISO = (dateStr: string | undefined) => {
+    if (!dateStr) return "";
+    const parts = dateStr.split("/");
+    if (parts.length !== 3) return dateStr;
+    let [d, m, y] = parts;
+    let year = parseInt(y, 10);
+    if (year > 2400) year -= 543;
+    return `${year}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+  };
 
   useEffect(() => {
     const loadInvoices = async () => {
@@ -36,13 +53,11 @@ const Invoice = () => {
         const invoicesData = data
           .filter((doc) => doc.document_type === "INVOICE")
           .map((doc) => ({
-            id: doc.id,
+            ...doc,
             number: doc.document_number,
             customer: doc.customer_name,
-            date: new Date(doc.issue_date).toLocaleDateString("th-TH"),
-            dueDate: doc.due_date
-              ? new Date(doc.due_date).toLocaleDateString("th-TH")
-              : "-",
+            documentDate: toISO(doc.issue_date),
+            dueDate: toISO(doc.due_date),
             total_amount: Number(doc.total_amount),
             status: doc.status,
           }));
@@ -53,7 +68,6 @@ const Invoice = () => {
         setLoading(false);
       }
     };
-
     loadInvoices();
   }, []);
 
@@ -128,6 +142,49 @@ const Invoice = () => {
     }
   };
 
+  // Helper เปรียบเทียบวันที่แบบไม่สนใจเวลา (ปลอดภัยกับ invalid date)
+  const toDateString = (d: string | Date | undefined) => {
+    if (!d) return "";
+    const date = new Date(d);
+    if (isNaN(date.getTime())) return "";
+    return date.toISOString().slice(0, 10);
+  };
+
+  // Helper แปลงวันที่ พ.ศ. (dd/mm/yyyy) เป็น ค.ศ. (yyyy-mm-dd)
+  const toAD = (dateStr: string | undefined) => {
+    if (!dateStr) return "";
+    const parts = dateStr.split("/");
+    if (parts.length !== 3) return dateStr;
+    let [d, m, y] = parts;
+    let year = parseInt(y, 10);
+    if (year > 2400) year -= 543;
+    return `${year}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+  };
+
+  // ฟังก์ชันกรองข้อมูล
+  const filteredInvoices = invoices.filter((inv) => {
+    if (
+      filters.status &&
+      filters.status !== "all" &&
+      inv.status !== filters.status
+    ) {
+      return false;
+    }
+    // กรองวันที่สร้าง (>= dateFrom)
+    if (filters.dateFrom && new Date(inv.documentDate) < filters.dateFrom) {
+      return false;
+    }
+    // กรองกำหนดชำระ (<= dateTo) เปรียบเทียบเฉพาะวันที่
+    if (
+      filters.dateTo &&
+      inv.dueDate &&
+      toDateString(inv.dueDate) > toDateString(filters.dateTo)
+    ) {
+      return false;
+    }
+    return true;
+  });
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -162,10 +219,17 @@ const Invoice = () => {
             />
           </div>
         </div>
-        <Button variant="outline" className="flex items-center gap-2">
-          <Filter className="w-4 h-4" />
-          กรองข้อมูล
-        </Button>
+        <DocumentFilter
+          onFilterChange={setFilters}
+          initialFilters={filters}
+          statusOptions={[
+            { value: "all", label: "ทั้งหมด" },
+            { value: "รอชำระ", label: "รอชำระ" },
+            { value: "ชำระแล้ว", label: "ชำระแล้ว" },
+            { value: "พ้นกำหนด", label: "พ้นกำหนด" },
+            { value: "ยกเลิก", label: "ยกเลิก" },
+          ]}
+        />
       </div>
 
       {/* Content */}
@@ -183,7 +247,7 @@ const Invoice = () => {
               <AlertTriangle className="w-8 h-8 mx-auto mb-2" />
               <p>เกิดข้อผิดพลาด: {error}</p>
             </div>
-          ) : invoices.length === 0 ? (
+          ) : filteredInvoices.length === 0 ? (
             <div className="text-center py-10 text-muted-foreground">
               <Receipt className="w-12 h-12 mx-auto mb-4" />
               <h3 className="text-lg font-semibold">ยังไม่มีใบแจ้งหนี้</h3>
@@ -218,7 +282,7 @@ const Invoice = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {invoices.map((invoice) => (
+                  {filteredInvoices.map((invoice) => (
                     <tr
                       key={invoice.id}
                       className="border-b border-border/40 hover:bg-muted/30 transition-colors"
@@ -230,10 +294,18 @@ const Invoice = () => {
                         {invoice.customer}
                       </td>
                       <td className="py-3 px-4 text-muted-foreground">
-                        {invoice.date}
+                        {invoice.documentDate
+                          ? new Date(invoice.documentDate).toLocaleDateString(
+                              "en-GB"
+                            )
+                          : "-"}
                       </td>
                       <td className="py-3 px-4 text-muted-foreground">
-                        {invoice.dueDate}
+                        {invoice.dueDate
+                          ? new Date(invoice.dueDate).toLocaleDateString(
+                              "en-GB"
+                            )
+                          : "-"}
                       </td>
                       <td className="py-3 px-4 font-medium text-foreground">
                         <span>{formatCurrency(invoice.total_amount)}</span>

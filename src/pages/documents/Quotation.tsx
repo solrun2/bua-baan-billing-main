@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import QuotationModal from "@/pages/sub/quotation/QuotationModal";
 import { calculateDocumentSummary } from "@/calculate/documentCalculations";
 import { formatCurrency } from "../../lib/utils";
+import DocumentFilter from "../../components/DocumentFilter";
 
 const Quotation = () => {
   const navigate = useNavigate();
@@ -28,6 +29,11 @@ const Quotation = () => {
   const [error, setError] = useState<string | null>(null);
   const [selectedQuotation, setSelectedQuotation] = useState<any | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [filters, setFilters] = useState<{
+    status?: string;
+    dateFrom?: Date;
+    dateTo?: Date;
+  }>({});
 
   useEffect(() => {
     const loadQuotations = async () => {
@@ -50,6 +56,7 @@ const Quotation = () => {
                 : "-",
               netTotal: netTotal,
               status: doc.status,
+              documentDate: doc.issue_date, // เพิ่มฟิลด์สำหรับการกรอง
             };
           });
         setQuotations(quotationsData);
@@ -108,6 +115,48 @@ const Quotation = () => {
     }
   };
 
+  // Helper เปรียบเทียบวันที่แบบไม่สนใจเวลา (ปลอดภัยกับ invalid date)
+  const toDateString = (d: string | Date | undefined) => {
+    if (!d) return "";
+    const date = new Date(d);
+    if (isNaN(date.getTime())) return "";
+    return date.toISOString().slice(0, 10);
+  };
+
+  // Helper แปลงวันที่ พ.ศ. (dd/mm/yyyy) เป็น ค.ศ. (yyyy-mm-dd)
+  const toAD = (dateStr: string | undefined) => {
+    if (!dateStr) return "";
+    const parts = dateStr.split("/");
+    if (parts.length !== 3) return dateStr;
+    let [d, m, y] = parts;
+    let year = parseInt(y, 10);
+    if (year > 2400) year -= 543;
+    return `${year}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+  };
+
+  const filteredQuotations = quotations.filter((q) => {
+    if (
+      filters.status &&
+      filters.status !== "all" &&
+      q.status !== filters.status
+    ) {
+      return false;
+    }
+    // กรองวันที่สร้าง (>= dateFrom)
+    if (filters.dateFrom && new Date(q.documentDate) < filters.dateFrom) {
+      return false;
+    }
+    // กรอง validUntil (<= dateTo) เปรียบเทียบเฉพาะวันที่
+    if (
+      filters.dateTo &&
+      q.validUntil &&
+      toDateString(q.validUntil) > toDateString(filters.dateTo)
+    ) {
+      return false;
+    }
+    return true;
+  });
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -139,10 +188,17 @@ const Quotation = () => {
             />
           </div>
         </div>
-        <Button variant="outline" className="flex items-center gap-2">
-          <Filter className="w-4 h-4" />
-          กรองข้อมูล
-        </Button>
+        <DocumentFilter
+          onFilterChange={setFilters}
+          initialFilters={filters}
+          statusOptions={[
+            { value: "all", label: "ทั้งหมด" },
+            { value: "รอตอบรับ", label: "รอตอบรับ" },
+            { value: "ตอบรับแล้ว", label: "ตอบรับแล้ว" },
+            { value: "พ้นกำหนด", label: "พ้นกำหนด" },
+            { value: "ยกเลิก", label: "ยกเลิก" },
+          ]}
+        />
       </div>
 
       {/* Content */}
@@ -160,7 +216,7 @@ const Quotation = () => {
               <AlertTriangle className="w-8 h-8 mx-auto mb-2" />
               <p>เกิดข้อผิดพลาด: {error}</p>
             </div>
-          ) : quotations.length === 0 ? (
+          ) : filteredQuotations.length === 0 ? (
             <div className="text-center py-10 text-muted-foreground">
               <FileText className="w-12 h-12 mx-auto mb-4" />
               <h3 className="text-lg font-semibold">ยังไม่มีใบเสนอราคา</h3>
@@ -195,7 +251,7 @@ const Quotation = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {quotations.map((quotation) => (
+                  {filteredQuotations.map((quotation) => (
                     <tr
                       key={quotation.id}
                       className="border-b border-border/40 hover:bg-muted/30 transition-colors"
@@ -207,10 +263,18 @@ const Quotation = () => {
                         {quotation.customer}
                       </td>
                       <td className="py-3 px-4 text-muted-foreground">
-                        {quotation.date}
+                        {quotation.documentDate
+                          ? new Date(
+                              toAD(quotation.documentDate)
+                            ).toLocaleDateString("en-GB")
+                          : "-"}
                       </td>
                       <td className="py-3 px-4 text-muted-foreground">
-                        {quotation.validUntil}
+                        {quotation.validUntil
+                          ? new Date(
+                              toAD(quotation.validUntil)
+                            ).toLocaleDateString("en-GB")
+                          : "-"}
                       </td>
                       <td className="py-3 px-4 font-medium text-foreground">
                         <span>{formatCurrency(quotation.netTotal)}</span>

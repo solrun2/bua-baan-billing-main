@@ -1,11 +1,28 @@
+import React, { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ShoppingCart, Plus } from "lucide-react";
+import { ShoppingCart, Plus, Search } from "lucide-react";
 import { formatCurrency } from "../../lib/utils";
+import DocumentFilter from "../../components/DocumentFilter";
 
 const PurchaseOrder = () => {
+  const [filters, setFilters] = useState({});
   return (
     <div className="space-y-6">
+      {/* Actions */}
+      <div className="flex items-center gap-4">
+        <div className="flex-1 max-w-md">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="ค้นหาใบสั่งซื้อ..."
+              className="w-full pl-10 pr-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
+            />
+          </div>
+        </div>
+        <DocumentFilter onFilterChange={setFilters} initialFilters={filters} />
+      </div>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 rounded-xl bg-indigo-100 flex items-center justify-center">

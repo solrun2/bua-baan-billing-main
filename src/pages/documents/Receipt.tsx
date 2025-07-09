@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,8 +10,9 @@ import {
 } from "lucide-react";
 import { apiService } from "@/pages/services/apiService";
 import type { Document } from "@/types/document";
-import ReceiptDetailsModal from "@/pages/documents/ReceiptDetailsModal";
+import ReceiptModal from "../sub/receipt/ReceiptModal";
 import { toast } from "sonner";
+import DocumentFilter from "../../components/DocumentFilter";
 
 const Receipt = () => {
   const [receipts, setReceipts] = useState<Document[]>([]);
@@ -20,6 +21,11 @@ const Receipt = () => {
 
   const [selectedReceipt, setSelectedReceipt] = useState<Document | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [filters, setFilters] = useState<{
+    status?: string;
+    dateFrom?: Date;
+    dateTo?: Date;
+  }>({});
 
   useEffect(() => {
     const loadReceipts = async () => {
@@ -124,6 +130,39 @@ const Receipt = () => {
     }
   };
 
+  // Helper เปรียบเทียบวันที่แบบไม่สนใจเวลา (ปลอดภัยกับ invalid date)
+  const toDateString = (d: string | Date | undefined) => {
+    if (!d) return "";
+    const date = new Date(d);
+    if (isNaN(date.getTime())) return "";
+    return date.toISOString().slice(0, 10);
+  };
+
+  const filteredReceipts = receipts.filter((r) => {
+    if (
+      filters.status &&
+      filters.status !== "all" &&
+      r.status !== filters.status
+    ) {
+      return false;
+    }
+    // กรองวันที่สร้าง (>= dateFrom)
+    if (
+      filters.dateFrom &&
+      toDateString(r.issue_date) < toDateString(filters.dateFrom)
+    ) {
+      return false;
+    }
+    // กรองวันที่สร้าง (<= dateTo)
+    if (
+      filters.dateTo &&
+      toDateString(r.issue_date) > toDateString(filters.dateTo)
+    ) {
+      return false;
+    }
+    return true;
+  });
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -153,10 +192,15 @@ const Receipt = () => {
             />
           </div>
         </div>
-        <Button variant="outline" className="flex items-center gap-2">
-          <Filter className="w-4 h-4" />
-          กรองข้อมูล
-        </Button>
+        <DocumentFilter
+          onFilterChange={setFilters}
+          initialFilters={filters}
+          statusOptions={[
+            { value: "all", label: "ทั้งหมด" },
+            { value: "ชำระแล้ว", label: "ชำระแล้ว" },
+            { value: "ยกเลิก", label: "ยกเลิก" },
+          ]}
+        />
       </div>
 
       {/* Content */}
@@ -174,7 +218,7 @@ const Receipt = () => {
               <AlertTriangle className="w-8 h-8 mx-auto mb-2" />
               <p>เกิดข้อผิดพลาด: {error}</p>
             </div>
-          ) : receipts.length === 0 ? (
+          ) : filteredReceipts.length === 0 ? (
             <div className="text-center py-10 text-muted-foreground">
               <CreditCard className="w-12 h-12 mx-auto mb-4" />
               <h3 className="text-lg font-semibold">ยังไม่มีใบเสร็จรับเงิน</h3>
@@ -206,7 +250,7 @@ const Receipt = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {receipts.map((receipt) => (
+                  {filteredReceipts.map((receipt) => (
                     <tr
                       key={receipt.id}
                       className="border-b border-border/40 hover:bg-muted/30 transition-colors"
@@ -219,7 +263,7 @@ const Receipt = () => {
                       </td>
                       <td className="py-3 px-4 text-muted-foreground">
                         {new Date(receipt.issue_date).toLocaleDateString(
-                          "th-TH"
+                          "en-GB"
                         )}
                       </td>
                       <td className="py-3 px-4 font-medium text-foreground">
@@ -271,9 +315,9 @@ const Receipt = () => {
         </CardContent>
       </Card>
 
-      <ReceiptDetailsModal
+      <ReceiptModal
         open={isModalOpen}
-        setOpen={setIsModalOpen}
+        onClose={() => setIsModalOpen(false)}
         receipt={mapReceiptForModal(selectedReceipt)}
       />
     </div>
