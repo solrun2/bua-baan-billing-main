@@ -35,8 +35,10 @@ const Receipt = () => {
       try {
         setLoading(true);
         const data = await apiService.getDocuments();
+        // กรองใบเสร็จที่ไม่มีเลขที่เอกสารจริง (mock) ออก
         const receiptsData = data
           .filter((doc) => doc.document_type === "RECEIPT")
+          .filter((doc) => doc.document_number && /^RE-\d{4}-\d{4}$/.test(doc.document_number))
           .map((doc) => ({
             ...doc,
             total_amount: Number(doc.total_amount),
@@ -79,7 +81,12 @@ const Receipt = () => {
   };
 
   const handleEditClick = (receipt: Document) => {
-    window.location.href = `/receipts/edit/${receipt.id}`;
+    // ถ้าไม่มีเลขที่เอกสารจริง (mock) ให้แจ้งเตือนและไม่ให้แก้ไข
+    if (!receipt.document_number || !/^RE-\d{4}-\d{4}$/.test(receipt.document_number)) {
+      toast.warning("ใบเสร็จนี้ยังไม่ได้บันทึกลงระบบ เลขที่เอกสารจะถูกกำหนดหลังบันทึก");
+      return;
+    }
+    window.location.href = `/documents/receipt/edit/${receipt.id}`;
   };
 
   const mapApiStatusToModalStatus = (

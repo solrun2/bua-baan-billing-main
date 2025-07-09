@@ -168,12 +168,14 @@ const App = () => {
 
               {/* แก้ไขใบเสนอราคา */}
               <Route
-                path="/quotations/edit/:id"
-                element={<EditDocumentPage />}
-              />
-              <Route
                 path="/documents/quotation/edit/:id"
                 element={<EditDocumentPage />}
+              />
+
+              {/* แก้ไขใบเสร็จ */}
+              <Route
+                path="/documents/receipt/edit/:id"
+                element={<ReceiptForm editMode={true} />}
               />
 
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

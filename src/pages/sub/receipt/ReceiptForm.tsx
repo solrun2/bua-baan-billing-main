@@ -33,60 +33,76 @@ const ReceiptForm = ({
   const { id } = useParams<{ id: string }>();
   const [isLoading, setIsLoading] = useState(true);
   const [isClient, setIsClient] = useState(false);
-  const [initialData, setInitialData] = useState<
-    EnsureDocumentType<DocumentData>
-  >({
-    id: `rc_${Date.now()}`,
-    documentNumber: "",
-    documentType: "receipt",
-    customer: { name: "", tax_id: "", phone: "", address: "" },
-    items: [],
-    summary: {
-      subtotal: 0,
-      discount: 0,
-      tax: 0,
-      total: 0,
-      withholdingTax: 0,
-    },
-    notes: "",
-    documentDate: new Date().toISOString().split("T")[0],
-    dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-      .toISOString()
-      .split("T")[0],
-    reference: "",
-    status: "ชำระแล้ว",
-    priceType: "exclusive",
-  });
-
+  const [initialData, setInitialData] =
+    useState<EnsureDocumentType<DocumentData>>();
   const [isEditing, setIsEditing] = useState(false);
 
-  // Load document data if editing
+  // โหลดข้อมูลใบเสร็จเมื่อ editMode และมี id
   useEffect(() => {
-    setIsLoading(true);
-    if (externalInitialData) {
+    const fetchData = async () => {
+      setIsLoading(true);
+      if (editMode && id) {
+        try {
+          const data = await apiService.getDocumentById(id);
+          setInitialData({
+            ...data,
+            documentType: "receipt",
+            status: data.status || "ชำระแล้ว",
+            priceType: data.priceType || "exclusive",
+          });
+          setIsEditing(true);
+        } catch (err) {
+          toast.error("ไม่พบใบเสร็จ");
+        } finally {
+          setIsLoading(false);
+          setIsClient(true);
+        }
+        return;
+      }
+      // กรณีสร้างใหม่หรือรับ initialData จาก props
+      if (externalInitialData) {
+        setInitialData({
+          ...externalInitialData,
+          documentType: "receipt",
+          status: externalInitialData.status || "ชำระแล้ว",
+          priceType: externalInitialData.priceType || "exclusive",
+        });
+        setIsEditing(true);
+        setIsLoading(false);
+        setIsClient(true);
+        return;
+      }
+      // For new document, generate a document number
+      const newNumber = documentService.generateNewDocumentNumber("receipt");
       setInitialData({
-        ...externalInitialData,
+        id: `rc_${Date.now()}`,
+        documentNumber: newNumber,
         documentType: "receipt",
-        status: externalInitialData.status || "ชำระแล้ว",
-        priceType: externalInitialData.priceType || "exclusive",
+        customer: { name: "", tax_id: "", phone: "", address: "" },
+        items: [],
+        summary: {
+          subtotal: 0,
+          discount: 0,
+          tax: 0,
+          total: 0,
+          withholdingTax: 0,
+        },
+        notes: "",
+        documentDate: new Date().toISOString().split("T")[0],
+        dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+          .toISOString()
+          .split("T")[0],
+        reference: "",
+        status: "ชำระแล้ว",
+        priceType: "exclusive",
       });
-      setIsEditing(true);
+      setIsEditing(false);
       setIsLoading(false);
       setIsClient(true);
-      return;
-    }
-    // For new document, generate a document number
-    const newNumber = documentService.generateNewDocumentNumber("receipt");
-    setInitialData((prev) => ({
-      ...prev,
-      documentNumber: newNumber,
-      documentType: "receipt",
-      status: "ชำระแล้ว",
-      priceType: "exclusive",
-    }));
-    setIsLoading(false);
-    setIsClient(true);
-  }, [externalInitialData]);
+    };
+    fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editMode, id, externalInitialData]);
 
   const handleCancel = () => {
     if (externalOnCancel) {
@@ -99,7 +115,6 @@ const ReceiptForm = ({
   const handleSave = async (data: DocumentData): Promise<void> => {
     try {
       setIsLoading(true);
-      // Ensure document type is set correctly
       const documentToSave: EnsureDocumentType<DocumentData> = {
         ...data,
         documentType: "receipt",
@@ -131,22 +146,25 @@ const ReceiptForm = ({
             .toISOString()
             .split("T")[0],
       };
-      // Save to backend first
-      const savedDocumentFromApi =
-        await apiService.createDocument(documentToSave);
-      // Save to localStorage for sync
-      const savedDocument = documentService.save(savedDocumentFromApi);
-      toast.success(
-        isEditing
-          ? "อัพเดทใบเสร็จเรียบร้อยแล้ว"
-          : "สร้างใบเสร็จใหม่เรียบร้อยแล้ว",
-        {
-          description: `ใบเสร็จเลขที่ ${savedDocument.documentNumber} ถูกบันทึกเรียบร้อยแล้ว`,
-        }
-      );
+      let savedDocumentFromApi;
+      if (editMode && id) {
+        savedDocumentFromApi = await apiService.updateDocument(
+          id,
+          documentToSave
+        );
+        toast.success("อัพเดทใบเสร็จเรียบร้อยแล้ว", {
+          description: `ใบเสร็จเลขที่ ${savedDocumentFromApi.documentNumber} ถูกบันทึกเรียบร้อยแล้ว`,
+        });
+      } else {
+        savedDocumentFromApi = await apiService.createDocument(documentToSave);
+        toast.success("สร้างใบเสร็จใหม่เรียบร้อยแล้ว", {
+          description: `ใบเสร็จเลขที่ ${savedDocumentFromApi.documentNumber} ถูกบันทึกเรียบร้อยแล้ว`,
+        });
+      }
+      documentService.save(savedDocumentFromApi);
       navigate("/documents/receipt");
       if (externalOnSave) {
-        await externalOnSave(savedDocument);
+        await externalOnSave(savedDocumentFromApi);
       }
     } catch (error) {
       console.error("Error saving receipt:", error);
@@ -159,7 +177,7 @@ const ReceiptForm = ({
     }
   };
 
-  if (!isClient) {
+  if (!isClient || isLoading || !initialData) {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="w-8 h-8 animate-spin" />

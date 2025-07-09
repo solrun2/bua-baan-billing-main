@@ -757,9 +757,17 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                   </Tooltip>
                 </div>
                 <div className="relative">
-                  {documentType === "receipt" &&
-                  (!form.documentNumber ||
-                    /RE-\d{4}-0001/.test(form.documentNumber)) ? (
+                  {editMode ? (
+                    <Input
+                      id="documentNumber"
+                      value={form.documentNumber}
+                      readOnly
+                      className="font-mono bg-muted"
+                      placeholder=""
+                    />
+                  ) : documentType === "receipt" &&
+                    (!form.documentNumber ||
+                      /RE-\d{4}-0001/.test(form.documentNumber)) ? (
                     <div className="text-muted-foreground italic py-2 px-3 bg-muted rounded border border-dashed border-gray-300">
                       เลขที่ใบเสร็จจะถูกกำหนดหลังบันทึก
                     </div>

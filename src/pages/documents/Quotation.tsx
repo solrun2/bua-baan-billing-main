@@ -101,7 +101,7 @@ const Quotation = () => {
   }, []);
 
   const handleEditClick = (id: any) => {
-    navigate(`/quotations/edit/${id}`);
+    navigate(`/documents/quotation/edit/${id}`);
   };
 
   const handleDeleteClick = async (id: any) => {
