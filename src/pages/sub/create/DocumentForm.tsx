@@ -61,9 +61,11 @@ export interface DocumentFormProps {
   onCancel: () => void;
   onSave: (data: DocumentPayload) => Promise<void>;
   initialData: DocumentData;
-  documentType: "quotation" | "invoice";
+  documentType: "quotation" | "invoice" | "receipt";
   isLoading: boolean;
   editMode?: boolean;
+  pageTitle?: string;
+  pageSubtitle?: string;
 }
 
 // เพิ่ม related_document_id ใน type DocumentData (workaround)
@@ -76,6 +78,8 @@ export const DocumentForm: FC<DocumentFormProps> = ({
   documentType,
   isLoading,
   editMode = false,
+  pageTitle,
+  pageSubtitle,
 }: DocumentFormProps) => {
   console.log("DocumentForm: initialData:", initialData);
   console.log(
@@ -553,21 +557,6 @@ export const DocumentForm: FC<DocumentFormProps> = ({
     return item.discount * item.quantity;
   }
 
-  const pageTitle = editMode
-    ? documentType === "quotation"
-      ? "แก้ไขใบเสนอราคา"
-      : `แก้ไขใบแจ้งหนี้${form.issueTaxInvoice ? " / ใบกำกับภาษี" : ""}`
-    : documentType === "quotation"
-      ? "สร้างใบเสนอราคา"
-      : `สร้างใบแจ้งหนี้${form.issueTaxInvoice ? " / ใบกำกับภาษี" : ""}`;
-  const pageSubtitle = editMode
-    ? documentType === "quotation"
-      ? "แก้ไขข้อมูลใบเสนอราคา"
-      : `แก้ไขข้อมูลใบแจ้งหนี้${form.issueTaxInvoice ? " / ใบกำกับภาษี" : ""}`
-    : documentType === "quotation"
-      ? "กรอกข้อมูลเพื่อสร้างใบเสนอราคาใหม่"
-      : `กรอกข้อมูลเพื่อสร้างใบแจ้งหนี้ใหม่${form.issueTaxInvoice ? " / ใบกำกับภาษี" : ""}`;
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSaving) return; // Prevent double submission
@@ -698,9 +687,11 @@ export const DocumentForm: FC<DocumentFormProps> = ({
             </Button>
             <div>
               <h1 className="text-2xl font-bold text-foreground">
-                {pageTitle}
+                {pageTitle || (editMode ? (documentType === "quotation" ? "แก้ไขใบเสนอราคา" : documentType === "invoice" ? `แก้ไขใบแจ้งหนี้${form.issueTaxInvoice ? " / ใบกำกับภาษี" : ""}` : "แก้ไขใบเสร็จ") : (documentType === "quotation" ? "สร้างใบเสนอราคา" : documentType === "invoice" ? `สร้างใบแจ้งหนี้${form.issueTaxInvoice ? " / ใบกำกับภาษี" : ""}` : "สร้างใบเสร็จ"))}
               </h1>
-              <p className="text-muted-foreground">{pageSubtitle}</p>
+              <p className="text-muted-foreground">
+                {pageSubtitle || (editMode ? (documentType === "quotation" ? "แก้ไขข้อมูลใบเสนอราคา" : documentType === "invoice" ? `แก้ไขข้อมูลใบแจ้งหนี้${form.issueTaxInvoice ? " / ใบกำกับภาษี" : ""}` : "แก้ไขข้อมูลใบเสร็จ") : (documentType === "quotation" ? "กรอกข้อมูลเพื่อสร้างใบเสนอราคาใหม่" : documentType === "invoice" ? `กรอกข้อมูลเพื่อสร้างใบแจ้งหนี้ใหม่${form.issueTaxInvoice ? " / ใบกำกับภาษี" : ""}` : "กรอกข้อมูลเพื่อสร้างใบเสร็จใหม่"))}
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-2">

@@ -18,6 +18,7 @@ import InvoiceModal from "../sub/invoice/InvoiceModal";
 import { DocumentForm } from "../sub/create/DocumentForm";
 import InvoiceForm from "../sub/invoice/InvoiceForm";
 import DocumentFilter from "../../components/DocumentFilter";
+import { Link } from "react-router-dom";
 
 const Invoice = () => {
   const navigate = useNavigate();
@@ -108,7 +109,7 @@ const Invoice = () => {
   };
 
   const handleEditClick = (invoice: any) => {
-    navigate(`/invoice/edit/${invoice.id}`);
+    navigate(`/documents/invoice/edit/${invoice.id}`);
   };
 
   const handleEditSave = async (data: any) => {
@@ -252,13 +253,12 @@ const Invoice = () => {
             <p className="text-gray-400">จัดการใบแจ้งหนี้ทั้งหมด</p>
           </div>
         </div>
-        <Button
-          className="flex items-center gap-2"
-          onClick={() => navigate("/invoice/new")}
-        >
-          <Plus className="w-4 h-4" />
-          สร้างใบแจ้งหนี้ใหม่
-        </Button>
+        <Link to="/documents/invoice/new">
+          <Button className="flex items-center gap-2">
+            <Plus className="w-4 h-4" />
+            สร้างใบแจ้งหนี้ใหม่
+          </Button>
+        </Link>
       </div>
 
       {/* Actions */}

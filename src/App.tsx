@@ -25,6 +25,7 @@ import Invoice from "./pages/documents/Invoice";
 // Form components
 import { DocumentForm } from "./pages/sub/create/DocumentForm";
 import QuotationForm from "./pages/sub/quotation/QuotationForm";
+import ReceiptForm from "./pages/sub/receipt/ReceiptForm";
 
 // Finance pages
 import BankAccounts from "./pages/finance/BankAccounts";
@@ -125,11 +126,22 @@ const App = () => {
               />
 
               <Route path="/documents/invoice" element={<Invoice />} />
-              <Route path="/invoice/new" element={<InvoiceForm />} />
-              <Route path="/invoice/edit/:id" element={<EditDocumentPage />} />
+              <Route path="/documents/invoice/new" element={<InvoiceForm />} />
+              <Route
+                path="/documents/invoice/edit/:id"
+                element={<EditDocumentPage />}
+              />
 
               <Route path="/documents/tax-invoice" element={<TaxInvoice />} />
               <Route path="/documents/receipt" element={<Receipt />} />
+              <Route
+                path="/documents/receipt/new"
+                element={<ReceiptForm editMode={false} />}
+              />
+              <Route
+                path="/documents/receipt/edit/:id"
+                element={<ReceiptForm editMode={true} />}
+              />
 
               {/* Finance routes */}
               <Route path="/finance/bank-accounts" element={<BankAccounts />} />

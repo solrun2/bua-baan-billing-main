@@ -776,9 +776,8 @@ app.post("/api/documents", async (req: Request, res: Response) => {
       `INSERT INTO documents (
         customer_id, customer_name, document_number, document_type, status, issue_date,
         subtotal, tax_amount, total_amount, notes,
-        customer_address, customer_phone, customer_email,
-        withholding_tax
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        customer_address, customer_phone, customer_email
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         customer.id,
         customer.name,
@@ -793,7 +792,6 @@ app.post("/api/documents", async (req: Request, res: Response) => {
         customer.address || "",
         customer.phone || "",
         customer.email || "",
-        withholdingTax,
       ]
     );
 

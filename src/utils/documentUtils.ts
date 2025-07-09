@@ -5,7 +5,7 @@ export const generateDocumentNumber = (
   const prefixMap = {
     quotation: "QT",
     invoice: "IV",
-    receipt: "RC",
+    receipt: "RE",
     tax_invoice: "TAX",
   };
 
@@ -46,7 +46,7 @@ export const generateClientDocumentNumber = (
   const prefixMap = {
     quotation: "QT",
     invoice: "IV",
-    receipt: "RC",
+    receipt: "RE",
     tax_invoice: "TAX",
   };
 

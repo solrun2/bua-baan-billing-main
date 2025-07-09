@@ -85,7 +85,10 @@ const prepareDocumentData = (document: DocumentData): any => {
       typeof summary.withholdingTax === "number" ? summary.withholdingTax : 0,
   };
 
+  // ลบ withholding_tax ออกจากข้อมูลที่จะส่ง
+  const { withholding_tax, ...rest } = document;
   const baseData = {
+    ...rest,
     customer, // object
     document_type: document.documentType
       ? document.documentType.toUpperCase()
@@ -97,6 +100,10 @@ const prepareDocumentData = (document: DocumentData): any => {
     items,
     summary: safeSummary,
   };
+  delete (baseData as any).withholding_tax;
+  if (baseData.summary && "withholding_tax" in baseData.summary) {
+    delete baseData.summary.withholding_tax;
+  }
 
   if (document.documentType === "quotation") {
     return {

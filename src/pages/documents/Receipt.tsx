@@ -7,12 +7,15 @@ import {
   Filter,
   AlertTriangle,
   Loader2,
+  Plus,
 } from "lucide-react";
 import { apiService } from "@/pages/services/apiService";
 import type { Document } from "@/types/document";
 import ReceiptModal from "../sub/receipt/ReceiptModal";
 import { toast } from "sonner";
 import DocumentFilter from "../../components/DocumentFilter";
+import { Link, Routes, Route } from "react-router-dom";
+import ReceiptForm from "../sub/receipt/ReceiptForm";
 
 const Receipt = () => {
   const [receipts, setReceipts] = useState<Document[]>([]);
@@ -213,163 +216,184 @@ const Receipt = () => {
   console.log("AFTER FILTER", filteredReceipts.length);
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-purple-100 flex items-center justify-center">
-            <CreditCard className="w-6 h-6 text-purple-600" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">
-              ใบเสร็จรับเงิน
-            </h1>
-            <p className="text-gray-400">จัดการใบเสร็จรับเงินทั้งหมด</p>
-          </div>
-        </div>
-      </div>
+    <Routes>
+      <Route
+        path="/"
+        element={
+          <div className="space-y-6">
+            {/* Header */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-purple-100 flex items-center justify-center">
+                  <CreditCard className="w-6 h-6 text-purple-600" />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold text-foreground">
+                    ใบเสร็จรับเงิน
+                  </h1>
+                  <p className="text-gray-400">จัดการใบเสร็จรับเงินทั้งหมด</p>
+                </div>
+              </div>
+              <Link to="/documents/receipt/new">
+                <Button className="flex items-center gap-2" variant="default">
+                  <Plus className="w-4 h-4" />
+                  สร้างใบเสร็จใหม่
+                </Button>
+              </Link>
+            </div>
 
-      {/* Actions */}
-      <div className="flex items-center gap-4">
-        <div className="flex-1 max-w-md">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="ค้นหาใบเสร็จรับเงิน..."
-              className="w-full pl-10 pr-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
+            {/* Actions */}
+            <div className="flex items-center gap-4">
+              <div className="flex-1 max-w-md">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <input
+                    type="text"
+                    placeholder="ค้นหาใบเสร็จรับเงิน..."
+                    className="w-full pl-10 pr-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  />
+                </div>
+              </div>
+              <DocumentFilter
+                onFilterChange={setFilters}
+                initialFilters={filters}
+                statusOptions={[
+                  { value: "all", label: "ทั้งหมด" },
+                  { value: "ชำระแล้ว", label: "ชำระแล้ว" },
+                  { value: "ยกเลิก", label: "ยกเลิก" },
+                ]}
+              />
+            </div>
+
+            {/* Content */}
+            <Card className="border border-border/40">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle>ใบเสร็จรับเงิน</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {loading ? (
+                  <div className="flex justify-center items-center py-10">
+                    <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                  </div>
+                ) : error ? (
+                  <div className="text-center py-10 text-red-500">
+                    <AlertTriangle className="w-8 h-8 mx-auto mb-2" />
+                    <p>เกิดข้อผิดพลาด: {error}</p>
+                  </div>
+                ) : filteredReceipts.length === 0 ? (
+                  <div className="text-center py-10 text-muted-foreground">
+                    <CreditCard className="w-12 h-12 mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold">
+                      ยังไม่มีใบเสร็จรับเงิน
+                    </h3>
+                    <p>
+                      ใบเสร็จรับเงินจะถูกสร้างโดยอัตโนมัติเมื่อมีการชำระเงิน
+                    </p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b border-border">
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground">
+                            เลขที่
+                          </th>
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground">
+                            ลูกค้า
+                          </th>
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground">
+                            วันที่
+                          </th>
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground">
+                            จำนวนเงิน
+                          </th>
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground">
+                            สถานะ
+                          </th>
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground">
+                            การดำเนินการ
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredReceipts.map((receipt) => (
+                          <tr
+                            key={receipt.id}
+                            className="border-b border-border/40 hover:bg-muted/30 transition-colors"
+                          >
+                            <td className="py-3 px-4 font-medium text-foreground">
+                              {receipt.document_number}
+                            </td>
+                            <td className="py-3 px-4 text-foreground">
+                              {receipt.customer_name}
+                            </td>
+                            <td className="py-3 px-4 text-muted-foreground">
+                              {new Date(receipt.issue_date).toLocaleDateString(
+                                "en-GB"
+                              )}
+                            </td>
+                            <td className="py-3 px-4 font-medium text-foreground">
+                              {new Intl.NumberFormat("th-TH", {
+                                style: "currency",
+                                currency: "THB",
+                              }).format(receipt.total_amount)}
+                            </td>
+                            <td className="py-3 px-4">
+                              <span
+                                className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(
+                                  receipt.status
+                                )}`}
+                              >
+                                {receipt.status}
+                              </span>
+                            </td>
+                            <td className="py-3 px-4">
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleViewClick(receipt)}
+                                >
+                                  ดู
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleEditClick(receipt)}
+                                >
+                                  แก้ไข
+                                </Button>
+                                <Button
+                                  variant="destructive"
+                                  size="sm"
+                                  onClick={() => handleDeleteClick(receipt.id)}
+                                >
+                                  ลบ
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <ReceiptModal
+              open={isModalOpen}
+              onClose={() => setIsModalOpen(false)}
+              receipt={mapReceiptForModal(selectedReceipt)}
             />
           </div>
-        </div>
-        <DocumentFilter
-          onFilterChange={setFilters}
-          initialFilters={filters}
-          statusOptions={[
-            { value: "all", label: "ทั้งหมด" },
-            { value: "ชำระแล้ว", label: "ชำระแล้ว" },
-            { value: "ยกเลิก", label: "ยกเลิก" },
-          ]}
-        />
-      </div>
-
-      {/* Content */}
-      <Card className="border border-border/40">
-        <CardHeader>
-          <CardTitle>รายการใบเสร็จรับเงิน</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="flex justify-center items-center py-10">
-              <Loader2 className="w-8 h-8 animate-spin text-primary" />
-            </div>
-          ) : error ? (
-            <div className="text-center py-10 text-red-500">
-              <AlertTriangle className="w-8 h-8 mx-auto mb-2" />
-              <p>เกิดข้อผิดพลาด: {error}</p>
-            </div>
-          ) : filteredReceipts.length === 0 ? (
-            <div className="text-center py-10 text-muted-foreground">
-              <CreditCard className="w-12 h-12 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold">ยังไม่มีใบเสร็จรับเงิน</h3>
-              <p>ใบเสร็จรับเงินจะถูกสร้างโดยอัตโนมัติเมื่อมีการชำระเงิน</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">
-                      เลขที่
-                    </th>
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">
-                      ลูกค้า
-                    </th>
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">
-                      วันที่
-                    </th>
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">
-                      จำนวนเงิน
-                    </th>
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">
-                      สถานะ
-                    </th>
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">
-                      การดำเนินการ
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredReceipts.map((receipt) => (
-                    <tr
-                      key={receipt.id}
-                      className="border-b border-border/40 hover:bg-muted/30 transition-colors"
-                    >
-                      <td className="py-3 px-4 font-medium text-foreground">
-                        {receipt.document_number}
-                      </td>
-                      <td className="py-3 px-4 text-foreground">
-                        {receipt.customer_name}
-                      </td>
-                      <td className="py-3 px-4 text-muted-foreground">
-                        {new Date(receipt.issue_date).toLocaleDateString(
-                          "en-GB"
-                        )}
-                      </td>
-                      <td className="py-3 px-4 font-medium text-foreground">
-                        {new Intl.NumberFormat("th-TH", {
-                          style: "currency",
-                          currency: "THB",
-                        }).format(receipt.total_amount)}
-                      </td>
-                      <td className="py-3 px-4">
-                        <span
-                          className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(
-                            receipt.status
-                          )}`}
-                        >
-                          {receipt.status}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleViewClick(receipt)}
-                          >
-                            ดู
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleEditClick(receipt)}
-                          >
-                            แก้ไข
-                          </Button>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => handleDeleteClick(receipt.id)}
-                          >
-                            ลบ
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <ReceiptModal
-        open={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        receipt={mapReceiptForModal(selectedReceipt)}
+        }
       />
-    </div>
+      <Route path="new" element={<ReceiptForm editMode={false} />} />
+      <Route path="edit/:id" element={<ReceiptForm editMode={true} />} />
+    </Routes>
   );
 };
 
