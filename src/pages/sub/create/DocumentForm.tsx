@@ -687,10 +687,32 @@ export const DocumentForm: FC<DocumentFormProps> = ({
             </Button>
             <div>
               <h1 className="text-2xl font-bold text-foreground">
-                {pageTitle || (editMode ? (documentType === "quotation" ? "แก้ไขใบเสนอราคา" : documentType === "invoice" ? `แก้ไขใบแจ้งหนี้${form.issueTaxInvoice ? " / ใบกำกับภาษี" : ""}` : "แก้ไขใบเสร็จ") : (documentType === "quotation" ? "สร้างใบเสนอราคา" : documentType === "invoice" ? `สร้างใบแจ้งหนี้${form.issueTaxInvoice ? " / ใบกำกับภาษี" : ""}` : "สร้างใบเสร็จ"))}
+                {pageTitle ||
+                  (editMode
+                    ? documentType === "quotation"
+                      ? "แก้ไขใบเสนอราคา"
+                      : documentType === "invoice"
+                        ? `แก้ไขใบแจ้งหนี้${form.issueTaxInvoice ? " / ใบกำกับภาษี" : ""}`
+                        : "แก้ไขใบเสร็จ"
+                    : documentType === "quotation"
+                      ? "สร้างใบเสนอราคา"
+                      : documentType === "invoice"
+                        ? `สร้างใบแจ้งหนี้${form.issueTaxInvoice ? " / ใบกำกับภาษี" : ""}`
+                        : "สร้างใบเสร็จ")}
               </h1>
               <p className="text-muted-foreground">
-                {pageSubtitle || (editMode ? (documentType === "quotation" ? "แก้ไขข้อมูลใบเสนอราคา" : documentType === "invoice" ? `แก้ไขข้อมูลใบแจ้งหนี้${form.issueTaxInvoice ? " / ใบกำกับภาษี" : ""}` : "แก้ไขข้อมูลใบเสร็จ") : (documentType === "quotation" ? "กรอกข้อมูลเพื่อสร้างใบเสนอราคาใหม่" : documentType === "invoice" ? `กรอกข้อมูลเพื่อสร้างใบแจ้งหนี้ใหม่${form.issueTaxInvoice ? " / ใบกำกับภาษี" : ""}` : "กรอกข้อมูลเพื่อสร้างใบเสร็จใหม่"))}
+                {pageSubtitle ||
+                  (editMode
+                    ? documentType === "quotation"
+                      ? "แก้ไขข้อมูลใบเสนอราคา"
+                      : documentType === "invoice"
+                        ? `แก้ไขข้อมูลใบแจ้งหนี้${form.issueTaxInvoice ? " / ใบกำกับภาษี" : ""}`
+                        : "แก้ไขข้อมูลใบเสร็จ"
+                    : documentType === "quotation"
+                      ? "กรอกข้อมูลเพื่อสร้างใบเสนอราคาใหม่"
+                      : documentType === "invoice"
+                        ? `กรอกข้อมูลเพื่อสร้างใบแจ้งหนี้ใหม่${form.issueTaxInvoice ? " / ใบกำกับภาษี" : ""}`
+                        : "กรอกข้อมูลเพื่อสร้างใบเสร็จใหม่")}
               </p>
             </div>
           </div>
@@ -723,17 +745,33 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                         สถานะ:{" "}
                         {initialData.id ? "แก้ไขเอกสาร" : "สร้างเอกสารใหม่"}
                       </p>
+                      {documentType === "receipt" && (
+                        <>
+                          <p className="mt-2 text-xs text-yellow-600">
+                            เลขที่ใบเสร็จจะรันต่อจากเลขล่าสุดในระบบ
+                            แม้จะมีการลบเอกสารเก่า เลขจะไม่ย้อนกลับ
+                          </p>
+                        </>
+                      )}
                     </TooltipContent>
                   </Tooltip>
                 </div>
                 <div className="relative">
-                  <Input
-                    id="documentNumber"
-                    value={form.documentNumber}
-                    readOnly
-                    className="font-mono bg-muted"
-                    placeholder=""
-                  />
+                  {documentType === "receipt" &&
+                  (!form.documentNumber ||
+                    /RE-\d{4}-0001/.test(form.documentNumber)) ? (
+                    <div className="text-muted-foreground italic py-2 px-3 bg-muted rounded border border-dashed border-gray-300">
+                      เลขที่ใบเสร็จจะถูกกำหนดหลังบันทึก
+                    </div>
+                  ) : (
+                    <Input
+                      id="documentNumber"
+                      value={form.documentNumber}
+                      readOnly
+                      className="font-mono bg-muted"
+                      placeholder=""
+                    />
+                  )}
                 </div>
               </div>
             </Label>
