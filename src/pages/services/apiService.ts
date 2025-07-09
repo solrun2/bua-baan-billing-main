@@ -325,6 +325,7 @@ function mapDocumentFromBackend(doc: any): DocumentData {
       address: doc.customer_address || "",
       email: doc.customer_email || "",
     },
+    related_document_id: doc.related_document_id, // เพิ่มบรรทัดนี้
     items: (doc.items || []).map((item: any) => {
       return {
         id: item.id?.toString() ?? `item-${Date.now()}`,

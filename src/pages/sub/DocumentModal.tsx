@@ -167,12 +167,22 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
     fetchProducts();
   }, [open, document]);
 
+  // Log document และ related_document_id ทุกครั้งที่ modal เปิด
+  if (open) {
+    console.log("DocumentModal document:", document);
+    console.log("related_document_id:", document.related_document_id);
+  }
+
   // ดึงข้อมูลเอกสารที่เกี่ยวข้อง
   useEffect(() => {
     if (!open || !document?.related_document_id) {
       setRelatedDocument(null);
       return;
     }
+    console.log(
+      "[useEffect] related_document_id:",
+      document.related_document_id
+    );
 
     const fetchRelatedDocument = async () => {
       try {
@@ -185,7 +195,7 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
         }
         const data = await res.json();
         setRelatedDocument(data);
-        console.log("relatedDocument", data);
+        console.log("relatedDocument response:", data);
       } catch (e) {
         setRelatedDocument(null);
       }
@@ -311,9 +321,11 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
             ) : null}
             <div>
               <b>อ้างอิง :</b>{" "}
-              {relatedDocument && relatedDocument.document_number
+              {document.related_document_id &&
+              relatedDocument &&
+              relatedDocument.document_number
                 ? relatedDocument.document_number
-                : document.reference || document.referenceNumber || "-"}
+                : "-"}
             </div>
           </div>
         </div>
