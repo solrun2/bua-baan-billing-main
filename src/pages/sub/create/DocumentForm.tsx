@@ -57,6 +57,12 @@ import { getCustomerById } from "@/pages/services/customerService";
 import { getProductById } from "@/pages/services/productService";
 import { documentService } from "@/pages/services/documentService";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Accordion,
+  AccordionItem,
+  AccordionTrigger,
+  AccordionContent,
+} from "@/components/ui/accordion";
 
 export interface DocumentFormProps {
   onCancel: () => void;
@@ -190,7 +196,6 @@ export const DocumentForm: FC<DocumentFormProps> = ({
     withholdingTax: 0,
     netTotalAmount: 0,
   });
-  const [netTotal, setNetTotal] = useState(0);
 
   // Optimize: Memoize summary calculation
   const calculatedSummary = useMemo(() => {
@@ -211,7 +216,6 @@ export const DocumentForm: FC<DocumentFormProps> = ({
   // Update summary when calculatedSummary changes
   useEffect(() => {
     setSummary(calculatedSummary);
-    setNetTotal(calculatedSummary.total);
   }, [calculatedSummary]);
 
   // handle เปลี่ยนค่าในฟอร์ม
@@ -418,7 +422,6 @@ export const DocumentForm: FC<DocumentFormProps> = ({
     const newSummary = calculateDocumentSummary(form.items);
     newSummary.netTotalAmount = newSummary.total - newSummary.withholdingTax;
     setSummary(newSummary);
-    setNetTotal(newSummary.netTotalAmount);
   }, [form.items]);
 
   // Set initial document number when component mounts or document type changes
@@ -559,7 +562,6 @@ export const DocumentForm: FC<DocumentFormProps> = ({
         newSummary2.netTotalAmount =
           newSummary2.total - newSummary2.withholdingTax;
         setSummary(newSummary2);
-        setNetTotal(newSummary2.netTotalAmount);
       }
     }
     fillEditData();
@@ -710,6 +712,63 @@ export const DocumentForm: FC<DocumentFormProps> = ({
   console.log("form.items", form.items);
   console.log("summary:", summary);
   console.log("initialData.summary.total", initialData.summary?.total);
+
+  // เพิ่ม state สำหรับข้อมูลเพิ่มเติม (เฉพาะใบเสร็จ)
+  const [paymentChannels, setPaymentChannels] = useState([
+    { enabled: true, method: "", amount: 0, note: "" },
+  ]);
+  const [fees, setFees] = useState([
+    { enabled: true, type: "", account: "", amount: 0, note: "" },
+  ]);
+  const [offsetDocs, setOffsetDocs] = useState([
+    { enabled: true, docType: "", docNumber: "", amount: 0, note: "" },
+  ]);
+
+  // ฟังก์ชันเพิ่ม/ลบ/แก้ไขแต่ละกลุ่ม
+  const addPaymentChannel = () =>
+    setPaymentChannels([
+      ...paymentChannels,
+      { enabled: true, method: "", amount: 0, note: "" },
+    ]);
+  const removePaymentChannel = (idx: number) =>
+    setPaymentChannels(paymentChannels.filter((_, i) => i !== idx));
+  const updatePaymentChannel = (idx: number, field: string, value: any) =>
+    setPaymentChannels(
+      paymentChannels.map((c, i) => (i === idx ? { ...c, [field]: value } : c))
+    );
+
+  const addFee = () =>
+    setFees([
+      ...fees,
+      { enabled: true, type: "", account: "", amount: 0, note: "" },
+    ]);
+  const removeFee = (idx: number) => setFees(fees.filter((_, i) => i !== idx));
+  const updateFee = (idx: number, field: string, value: any) =>
+    setFees(fees.map((c, i) => (i === idx ? { ...c, [field]: value } : c)));
+
+  const addOffsetDoc = () =>
+    setOffsetDocs([
+      ...offsetDocs,
+      { enabled: true, docType: "", docNumber: "", amount: 0, note: "" },
+    ]);
+  const removeOffsetDoc = (idx: number) =>
+    setOffsetDocs(offsetDocs.filter((_, i) => i !== idx));
+  const updateOffsetDoc = (idx: number, field: string, value: any) =>
+    setOffsetDocs(
+      offsetDocs.map((c, i) => (i === idx ? { ...c, [field]: value } : c))
+    );
+
+  // คำนวณยอดรวม
+  const totalPayment = paymentChannels
+    .filter((c) => c.enabled)
+    .reduce((sum, c) => sum + Number(c.amount || 0), 0);
+  const totalFee = fees
+    .filter((f) => f.enabled)
+    .reduce((sum, f) => sum + Number(f.amount || 0), 0);
+  const totalOffset = offsetDocs
+    .filter((d) => d.enabled)
+    .reduce((sum, d) => sum + Number(d.amount || 0), 0);
+  const netTotal = totalPayment - totalFee - totalOffset;
 
   return (
     <>
@@ -1289,180 +1348,330 @@ export const DocumentForm: FC<DocumentFormProps> = ({
           </Card>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="space-y-2">
-            <Label>หมายเหตุ</Label>
-            <Textarea
-              value={form.notes}
-              onChange={(e) => handleFormChange("notes", e.target.value)}
-              placeholder="ระบุหมายเหตุ (ถ้ามี)"
-              className="h-32"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>แนบไฟล์</Label>
-            <div className="border rounded-lg p-4 h-32 flex flex-col">
-              <div className="flex-grow overflow-y-auto">
-                {attachments.length === 0 ? (
-                  <div className="mt-8">
-                    <Dialog
-                      open={isProductFormOpen}
-                      onOpenChange={setIsProductFormOpen}
-                    >
-                      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-                        <ProductForm
-                          onSuccess={(newProductData) => {
-                            const updatedItems = form.items.map((item) => {
-                              if (item.isNew) {
-                                const newItem = {
-                                  ...item,
-                                  productId: newProductData.id,
-                                  productTitle: newProductData.name,
-                                  unitPrice: newProductData.selling_price,
-                                  unit: newProductData.unit,
-                                  description: newProductData.description,
-                                  tax:
-                                    newProductData.selling_vat_rate !== null
-                                      ? Number(newProductData.selling_vat_rate)
-                                      : undefined,
-                                  isNew: false,
-                                };
-                                return updateItemWithCalculations(newItem);
-                              }
-                              return item;
-                            });
-                            handleItemChange(
-                              form.items[form.items.length - 1].id,
-                              "isNew",
-                              false
-                            );
-                            handleItemChange(
-                              form.items[form.items.length - 1].id,
-                              "productId",
-                              newProductData.id
-                            );
-                            handleItemChange(
-                              form.items[form.items.length - 1].id,
-                              "productTitle",
-                              newProductData.name
-                            );
-                            handleItemChange(
-                              form.items[form.items.length - 1].id,
-                              "unitPrice",
-                              newProductData.selling_price
-                            );
-                            handleItemChange(
-                              form.items[form.items.length - 1].id,
-                              "unit",
-                              newProductData.unit
-                            );
-                            handleItemChange(
-                              form.items[form.items.length - 1].id,
-                              "description",
-                              newProductData.description
-                            );
-                            handleItemChange(
-                              form.items[form.items.length - 1].id,
-                              "tax",
-                              newProductData.selling_vat_rate !== null
-                                ? Number(newProductData.selling_vat_rate)
-                                : undefined
-                            );
-                            handleItemChange(
-                              form.items[form.items.length - 1].id,
-                              "isNew",
-                              false
-                            );
-                          }}
-                          onCancel={() => {
-                            handleItemChange(
-                              form.items[form.items.length - 1].id,
-                              "isNew",
-                              true
-                            );
-                            handleItemChange(
-                              form.items[form.items.length - 1].id,
-                              "productId",
-                              ""
-                            );
-                            handleItemChange(
-                              form.items[form.items.length - 1].id,
-                              "productTitle",
-                              ""
-                            );
-                            handleItemChange(
-                              form.items[form.items.length - 1].id,
-                              "unitPrice",
-                              0
-                            );
-                            handleItemChange(
-                              form.items[form.items.length - 1].id,
-                              "unit",
-                              ""
-                            );
-                            handleItemChange(
-                              form.items[form.items.length - 1].id,
-                              "description",
-                              ""
-                            );
-                            handleItemChange(
-                              form.items[form.items.length - 1].id,
-                              "tax",
-                              7
-                            );
-                            handleItemChange(
-                              form.items[form.items.length - 1].id,
-                              "isNew",
-                              true
-                            );
-                          }}
-                        />
-                      </DialogContent>
-                    </Dialog>
+        {documentType === "receipt" && (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle>ข้อมูลเพิ่มเติม</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* ช่องทางการรับชำระเงิน */}
+              <div className="border rounded-lg p-4 mb-2 bg-blue-50">
+                <div className="font-semibold mb-2">ช่องทางการรับชำระเงิน</div>
+                {paymentChannels.map((c, idx) => (
+                  <div key={idx} className="mb-2">
+                    <div className="flex items-center gap-2 mb-2">
+                      <input type="checkbox" checked={c.enabled} onChange={e => updatePaymentChannel(idx, "enabled", e.target.checked)} />
+                      <span className="font-medium">ช่องทางการรับชำระเงิน {idx + 1}</span>
+                    </div>
+                    {c.enabled && (
+                      <div className="grid grid-cols-12 gap-2 items-center bg-white/80 p-2 rounded-md border">
+                        <div className="col-span-3">
+                          <Select value={c.method} onValueChange={v => updatePaymentChannel(idx, "method", v)}>
+                            <SelectTrigger><SelectValue placeholder="รับชำระโดย" /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="cash">เงินสด</SelectItem>
+                              <SelectItem value="transfer">โอนเงิน</SelectItem>
+                              <SelectItem value="credit">บัตรเครดิต</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="col-span-3">
+                          <input type="number" className="input w-full" placeholder="จำนวนเงินที่รับชำระ" value={c.amount} onChange={e => updatePaymentChannel(idx, "amount", e.target.value)} />
+                        </div>
+                        <div className="col-span-5">
+                          <input type="text" className="input w-full" placeholder="หมายเหตุ" maxLength={20} value={c.note} onChange={e => updatePaymentChannel(idx, "note", e.target.value)} />
+                        </div>
+                        <div className="col-span-1 flex items-center">
+                          {paymentChannels.length > 1 && <Button size="icon" variant="ghost" onClick={() => removePaymentChannel(idx)}>-</Button>}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                ) : (
-                  <ul className="space-y-2">
-                    {attachments.map((file, index) => (
-                      <li
-                        key={index}
-                        className="flex items-center justify-between text-sm bg-muted p-2 rounded-md"
-                      >
-                        <span className="truncate max-w-[200px]">
-                          {file.name}
-                        </span>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6"
-                          onClick={() => handleRemoveAttachment(file.name)}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
+                ))}
+                <Button type="button" variant="outline" size="sm" onClick={addPaymentChannel} className="mt-2">+ เพิ่มช่องทางการรับชำระเงิน</Button>
               </div>
-              <Button
-                type="button"
-                variant="outline"
-                className="mt-2"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <Paperclip className="w-4 h-4 mr-2" />
-                เพิ่มไฟล์แนบ
-              </Button>
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleFileChange}
-                multiple
-                className="hidden"
-              />
-            </div>
-          </div>
-        </div>
+              {/* ค่าธรรมเนียม/ปรับปรุง */}
+              <div className="border rounded-lg p-4 mb-2 bg-blue-50">
+                <div className="font-semibold mb-2">ค่าธรรมเนียม หรือรายการปรับปรุง</div>
+                {fees.map((f, idx) => (
+                  <div key={idx} className="mb-2">
+                    <div className="flex items-center gap-2 mb-2">
+                      <input type="checkbox" checked={f.enabled} onChange={e => updateFee(idx, "enabled", e.target.checked)} />
+                      <span className="font-medium">ค่าธรรมเนียม/ปรับปรุง {idx + 1}</span>
+                    </div>
+                    {f.enabled && (
+                      <div className="grid grid-cols-12 gap-2 items-center bg-white/80 p-2 rounded-md border">
+                        <div className="col-span-2">
+                          <Select value={f.type} onValueChange={v => updateFee(idx, "type", v)}>
+                            <SelectTrigger><SelectValue placeholder="ประเภท" /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="fee">ปรับปรุง</SelectItem>
+                              <SelectItem value="other">อื่นๆ</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="col-span-3">
+                          <Select value={f.account} onValueChange={v => updateFee(idx, "account", v)}>
+                            <SelectTrigger><SelectValue placeholder="บัญชีที่เกี่ยวข้อง" /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="530501">530501 - ค่าธรรมเนียมธนาคาร</SelectItem>
+                              <SelectItem value="530502">530502 - ค่าธรรมเนียมอื่นๆ</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="col-span-3">
+                          <input type="number" className="input w-full" placeholder="จำนวนเงินปรับปรุง" value={f.amount} onChange={e => updateFee(idx, "amount", e.target.value)} />
+                        </div>
+                        <div className="col-span-3">
+                          <input type="text" className="input w-full" placeholder="หมายเหตุ" maxLength={20} value={f.note} onChange={e => updateFee(idx, "note", e.target.value)} />
+                        </div>
+                        <div className="col-span-1 flex items-center">
+                          {fees.length > 1 && <Button size="icon" variant="ghost" onClick={() => removeFee(idx)}>-</Button>}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+                <Button type="button" variant="outline" size="sm" onClick={addFee} className="mt-2">+ เพิ่มค่าธรรมเนียม หรือรายการปรับปรุง</Button>
+              </div>
+              {/* ตัดชำระกับเอกสาร */}
+              <div className="border rounded-lg p-4 mb-2 bg-blue-50">
+                <div className="font-semibold mb-2">ตัดชำระกับเอกสาร</div>
+                {offsetDocs.map((d, idx) => (
+                  <div key={idx} className="mb-2">
+                    <div className="flex items-center gap-2 mb-2">
+                      <input type="checkbox" checked={d.enabled} onChange={e => updateOffsetDoc(idx, "enabled", e.target.checked)} />
+                      <span className="font-medium">ตัดชำระกับเอกสาร {idx + 1}</span>
+                    </div>
+                    {d.enabled && (
+                      <div className="grid grid-cols-12 gap-2 items-center bg-white/80 p-2 rounded-md border">
+                        <div className="col-span-3">
+                          <Select value={d.docType} onValueChange={v => updateOffsetDoc(idx, "docType", v)}>
+                            <SelectTrigger><SelectValue placeholder="ประเภทเอกสาร" /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="invoice">ใบแจ้งหนี้</SelectItem>
+                              <SelectItem value="credit">ใบลดหนี้</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="col-span-3">
+                          <Select value={d.docNumber} onValueChange={v => updateOffsetDoc(idx, "docNumber", v)}>
+                            <SelectTrigger><SelectValue placeholder="เลขที่เอกสาร" /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="INV-2025-0001">INV-2025-0001</SelectItem>
+                              <SelectItem value="CR-2025-0001">CR-2025-0001</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="col-span-3">
+                          <input type="number" className="input w-full" placeholder="จำนวนเงินที่รับชำระ" value={d.amount} onChange={e => updateOffsetDoc(idx, "amount", e.target.value)} />
+                        </div>
+                        <div className="col-span-2">
+                          <input type="text" className="input w-full" placeholder="หมายเหตุ" maxLength={20} value={d.note} onChange={e => updateOffsetDoc(idx, "note", e.target.value)} />
+                        </div>
+                        <div className="col-span-1 flex items-center">
+                          {offsetDocs.length > 1 && <Button size="icon" variant="ghost" onClick={() => removeOffsetDoc(idx)}>-</Button>}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+                <Button type="button" variant="outline" size="sm" onClick={addOffsetDoc} className="mt-2">+ ตัดชำระกับเอกสาร</Button>
+              </div>
+              {/* สรุปยอด */}
+              <div className="flex flex-col items-end bg-blue-50 rounded-lg p-4">
+                <div className="flex flex-col gap-1 w-full max-w-xs">
+                  <div className="flex justify-between"><span>ปรับปรุงรวม :</span><span>{totalFee.toLocaleString(undefined, {minimumFractionDigits:2})} บาท</span></div>
+                  <div className="flex justify-between"><span>ตัดชำระ :</span><span>{totalOffset.toLocaleString(undefined, {minimumFractionDigits:2})} บาท</span></div>
+                  <div className="flex justify-between font-bold text-lg"><span>รับชำระรวมทั้งสิ้น</span><span>{(summary.netTotalAmount ?? 0).toLocaleString(undefined, {minimumFractionDigits:2})} บาท</span></div>
+                </div>
+                <div className="text-xs text-gray-500 mt-1">ต้องรับชำระเงินอีก {(summary.netTotalAmount ?? 0).toLocaleString(undefined, {minimumFractionDigits:2})} บาท</div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
+        <Accordion type="multiple" className="mb-6">
+          <AccordionItem value="note-for-customer">
+            <AccordionTrigger>หมายเหตุสำหรับลูกค้า</AccordionTrigger>
+            <AccordionContent>
+              <Label>หมายเหตุ</Label>
+              <Textarea
+                value={form.notes}
+                onChange={(e) => handleFormChange("notes", e.target.value)}
+                placeholder="ระบุหมายเหตุ (ถ้ามี)"
+                className="h-32"
+              />
+            </AccordionContent>
+          </AccordionItem>
+          <AccordionItem value="attachments">
+            <AccordionTrigger>แนบไฟล์ในเอกสารนี้</AccordionTrigger>
+            <AccordionContent>
+              <Label>แนบไฟล์</Label>
+              <div className="border rounded-lg p-4 h-32 flex flex-col">
+                <div className="flex-grow overflow-y-auto">
+                  {attachments.length === 0 ? (
+                    <div className="mt-8">
+                      <Dialog
+                        open={isProductFormOpen}
+                        onOpenChange={setIsProductFormOpen}
+                      >
+                        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                          <ProductForm
+                            onSuccess={(newProductData) => {
+                              const updatedItems = form.items.map((item) => {
+                                if (item.isNew) {
+                                  const newItem = {
+                                    ...item,
+                                    productId: newProductData.id,
+                                    productTitle: newProductData.name,
+                                    unitPrice: newProductData.selling_price,
+                                    unit: newProductData.unit,
+                                    description: newProductData.description,
+                                    tax:
+                                      newProductData.selling_vat_rate !== null
+                                        ? Number(
+                                            newProductData.selling_vat_rate
+                                          )
+                                        : undefined,
+                                    isNew: false,
+                                  };
+                                  return updateItemWithCalculations(newItem);
+                                }
+                                return item;
+                              });
+                              handleItemChange(
+                                form.items[form.items.length - 1].id,
+                                "isNew",
+                                false
+                              );
+                              handleItemChange(
+                                form.items[form.items.length - 1].id,
+                                "productId",
+                                newProductData.id
+                              );
+                              handleItemChange(
+                                form.items[form.items.length - 1].id,
+                                "productTitle",
+                                newProductData.name
+                              );
+                              handleItemChange(
+                                form.items[form.items.length - 1].id,
+                                "unitPrice",
+                                newProductData.selling_price
+                              );
+                              handleItemChange(
+                                form.items[form.items.length - 1].id,
+                                "unit",
+                                newProductData.unit
+                              );
+                              handleItemChange(
+                                form.items[form.items.length - 1].id,
+                                "description",
+                                newProductData.description
+                              );
+                              handleItemChange(
+                                form.items[form.items.length - 1].id,
+                                "tax",
+                                newProductData.selling_vat_rate !== null
+                                  ? Number(newProductData.selling_vat_rate)
+                                  : undefined
+                              );
+                              handleItemChange(
+                                form.items[form.items.length - 1].id,
+                                "isNew",
+                                false
+                              );
+                            }}
+                            onCancel={() => {
+                              handleItemChange(
+                                form.items[form.items.length - 1].id,
+                                "isNew",
+                                true
+                              );
+                              handleItemChange(
+                                form.items[form.items.length - 1].id,
+                                "productId",
+                                ""
+                              );
+                              handleItemChange(
+                                form.items[form.items.length - 1].id,
+                                "productTitle",
+                                ""
+                              );
+                              handleItemChange(
+                                form.items[form.items.length - 1].id,
+                                "unitPrice",
+                                0
+                              );
+                              handleItemChange(
+                                form.items[form.items.length - 1].id,
+                                "unit",
+                                ""
+                              );
+                              handleItemChange(
+                                form.items[form.items.length - 1].id,
+                                "description",
+                                ""
+                              );
+                              handleItemChange(
+                                form.items[form.items.length - 1].id,
+                                "tax",
+                                7
+                              );
+                              handleItemChange(
+                                form.items[form.items.length - 1].id,
+                                "isNew",
+                                true
+                              );
+                            }}
+                          />
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                  ) : (
+                    <ul className="space-y-2">
+                      {attachments.map((file, index) => (
+                        <li
+                          key={index}
+                          className="flex items-center justify-between text-sm bg-muted p-2 rounded-md"
+                        >
+                          <span className="truncate max-w-[200px]">
+                            {file.name}
+                          </span>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6"
+                            onClick={() => handleRemoveAttachment(file.name)}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="mt-2"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Paperclip className="w-4 h-4 mr-2" />
+                  เพิ่มไฟล์แนบ
+                </Button>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileChange}
+                  multiple
+                  className="hidden"
+                />
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
         <div className="space-y-2">
           <Label>แท็ก</Label>
           <Input placeholder="กรุณาเลือกแท็กที่ต้องการ" />
