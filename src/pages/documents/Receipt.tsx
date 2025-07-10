@@ -162,7 +162,8 @@ const Receipt = () => {
     const datePart = str.split("T")[0];
     const [y, m, d] = datePart.split("-").map(Number);
     if (!y || !m || !d) return null;
-    const date = new Date(y, m - 1, d);
+    // สร้างวันที่แบบ UTC เพื่อหลีกเลี่ยงปัญหา timezone
+    const date = new Date(Date.UTC(y, m - 1, d));
     return isNaN(date.getTime()) ? null : date;
   }
 
@@ -176,7 +177,7 @@ const Receipt = () => {
       d.match(/^\d{4}-\d{2}-\d{2}$/)
     ) {
       const [y, m, day] = d.split("-");
-      dateObj = new Date(Number(y), Number(m) - 1, Number(day));
+      dateObj = new Date(Date.UTC(Number(y), Number(m) - 1, Number(day)));
     }
     if (!dateObj || isNaN(dateObj.getTime())) return "";
     return dateObj.toISOString().slice(0, 10);
@@ -193,37 +194,67 @@ const Receipt = () => {
     // กรองวันที่สร้าง (>= dateFrom)
     if (filters.dateFrom) {
       const filterDate = new Date(
-        filters.dateFrom.getFullYear(),
-        filters.dateFrom.getMonth(),
-        filters.dateFrom.getDate()
+        Date.UTC(
+          filters.dateFrom.getFullYear(),
+          filters.dateFrom.getMonth(),
+          filters.dateFrom.getDate()
+        )
       );
       const docDate = parseLocalDate(r.issue_date);
-      // debug log
+      const docDateStr = docDate ? docDate.toISOString().split("T")[0] : "";
+      const filterDateStr = filterDate.toISOString().split("T")[0];
       console.log(
-        "docDate",
+        "[DEBUG] docDate:",
         r.issue_date,
-        typeof r.issue_date,
-        "parsed",
-        docDate,
-        "filterDate",
-        filterDate,
-        typeof filterDate
+        "->",
+        docDateStr,
+        "| filterDate:",
+        filterDateStr
       );
       if (!docDate) {
         console.log("SKIP: docDate invalid", r.issue_date);
         return false;
       }
-      if (docDate.getTime() < filterDate.getTime()) {
-        console.log("SKIP: docDate", docDate, "< filterDate", filterDate);
+      if (docDateStr < filterDateStr) {
+        console.log(
+          "SKIP: docDateStr < filterDateStr",
+          docDateStr,
+          filterDateStr
+        );
         return false;
       }
     }
     // กรองวันที่สร้าง (<= dateTo)
-    if (
-      filters.dateTo &&
-      toDateOnly(r.issue_date) > toDateOnly(filters.dateTo)
-    ) {
-      return false;
+    if (filters.dateTo) {
+      const filterDateTo = new Date(
+        Date.UTC(
+          filters.dateTo.getFullYear(),
+          filters.dateTo.getMonth(),
+          filters.dateTo.getDate()
+        )
+      );
+      const docDate = parseLocalDate(r.issue_date);
+      const docDateStr = docDate ? docDate.toISOString().split("T")[0] : "";
+      const filterDateToStr = filterDateTo.toISOString().split("T")[0];
+      console.log(
+        "[DEBUG] (TO) docDate:",
+        r.issue_date,
+        "->",
+        docDateStr,
+        "| filterDateTo:",
+        filterDateToStr
+      );
+      if (!docDate) {
+        return false;
+      }
+      if (docDateStr > filterDateToStr) {
+        console.log(
+          "SKIP: docDateStr > filterDateToStr",
+          docDateStr,
+          filterDateToStr
+        );
+        return false;
+      }
     }
     return true;
   });

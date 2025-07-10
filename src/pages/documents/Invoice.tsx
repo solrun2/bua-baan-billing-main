@@ -53,7 +53,8 @@ const Invoice = () => {
     const datePart = str.split("T")[0];
     const [y, m, d] = datePart.split("-").map(Number);
     if (!y || !m || !d) return null;
-    const date = new Date(y, m - 1, d);
+    // สร้างวันที่แบบ UTC เพื่อหลีกเลี่ยงปัญหา timezone
+    const date = new Date(Date.UTC(y, m - 1, d));
     return isNaN(date.getTime()) ? null : date;
   }
 
@@ -169,9 +170,9 @@ const Invoice = () => {
       d.length === 10 &&
       d.match(/^\d{4}-\d{2}-\d{2}$/)
     ) {
-      // ถ้าเป็น yyyy-mm-dd string ให้สร้าง Date แบบ local
+      // ถ้าเป็น yyyy-mm-dd string ให้สร้าง Date แบบ UTC
       const [y, m, day] = d.split("-");
-      dateObj = new Date(Number(y), Number(m) - 1, Number(day));
+      dateObj = new Date(Date.UTC(Number(y), Number(m) - 1, Number(day)));
     }
     if (!dateObj || isNaN(dateObj.getTime())) return "";
     return dateObj.toISOString().slice(0, 10);
@@ -199,10 +200,13 @@ const Invoice = () => {
     }
     // กรองวันที่สร้าง (>= dateFrom)
     if (filters.dateFrom) {
+      // สร้าง filterDate แบบ UTC เพื่อหลีกเลี่ยงปัญหา timezone
       const filterDate = new Date(
-        filters.dateFrom.getFullYear(),
-        filters.dateFrom.getMonth(),
-        filters.dateFrom.getDate()
+        Date.UTC(
+          filters.dateFrom.getFullYear(),
+          filters.dateFrom.getMonth(),
+          filters.dateFrom.getDate()
+        )
       );
       const docDate = parseLocalDate(inv.documentDate);
       // debug log
@@ -214,24 +218,48 @@ const Invoice = () => {
         docDate,
         "filterDate",
         filterDate,
+        "filterDate ISO",
+        filterDate.toISOString(),
         typeof filterDate
       );
       if (!docDate) {
         console.log("SKIP: docDate invalid", inv.documentDate);
         return false;
       }
-      if (docDate.getTime() < filterDate.getTime()) {
-        console.log("SKIP: docDate", docDate, "< filterDate", filterDate);
+      // เปรียบเทียบวันที่แบบ string เพื่อความแม่นยำ
+      const docDateStr = docDate.toISOString().split("T")[0];
+      const filterDateStr = filterDate.toISOString().split("T")[0];
+      console.log("Comparing dates:", docDateStr, ">=", filterDateStr);
+      if (docDateStr < filterDateStr) {
+        console.log("SKIP: docDate", docDateStr, "< filterDate", filterDateStr);
         return false;
       }
     }
     // กรองวันที่กำหนด (<= dateTo)
-    if (
-      filters.dateTo &&
-      inv.dueDate &&
-      toDateOnly(inv.dueDate) > toDateOnly(filters.dateTo)
-    ) {
-      return false;
+    if (filters.dateTo && inv.dueDate) {
+      const filterDateTo = new Date(
+        Date.UTC(
+          filters.dateTo.getFullYear(),
+          filters.dateTo.getMonth(),
+          filters.dateTo.getDate()
+        )
+      );
+      const docDate = parseLocalDate(inv.dueDate);
+      if (!docDate) {
+        return false;
+      }
+      const docDateStr = docDate.toISOString().split("T")[0];
+      const filterDateToStr = filterDateTo.toISOString().split("T")[0];
+      console.log("Comparing end dates:", docDateStr, "<=", filterDateToStr);
+      if (docDateStr > filterDateToStr) {
+        console.log(
+          "SKIP: docDate",
+          docDateStr,
+          "> filterDateTo",
+          filterDateToStr
+        );
+        return false;
+      }
     }
     return true;
   });

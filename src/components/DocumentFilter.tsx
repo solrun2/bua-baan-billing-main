@@ -124,10 +124,21 @@ export const DocumentFilter: React.FC<DocumentFilterProps> = ({
                       value={toDateInputValue(dateFrom)}
                       onChange={(e) => {
                         const val = e.target.value
-                          ? new Date(e.target.value)
+                          ? e.target.value.split("-")
                           : undefined;
-                        if (val) val.setHours(0, 0, 0, 0);
-                        setDateFrom(val);
+                        if (val) {
+                          // val = [yyyy, mm, dd]
+                          const date = new Date(
+                            Date.UTC(
+                              Number(val[0]),
+                              Number(val[1]) - 1,
+                              Number(val[2])
+                            )
+                          );
+                          setDateFrom(date);
+                        } else {
+                          setDateFrom(undefined);
+                        }
                       }}
                       style={{
                         border: "1px solid #ffe600",
@@ -185,10 +196,21 @@ export const DocumentFilter: React.FC<DocumentFilterProps> = ({
                       value={toDateInputValue(dateTo)}
                       onChange={(e) => {
                         const val = e.target.value
-                          ? new Date(e.target.value)
+                          ? e.target.value.split("-")
                           : undefined;
-                        if (val) val.setHours(0, 0, 0, 0);
-                        setDateTo(val);
+                        if (val) {
+                          // val = [yyyy, mm, dd]
+                          const date = new Date(
+                            Date.UTC(
+                              Number(val[0]),
+                              Number(val[1]) - 1,
+                              Number(val[2])
+                            )
+                          );
+                          setDateTo(date);
+                        } else {
+                          setDateTo(undefined);
+                        }
                       }}
                       style={{
                         border: "1px solid #ffe600",
