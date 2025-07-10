@@ -20,6 +20,8 @@ import InvoiceForm from "../sub/invoice/InvoiceForm";
 import DocumentFilter from "../../components/DocumentFilter";
 import { Link } from "react-router-dom";
 import { Skeleton } from "@/components/ui/skeleton";
+import { sortData } from "@/utils/sortUtils";
+import { searchData } from "@/utils/searchUtils";
 
 const Invoice = () => {
   const navigate = useNavigate();
@@ -35,6 +37,21 @@ const Invoice = () => {
     dateFrom?: Date;
     dateTo?: Date;
   }>({});
+  const [searchText, setSearchText] = useState("");
+
+  // state สำหรับการเรียงลำดับ
+  const [sortColumn, setSortColumn] = useState<string>("date");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+
+  // ฟังก์ชันเปลี่ยนคอลัมน์และทิศทางการเรียง
+  const handleSort = (column: string) => {
+    if (sortColumn === column) {
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortColumn(column);
+      setSortDirection("asc");
+    }
+  };
 
   // Helper แปลงวันที่ dd/mm/yyyy (พ.ศ./ค.ศ.) เป็น yyyy-mm-dd (ค.ศ.)
   const toISO = (dateStr: string | undefined) => {
@@ -237,6 +254,31 @@ const Invoice = () => {
     return true;
   });
 
+  // กรองข้อมูลด้วย search ก่อน filter/sort
+  const searchedInvoices = searchData(invoices, searchText, [
+    "number",
+    "customer",
+  ]);
+  const invoicesWithSortKeys = searchedInvoices.map((doc) => ({
+    ...doc,
+    date: doc.issue_date
+      ? new Date(doc.issue_date).toLocaleDateString("th-TH")
+      : "-",
+    dateValue: doc.issue_date ? new Date(doc.issue_date).getTime() : 0,
+    dueDateText: doc.due_date
+      ? new Date(doc.due_date).toLocaleDateString("th-TH")
+      : "-",
+    dueDateValue: doc.due_date ? new Date(doc.due_date).getTime() : 0,
+    totalAmount: Number(doc.total_amount),
+  }));
+
+  // เรียงลำดับข้อมูล
+  const sortedInvoices = sortData(
+    invoicesWithSortKeys,
+    sortColumn as keyof (typeof invoicesWithSortKeys)[0],
+    sortDirection
+  );
+
   // หลัง filter
   console.log("[Invoice] Filter:", filters.dateFrom, typeof filters.dateFrom);
   console.log("[Invoice] หลัง filter:", filteredInvoices.length);
@@ -271,6 +313,8 @@ const Invoice = () => {
               type="text"
               placeholder="ค้นหาใบแจ้งหนี้..."
               className="w-full pl-10 pr-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
             />
           </div>
         </div>
@@ -314,31 +358,103 @@ const Invoice = () => {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-border">
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">
-                      เลขที่
+                    <th
+                      className="text-left py-3 px-4 font-medium text-muted-foreground cursor-pointer select-none"
+                      onClick={() => handleSort("number")}
+                    >
+                      เลขที่{" "}
+                      {sortColumn === "number" ? (
+                        sortDirection === "asc" ? (
+                          <b>▲</b>
+                        ) : (
+                          <b>▼</b>
+                        )
+                      ) : (
+                        <span style={{ color: "#bbb" }}>⇅</span>
+                      )}
                     </th>
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">
-                      ลูกค้า
+                    <th
+                      className="text-left py-3 px-4 font-medium text-muted-foreground cursor-pointer select-none"
+                      onClick={() => handleSort("customer")}
+                    >
+                      ลูกค้า{" "}
+                      {sortColumn === "customer" ? (
+                        sortDirection === "asc" ? (
+                          <b>▲</b>
+                        ) : (
+                          <b>▼</b>
+                        )
+                      ) : (
+                        <span style={{ color: "#bbb" }}>⇅</span>
+                      )}
                     </th>
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">
-                      วันที่
+                    <th
+                      className="text-left py-3 px-4 font-medium text-muted-foreground cursor-pointer select-none"
+                      onClick={() => handleSort("dateValue")}
+                    >
+                      วันที่{" "}
+                      {sortColumn === "dateValue" ? (
+                        sortDirection === "asc" ? (
+                          <b>▲</b>
+                        ) : (
+                          <b>▼</b>
+                        )
+                      ) : (
+                        <span style={{ color: "#bbb" }}>⇅</span>
+                      )}
                     </th>
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">
-                      กำหนดชำระ
+                    <th
+                      className="text-left py-3 px-4 font-medium text-muted-foreground cursor-pointer select-none"
+                      onClick={() => handleSort("dueDateValue")}
+                    >
+                      วันครบกำหนด{" "}
+                      {sortColumn === "dueDateValue" ? (
+                        sortDirection === "asc" ? (
+                          <b>▲</b>
+                        ) : (
+                          <b>▼</b>
+                        )
+                      ) : (
+                        <span style={{ color: "#bbb" }}>⇅</span>
+                      )}
                     </th>
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">
-                      จำนวนเงิน
+                    <th
+                      className="text-left py-3 px-4 font-medium text-muted-foreground cursor-pointer select-none"
+                      onClick={() => handleSort("totalAmount")}
+                    >
+                      จำนวนเงิน{" "}
+                      {sortColumn === "totalAmount" ? (
+                        sortDirection === "asc" ? (
+                          <b>▲</b>
+                        ) : (
+                          <b>▼</b>
+                        )
+                      ) : (
+                        <span style={{ color: "#bbb" }}>⇅</span>
+                      )}
                     </th>
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">
-                      สถานะ
+                    <th
+                      className="text-left py-3 px-4 font-medium text-muted-foreground cursor-pointer select-none"
+                      onClick={() => handleSort("status")}
+                    >
+                      สถานะ{" "}
+                      {sortColumn === "status" ? (
+                        sortDirection === "asc" ? (
+                          <b>▲</b>
+                        ) : (
+                          <b>▼</b>
+                        )
+                      ) : (
+                        <span style={{ color: "#bbb" }}>⇅</span>
+                      )}
                     </th>
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground no-print">
                       การดำเนินการ
                     </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredInvoices.map((invoice) => (
+                  {sortedInvoices.map((invoice) => (
                     <tr
                       key={invoice.id}
                       className="border-b border-border/40 hover:bg-muted/30 transition-colors"
@@ -350,21 +466,13 @@ const Invoice = () => {
                         {invoice.customer}
                       </td>
                       <td className="py-3 px-4 text-muted-foreground">
-                        {invoice.documentDate
-                          ? new Date(invoice.documentDate).toLocaleDateString(
-                              "en-GB"
-                            )
-                          : "-"}
+                        {invoice.date}
                       </td>
                       <td className="py-3 px-4 text-muted-foreground">
-                        {invoice.dueDate
-                          ? new Date(invoice.dueDate).toLocaleDateString(
-                              "en-GB"
-                            )
-                          : "-"}
+                        {invoice.dueDateText}
                       </td>
                       <td className="py-3 px-4 font-medium text-foreground">
-                        <span>{formatCurrency(invoice.total_amount)}</span>
+                        {formatCurrency(invoice.totalAmount)}
                       </td>
                       <td className="py-3 px-4">
                         <span
@@ -373,7 +481,7 @@ const Invoice = () => {
                           {invoice.status}
                         </span>
                       </td>
-                      <td className="py-3 px-4">
+                      <td className="py-3 px-4 no-print">
                         <div className="flex items-center gap-2">
                           <Button
                             variant="outline"

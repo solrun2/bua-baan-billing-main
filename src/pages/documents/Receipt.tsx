@@ -17,6 +17,8 @@ import DocumentFilter from "../../components/DocumentFilter";
 import { Link, Routes, Route } from "react-router-dom";
 import ReceiptForm from "../sub/receipt/ReceiptForm";
 import { Skeleton } from "@/components/ui/skeleton";
+import { sortData } from "@/utils/sortUtils";
+import { searchData } from "@/utils/searchUtils";
 
 const Receipt = () => {
   const [receipts, setReceipts] = useState<Document[]>([]);
@@ -30,6 +32,21 @@ const Receipt = () => {
     dateFrom?: Date;
     dateTo?: Date;
   }>({});
+  const [searchText, setSearchText] = useState("");
+
+  // state สำหรับการเรียงลำดับ
+  const [sortColumn, setSortColumn] = useState<string>("created_at");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+
+  // ฟังก์ชันเปลี่ยนคอลัมน์และทิศทางการเรียง
+  const handleSort = (column: string) => {
+    if (sortColumn === column) {
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortColumn(column);
+      setSortDirection("asc");
+    }
+  };
 
   useEffect(() => {
     const loadReceipts = async () => {
@@ -226,6 +243,28 @@ const Receipt = () => {
     return true;
   });
 
+  // กรองข้อมูลด้วย search ก่อน filter/sort
+  const searchedReceipts = searchData(receipts, searchText, [
+    "document_number",
+    "customer_name",
+  ]);
+  // เพิ่ม key สำหรับ sort วันที่และครบทุกคอลัมน์ที่จำเป็น
+  const receiptsWithSortKeys = searchedReceipts.map((doc) => ({
+    ...doc,
+    date: doc.issue_date
+      ? new Date(doc.issue_date).toLocaleDateString("th-TH")
+      : "-",
+    dateValue: doc.issue_date ? new Date(doc.issue_date).getTime() : 0,
+    totalAmount: Number(doc.total_amount),
+  }));
+
+  // เรียงลำดับข้อมูล
+  const sortedReceipts = sortData(
+    receiptsWithSortKeys,
+    sortColumn as keyof (typeof receiptsWithSortKeys)[0],
+    sortDirection
+  );
+
   // หลัง filter
   console.log("[Receipt] Filter:", filters.dateFrom, typeof filters.dateFrom);
   console.log("[Receipt] หลัง filter:", filteredReceipts.length);
@@ -260,6 +299,8 @@ const Receipt = () => {
               type="text"
               placeholder="ค้นหาใบเสร็จ..."
               className="w-full pl-10 pr-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
             />
           </div>
         </div>
@@ -302,28 +343,88 @@ const Receipt = () => {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-border">
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">
-                      เลขที่
+                    <th
+                      className="text-left py-3 px-4 font-medium text-muted-foreground cursor-pointer select-none"
+                      onClick={() => handleSort("document_number")}
+                    >
+                      เลขที่{" "}
+                      {sortColumn === "document_number" ? (
+                        sortDirection === "asc" ? (
+                          <b>▲</b>
+                        ) : (
+                          <b>▼</b>
+                        )
+                      ) : (
+                        <span style={{ color: "#bbb" }}>⇅</span>
+                      )}
                     </th>
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">
-                      ลูกค้า
+                    <th
+                      className="text-left py-3 px-4 font-medium text-muted-foreground cursor-pointer select-none"
+                      onClick={() => handleSort("customer_name")}
+                    >
+                      ลูกค้า{" "}
+                      {sortColumn === "customer_name" ? (
+                        sortDirection === "asc" ? (
+                          <b>▲</b>
+                        ) : (
+                          <b>▼</b>
+                        )
+                      ) : (
+                        <span style={{ color: "#bbb" }}>⇅</span>
+                      )}
                     </th>
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">
-                      วันที่ชำระเงิน
+                    <th
+                      className="text-left py-3 px-4 font-medium text-muted-foreground cursor-pointer select-none"
+                      onClick={() => handleSort("dateValue")}
+                    >
+                      วันที่{" "}
+                      {sortColumn === "dateValue" ? (
+                        sortDirection === "asc" ? (
+                          <b>▲</b>
+                        ) : (
+                          <b>▼</b>
+                        )
+                      ) : (
+                        <span style={{ color: "#bbb" }}>⇅</span>
+                      )}
                     </th>
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">
-                      จำนวนเงิน
+                    <th
+                      className="text-left py-3 px-4 font-medium text-muted-foreground cursor-pointer select-none"
+                      onClick={() => handleSort("totalAmount")}
+                    >
+                      จำนวนเงิน{" "}
+                      {sortColumn === "totalAmount" ? (
+                        sortDirection === "asc" ? (
+                          <b>▲</b>
+                        ) : (
+                          <b>▼</b>
+                        )
+                      ) : (
+                        <span style={{ color: "#bbb" }}>⇅</span>
+                      )}
                     </th>
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">
-                      สถานะ
+                    <th
+                      className="text-left py-3 px-4 font-medium text-muted-foreground cursor-pointer select-none"
+                      onClick={() => handleSort("status")}
+                    >
+                      สถานะ{" "}
+                      {sortColumn === "status" ? (
+                        sortDirection === "asc" ? (
+                          <b>▲</b>
+                        ) : (
+                          <b>▼</b>
+                        )
+                      ) : (
+                        <span style={{ color: "#bbb" }}>⇅</span>
+                      )}
                     </th>
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground no-print">
                       การดำเนินการ
                     </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredReceipts.map((receipt) => (
+                  {sortedReceipts.map((receipt) => (
                     <tr
                       key={receipt.id}
                       className="border-b border-border/40 hover:bg-muted/30 transition-colors"
@@ -335,19 +436,10 @@ const Receipt = () => {
                         {receipt.customer_name}
                       </td>
                       <td className="py-3 px-4 text-muted-foreground">
-                        {receipt.issue_date
-                          ? new Date(receipt.issue_date).toLocaleDateString(
-                              "th-TH"
-                            )
-                          : "-"}
+                        {receipt.date}
                       </td>
                       <td className="py-3 px-4 font-medium text-foreground">
-                        <span>
-                          {new Intl.NumberFormat("th-TH", {
-                            style: "currency",
-                            currency: "THB",
-                          }).format(receipt.total_amount)}
-                        </span>
+                        {receipt.totalAmount.toLocaleString()}
                       </td>
                       <td className="py-3 px-4">
                         <span
@@ -356,7 +448,7 @@ const Receipt = () => {
                           {receipt.status}
                         </span>
                       </td>
-                      <td className="py-3 px-4">
+                      <td className="py-3 px-4 no-print">
                         <div className="flex items-center gap-2">
                           <Button
                             variant="outline"

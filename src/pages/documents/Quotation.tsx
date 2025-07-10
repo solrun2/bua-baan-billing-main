@@ -17,6 +17,8 @@ import { calculateDocumentSummary } from "@/calculate/documentCalculations";
 import { formatCurrency } from "../../lib/utils";
 import DocumentFilter from "../../components/DocumentFilter";
 import { Skeleton } from "@/components/ui/skeleton";
+import { sortData } from "@/utils/sortUtils";
+import { searchData } from "@/utils/searchUtils";
 
 const Quotation = () => {
   const navigate = useNavigate();
@@ -36,6 +38,21 @@ const Quotation = () => {
     dateFrom?: Date;
     dateTo?: Date;
   }>({});
+  const [searchText, setSearchText] = useState("");
+
+  // state สำหรับการเรียงลำดับ
+  const [sortColumn, setSortColumn] = useState<string>("date");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+
+  // ฟังก์ชันเปลี่ยนคอลัมน์และทิศทางการเรียง
+  const handleSort = (column: string) => {
+    if (sortColumn === column) {
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortColumn(column);
+      setSortDirection("asc");
+    }
+  };
 
   useEffect(() => {
     const loadQuotations = async () => {
@@ -54,9 +71,13 @@ const Quotation = () => {
               number: doc.document_number,
               customer: doc.customer_name,
               date: new Date(doc.issue_date).toLocaleDateString("th-TH"),
+              dateValue: new Date(doc.issue_date).getTime(), // เพิ่ม timestamp สำหรับ sort
               validUntil: doc.valid_until
                 ? new Date(doc.valid_until).toLocaleDateString("th-TH")
                 : "-",
+              validUntilValue: doc.valid_until
+                ? new Date(doc.valid_until).getTime()
+                : 0, // เพิ่ม timestamp สำหรับ sort
               netTotal: netTotal,
               status: doc.status,
               documentDate: doc.issue_date, // เพิ่มฟิลด์สำหรับการกรอง
@@ -177,7 +198,13 @@ const Quotation = () => {
     setFilters(newFilters);
   };
 
-  const filteredQuotations = quotations.filter((q) => {
+  // กรองข้อมูลด้วย search ก่อน filter อื่น ๆ
+  const searchedQuotations = searchData(quotations, searchText, [
+    "number",
+    "customer",
+  ]);
+  // สร้างข้อมูลที่ผ่าน filter และ sort แล้ว
+  const filteredQuotations = searchedQuotations.filter((q) => {
     if (
       filters.status &&
       filters.status !== "all" &&
@@ -199,6 +226,13 @@ const Quotation = () => {
     if (toStr && docDateStr && docDateStr > toStr) return false;
     return true;
   });
+
+  // เรียงลำดับข้อมูล
+  const sortedQuotations = sortData(
+    filteredQuotations,
+    sortColumn as keyof (typeof filteredQuotations)[0],
+    sortDirection
+  );
 
   // หลัง filter
   console.log("[Quotation] Filter:", filters.dateFrom, typeof filters.dateFrom);
@@ -232,6 +266,8 @@ const Quotation = () => {
               type="text"
               placeholder="ค้นหาใบเสนอราคา..."
               className="w-full pl-10 pr-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
             />
           </div>
         </div>
@@ -275,23 +311,95 @@ const Quotation = () => {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-border">
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">
-                      เลขที่
+                    <th
+                      className="text-left py-3 px-4 font-medium text-muted-foreground cursor-pointer select-none"
+                      onClick={() => handleSort("number")}
+                    >
+                      เลขที่{" "}
+                      {sortColumn === "number" ? (
+                        sortDirection === "asc" ? (
+                          <b>▲</b>
+                        ) : (
+                          <b>▼</b>
+                        )
+                      ) : (
+                        <span style={{ color: "#bbb" }}>⇅</span>
+                      )}
                     </th>
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">
-                      ลูกค้า
+                    <th
+                      className="text-left py-3 px-4 font-medium text-muted-foreground cursor-pointer select-none"
+                      onClick={() => handleSort("customer")}
+                    >
+                      ลูกค้า{" "}
+                      {sortColumn === "customer" ? (
+                        sortDirection === "asc" ? (
+                          <b>▲</b>
+                        ) : (
+                          <b>▼</b>
+                        )
+                      ) : (
+                        <span style={{ color: "#bbb" }}>⇅</span>
+                      )}
                     </th>
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">
-                      วันที่
+                    <th
+                      className="text-left py-3 px-4 font-medium text-muted-foreground cursor-pointer select-none"
+                      onClick={() => handleSort("dateValue")}
+                    >
+                      วันที่{" "}
+                      {sortColumn === "dateValue" ? (
+                        sortDirection === "asc" ? (
+                          <b>▲</b>
+                        ) : (
+                          <b>▼</b>
+                        )
+                      ) : (
+                        <span style={{ color: "#bbb" }}>⇅</span>
+                      )}
                     </th>
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">
-                      วันหมดอายุ
+                    <th
+                      className="text-left py-3 px-4 font-medium text-muted-foreground cursor-pointer select-none"
+                      onClick={() => handleSort("validUntilValue")}
+                    >
+                      วันหมดอายุ{" "}
+                      {sortColumn === "validUntilValue" ? (
+                        sortDirection === "asc" ? (
+                          <b>▲</b>
+                        ) : (
+                          <b>▼</b>
+                        )
+                      ) : (
+                        <span style={{ color: "#bbb" }}>⇅</span>
+                      )}
                     </th>
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">
-                      จำนวนเงิน
+                    <th
+                      className="text-left py-3 px-4 font-medium text-muted-foreground cursor-pointer select-none"
+                      onClick={() => handleSort("netTotal")}
+                    >
+                      จำนวนเงิน{" "}
+                      {sortColumn === "netTotal" ? (
+                        sortDirection === "asc" ? (
+                          <b>▲</b>
+                        ) : (
+                          <b>▼</b>
+                        )
+                      ) : (
+                        <span style={{ color: "#bbb" }}>⇅</span>
+                      )}
                     </th>
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">
-                      สถานะ
+                    <th
+                      className="text-left py-3 px-4 font-medium text-muted-foreground cursor-pointer select-none"
+                      onClick={() => handleSort("status")}
+                    >
+                      สถานะ{" "}
+                      {sortColumn === "status" ? (
+                        sortDirection === "asc" ? (
+                          <b>▲</b>
+                        ) : (
+                          <b>▼</b>
+                        )
+                      ) : (
+                        <span style={{ color: "#bbb" }}>⇅</span>
+                      )}
                     </th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground no-print">
                       การดำเนินการ
@@ -299,7 +407,7 @@ const Quotation = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredQuotations.map((quotation) => (
+                  {sortedQuotations.map((quotation) => (
                     <tr
                       key={quotation.id}
                       className="border-b border-border/40 hover:bg-muted/30 transition-colors"

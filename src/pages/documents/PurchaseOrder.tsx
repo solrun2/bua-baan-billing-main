@@ -5,12 +5,52 @@ import { ShoppingCart, Plus, Search, AlertTriangle } from "lucide-react";
 import { formatCurrency } from "../../lib/utils";
 import DocumentFilter from "../../components/DocumentFilter";
 import { Skeleton } from "@/components/ui/skeleton";
+import { sortData } from "@/utils/sortUtils";
+import { searchData } from "@/utils/searchUtils";
 
 const PurchaseOrder = () => {
   const [filters, setFilters] = useState({});
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [documents, setDocuments] = useState<any[]>([]);
+  const [searchText, setSearchText] = useState("");
+
+  // state สำหรับการเรียงลำดับ
+  const [sortColumn, setSortColumn] = useState<string>("date");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+
+  // ฟังก์ชันเปลี่ยนคอลัมน์และทิศทางการเรียง
+  const handleSort = (column: string) => {
+    if (sortColumn === column) {
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortColumn(column);
+      setSortDirection("asc");
+    }
+  };
+
+  // กรองข้อมูลด้วย search ก่อน filter/sort
+  const searchedDocuments = searchData(documents, searchText, [
+    "number",
+    "customer",
+  ]);
+  // เพิ่ม key สำหรับ sort (mock)
+  const documentsWithSortKeys = searchedDocuments.map((doc) => ({
+    ...doc,
+    number: doc.number ?? "",
+    customer: doc.customer ?? "",
+    date: doc.date ?? "",
+    dateValue: doc.date ? new Date(doc.date).getTime() : 0,
+    totalAmount: Number(doc.totalAmount ?? 0),
+    status: doc.status ?? "",
+  }));
+
+  // เรียงลำดับข้อมูล
+  const sortedDocuments = sortData(
+    documentsWithSortKeys,
+    sortColumn as keyof (typeof documentsWithSortKeys)[0],
+    sortDirection
+  );
 
   useEffect(() => {
     setIsLoading(true);
@@ -58,6 +98,8 @@ const PurchaseOrder = () => {
               type="text"
               placeholder="ค้นหาใบสั่งซื้อ..."
               className="w-full pl-10 pr-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
             />
           </div>
         </div>
@@ -92,27 +134,105 @@ const PurchaseOrder = () => {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-border">
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">
-                      เลขที่
+                    <th
+                      className="text-left py-3 px-4 font-medium text-muted-foreground cursor-pointer select-none"
+                      onClick={() => handleSort("number")}
+                    >
+                      เลขที่{" "}
+                      {sortColumn === "number" ? (
+                        sortDirection === "asc" ? (
+                          <b>▲</b>
+                        ) : (
+                          <b>▼</b>
+                        )
+                      ) : (
+                        <span style={{ color: "#bbb" }}>⇅</span>
+                      )}
                     </th>
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">
-                      ลูกค้า
+                    <th
+                      className="text-left py-3 px-4 font-medium text-muted-foreground cursor-pointer select-none"
+                      onClick={() => handleSort("customer")}
+                    >
+                      ลูกค้า{" "}
+                      {sortColumn === "customer" ? (
+                        sortDirection === "asc" ? (
+                          <b>▲</b>
+                        ) : (
+                          <b>▼</b>
+                        )
+                      ) : (
+                        <span style={{ color: "#bbb" }}>⇅</span>
+                      )}
                     </th>
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">
-                      วันที่
+                    <th
+                      className="text-left py-3 px-4 font-medium text-muted-foreground cursor-pointer select-none"
+                      onClick={() => handleSort("dateValue")}
+                    >
+                      วันที่{" "}
+                      {sortColumn === "dateValue" ? (
+                        sortDirection === "asc" ? (
+                          <b>▲</b>
+                        ) : (
+                          <b>▼</b>
+                        )
+                      ) : (
+                        <span style={{ color: "#bbb" }}>⇅</span>
+                      )}
                     </th>
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">
-                      จำนวนเงิน
+                    <th
+                      className="text-left py-3 px-4 font-medium text-muted-foreground cursor-pointer select-none"
+                      onClick={() => handleSort("totalAmount")}
+                    >
+                      จำนวนเงิน{" "}
+                      {sortColumn === "totalAmount" ? (
+                        sortDirection === "asc" ? (
+                          <b>▲</b>
+                        ) : (
+                          <b>▼</b>
+                        )
+                      ) : (
+                        <span style={{ color: "#bbb" }}>⇅</span>
+                      )}
                     </th>
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">
-                      สถานะ
-                    </th>
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">
-                      การดำเนินการ
+                    <th
+                      className="text-left py-3 px-4 font-medium text-muted-foreground cursor-pointer select-none"
+                      onClick={() => handleSort("status")}
+                    >
+                      สถานะ{" "}
+                      {sortColumn === "status" ? (
+                        sortDirection === "asc" ? (
+                          <b>▲</b>
+                        ) : (
+                          <b>▼</b>
+                        )
+                      ) : (
+                        <span style={{ color: "#bbb" }}>⇅</span>
+                      )}
                     </th>
                   </tr>
                 </thead>
-                <tbody>{/* TODO: map ข้อมูลจริง */}</tbody>
+                <tbody>
+                  {sortedDocuments.map((doc, idx) => (
+                    <tr
+                      key={idx}
+                      className="border-b border-border/40 hover:bg-muted/30 transition-colors"
+                    >
+                      <td className="py-3 px-4 font-medium text-foreground">
+                        {doc.number}
+                      </td>
+                      <td className="py-3 px-4 text-foreground">
+                        {doc.customer}
+                      </td>
+                      <td className="py-3 px-4 text-muted-foreground">
+                        {doc.date}
+                      </td>
+                      <td className="py-3 px-4 font-medium text-foreground">
+                        {doc.totalAmount.toLocaleString()}
+                      </td>
+                      <td className="py-3 px-4">{doc.status}</td>
+                    </tr>
+                  ))}
+                </tbody>
               </table>
             </div>
           )}
