@@ -53,6 +53,7 @@ export const DocumentFilter: React.FC<DocumentFilterProps> = ({
       : DEFAULT_STATUS_OPTIONS;
 
   const handleApply = () => {
+    console.log("[DocumentFilter] ใช้ filter:", { dateFrom, dateTo, status });
     onFilterChange({
       dateFrom,
       dateTo,
@@ -62,6 +63,7 @@ export const DocumentFilter: React.FC<DocumentFilterProps> = ({
   };
 
   const handleClear = () => {
+    console.log("[DocumentFilter] ล้าง filter");
     setDateFrom(undefined);
     setDateTo(undefined);
     setStatus("all");
@@ -115,7 +117,7 @@ export const DocumentFilter: React.FC<DocumentFilterProps> = ({
                     width: 180,
                   }}
                 >
-                  <label style={{ fontWeight: 500 }}>วันที่สร้าง</label>
+                  <label style={{ fontWeight: 500 }}>วันที่เริ่มต้น</label>
                   <div
                     style={{ position: "relative", display: "inline-block" }}
                   >
@@ -134,6 +136,10 @@ export const DocumentFilter: React.FC<DocumentFilterProps> = ({
                               Number(val[1]) - 1,
                               Number(val[2])
                             )
+                          );
+                          console.log(
+                            "[DocumentFilter] ตั้งค่าวันที่เริ่มต้น:",
+                            date
                           );
                           setDateFrom(date);
                         } else {
@@ -182,7 +188,7 @@ export const DocumentFilter: React.FC<DocumentFilterProps> = ({
                     width: 180,
                   }}
                 >
-                  <label style={{ fontWeight: 500 }}>วันที่กำหนด</label>
+                  <label style={{ fontWeight: 500 }}>วันที่สิ้นสุด</label>
                   <div
                     style={{ position: "relative", display: "inline-block" }}
                   >
@@ -201,6 +207,10 @@ export const DocumentFilter: React.FC<DocumentFilterProps> = ({
                               Number(val[1]) - 1,
                               Number(val[2])
                             )
+                          );
+                          console.log(
+                            "[DocumentFilter] ตั้งค่าวันที่สิ้นสุด:",
+                            date
                           );
                           setDateTo(date);
                         } else {

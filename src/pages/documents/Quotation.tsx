@@ -185,71 +185,18 @@ const Quotation = () => {
     ) {
       return false;
     }
-    // กรองวันที่สร้าง (>= dateFrom)
-    if (filters.dateFrom) {
-      const filterDate = new Date(
-        Date.UTC(
-          filters.dateFrom.getFullYear(),
-          filters.dateFrom.getMonth(),
-          filters.dateFrom.getDate()
-        )
-      );
-      const docDate = parseLocalDate(q.documentDate);
-      const docDateStr = docDate ? docDate.toLocaleDateString("en-CA") : "";
-      const filterDateStr = filterDate.toLocaleDateString("en-CA");
-      console.log(
-        "[DEBUG] docDate:",
-        q.documentDate,
-        "->",
-        docDateStr,
-        "| filterDate:",
-        filterDateStr
-      );
-      if (!docDate) {
-        console.log("SKIP: docDate invalid", q.documentDate);
-        return false;
-      }
-      if (docDateStr < filterDateStr) {
-        console.log(
-          "SKIP: docDateStr < filterDateStr",
-          docDateStr,
-          filterDateStr
-        );
-        return false;
-      }
-    }
-    // กรองวันที่กำหนด (<= dateTo)
-    if (filters.dateTo && q.validUntil) {
-      const filterDateTo = new Date(
-        Date.UTC(
-          filters.dateTo.getFullYear(),
-          filters.dateTo.getMonth(),
-          filters.dateTo.getDate()
-        )
-      );
-      const docDate = parseLocalDate(q.validUntil);
-      const docDateStr = docDate ? docDate.toLocaleDateString("en-CA") : "";
-      const filterDateToStr = filterDateTo.toLocaleDateString("en-CA");
-      console.log(
-        "[DEBUG] (TO) docDate:",
-        q.validUntil,
-        "->",
-        docDateStr,
-        "| filterDateTo:",
-        filterDateToStr
-      );
-      if (!docDate) {
-        return false;
-      }
-      if (docDateStr > filterDateToStr) {
-        console.log(
-          "SKIP: docDateStr > filterDateToStr",
-          docDateStr,
-          filterDateToStr
-        );
-        return false;
-      }
-    }
+    // เปรียบเทียบวันที่แบบเป๊ะ 100%
+    const docDateStr = q.documentDate
+      ? new Date(q.documentDate).toISOString().slice(0, 10)
+      : null;
+    const fromStr = filters.dateFrom
+      ? new Date(filters.dateFrom).toISOString().slice(0, 10)
+      : null;
+    const toStr = filters.dateTo
+      ? new Date(filters.dateTo).toISOString().slice(0, 10)
+      : null;
+    if (fromStr && docDateStr && docDateStr < fromStr) return false;
+    if (toStr && docDateStr && docDateStr > toStr) return false;
     return true;
   });
 

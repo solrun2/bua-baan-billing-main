@@ -157,11 +157,14 @@ const Receipt = () => {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "ชำระแล้ว":
+      case "PAID":
         return "bg-green-100 text-green-700";
-      case "พ้นกำหนด":
+      case "ยกเลิก":
+      case "CANCELLED":
         return "bg-red-100 text-red-700";
-      case "รอชำระ":
-        return "bg-gray-100 text-gray-700";
+      case "คืนเงิน":
+      case "REFUNDED":
+        return "bg-orange-100 text-orange-700";
       default:
         return "bg-gray-100 text-gray-700";
     }
@@ -208,71 +211,18 @@ const Receipt = () => {
     ) {
       return false;
     }
-    // กรองวันที่สร้าง (>= dateFrom)
-    if (filters.dateFrom) {
-      const filterDate = new Date(
-        Date.UTC(
-          filters.dateFrom.getFullYear(),
-          filters.dateFrom.getMonth(),
-          filters.dateFrom.getDate()
-        )
-      );
-      const docDate = parseLocalDate(r.issue_date);
-      const docDateStr = docDate ? docDate.toLocaleDateString("en-CA") : "";
-      const filterDateStr = filterDate.toLocaleDateString("en-CA");
-      console.log(
-        "[DEBUG] docDate:",
-        r.issue_date,
-        "->",
-        docDateStr,
-        "| filterDate:",
-        filterDateStr
-      );
-      if (!docDate) {
-        console.log("SKIP: docDate invalid", r.issue_date);
-        return false;
-      }
-      if (docDateStr < filterDateStr) {
-        console.log(
-          "SKIP: docDateStr < filterDateStr",
-          docDateStr,
-          filterDateStr
-        );
-        return false;
-      }
-    }
-    // กรองวันที่กำหนด (<= dateTo)
-    if (filters.dateTo) {
-      const filterDateTo = new Date(
-        Date.UTC(
-          filters.dateTo.getFullYear(),
-          filters.dateTo.getMonth(),
-          filters.dateTo.getDate()
-        )
-      );
-      const docDate = parseLocalDate(r.issue_date);
-      const docDateStr = docDate ? docDate.toLocaleDateString("en-CA") : "";
-      const filterDateToStr = filterDateTo.toLocaleDateString("en-CA");
-      console.log(
-        "[DEBUG] (TO) docDate:",
-        r.issue_date,
-        "->",
-        docDateStr,
-        "| filterDateTo:",
-        filterDateToStr
-      );
-      if (!docDate) {
-        return false;
-      }
-      if (docDateStr > filterDateToStr) {
-        console.log(
-          "SKIP: docDateStr > filterDateToStr",
-          docDateStr,
-          filterDateToStr
-        );
-        return false;
-      }
-    }
+    // เปรียบเทียบวันที่แบบเป๊ะ 100%
+    const docDateStr = r.issue_date
+      ? new Date(r.issue_date).toISOString().slice(0, 10)
+      : null;
+    const fromStr = filters.dateFrom
+      ? new Date(filters.dateFrom).toISOString().slice(0, 10)
+      : null;
+    const toStr = filters.dateTo
+      ? new Date(filters.dateTo).toISOString().slice(0, 10)
+      : null;
+    if (fromStr && docDateStr && docDateStr < fromStr) return false;
+    if (toStr && docDateStr && docDateStr > toStr) return false;
     return true;
   });
 
@@ -318,10 +268,9 @@ const Receipt = () => {
           initialFilters={filters}
           statusOptions={[
             { value: "all", label: "ทั้งหมด" },
-            { value: "รอชำระ", label: "รอชำระ" },
             { value: "ชำระแล้ว", label: "ชำระแล้ว" },
-            { value: "พ้นกำหนด", label: "พ้นกำหนด" },
             { value: "ยกเลิก", label: "ยกเลิก" },
+            { value: "คืนเงิน", label: "คืนเงิน" },
           ]}
         />
       </div>
@@ -360,7 +309,7 @@ const Receipt = () => {
                       ลูกค้า
                     </th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground">
-                      วันที่
+                      วันที่ชำระเงิน
                     </th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground">
                       จำนวนเงิน

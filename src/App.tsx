@@ -21,6 +21,9 @@ import Quotation from "./pages/documents/Quotation";
 import Receipt from "./pages/documents/Receipt";
 import TaxInvoice from "./pages/documents/TaxInvoice";
 import Invoice from "./pages/documents/Invoice";
+import CreditNote from "./pages/documents/CreditNote";
+import PurchaseOrder from "./pages/documents/PurchaseOrder";
+import Billing from "./pages/documents/Billing";
 
 // Form components
 import { DocumentForm } from "./pages/sub/create/DocumentForm";
@@ -142,6 +145,13 @@ const App = () => {
                 path="/documents/receipt/edit/:id"
                 element={<ReceiptForm editMode={true} />}
               />
+
+              <Route path="/documents/credit-note" element={<CreditNote />} />
+              <Route
+                path="/documents/purchase-order"
+                element={<PurchaseOrder />}
+              />
+              <Route path="/documents/billing" element={<Billing />} />
 
               {/* Finance routes */}
               <Route path="/finance/bank-accounts" element={<BankAccounts />} />
