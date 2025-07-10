@@ -243,7 +243,6 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
             taxAmount: item.taxAmount ?? item.tax_amount,
             withholdingTaxAmount:
               item.withholdingTaxAmount ?? item.withholding_tax_amount,
-            // เพิ่ม field อื่นๆ ตามต้องการ
           }))
         : [];
   console.log("DocumentModal items (with fallback):", items);
@@ -283,359 +282,238 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
   console.log("DocumentModal items:", document.items);
 
   // --- Section Helper Functions ---
-  const renderHeader = () => {
-    switch (type) {
-      case "quotation":
-        return (
-          <>
-            <div className="font-bold text-lg text-blue-900">ใบเสนอราคา</div>
-            <div className="mt-2">
-              <div>
-                <b>ผู้ขาย :</b> {SELLER_INFO.company}
-              </div>
-              <div>
-                <b>ที่อยู่ :</b> {SELLER_INFO.address}
-              </div>
-              <div>
-                <b>เลขประจำตัวผู้เสียภาษี :</b> {SELLER_INFO.taxId}
-              </div>
-              <div>
-                <b>เว็บไซต์ :</b> {SELLER_INFO.website}
-              </div>
-              <div>
-                <b>โทร :</b> {SELLER_INFO.phone}
-              </div>
-              <div>
-                <b>วันหมดอายุ:</b>{" "}
-                {formatDate(document.valid_until || document.validUntil)}
-              </div>
+  // Header: โลโก้+ชื่อบริษัท (ซ้าย), Document Title (ขวาบน, บรรทัดเดียว)
+  const renderHeader = () => (
+    <div className="flex flex-row justify-between items-end border-b-2 border-blue-200 pb-4 mb-2">
+      <div className="flex flex-row items-center gap-4">
+        <div className="w-16 h-16 border-2 border-blue-200 rounded-full flex items-center justify-center text-blue-300 text-lg font-bold">
+          LOGO
+        </div>
+        <div className="flex flex-col">
+          <span className="font-extrabold text-xl text-blue-900 leading-tight">
+            {SELLER_INFO.company}
+          </span>
+          <span className="text-xs text-gray-700 leading-tight">
+            {SELLER_INFO.address}
+          </span>
+          <span className="text-xs text-gray-700 leading-tight">
+            เลขประจำตัวผู้เสียภาษี {SELLER_INFO.taxId}
+          </span>
+          <span className="text-xs text-gray-700 leading-tight">
+            โทร {SELLER_INFO.phone}
+          </span>
+        </div>
+      </div>
+      <div className="flex flex-col items-end">
+        <span className="font-extrabold text-3xl text-blue-700 mb-1 whitespace-nowrap">
+          {typeLabels[type].title}
+        </span>
+        <div className="text-xs text-gray-700 text-right">
+          <div>
+            <b>เลขที่:</b>{" "}
+            {document.document_number || document.documentNumber || "-"}
+          </div>
+          <div>
+            <b>วันที่:</b>{" "}
+            {formatDate(document.issue_date || document.documentDate)}
+          </div>
+          {type === "invoice" && (
+            <div>
+              <b>ครบกำหนด:</b>{" "}
+              {formatDate(document.due_date || document.dueDate)}
             </div>
-          </>
-        );
-      case "invoice":
-        return (
-          <>
-            <div className="font-bold text-lg text-blue-900">ใบแจ้งหนี้</div>
-            <div className="mt-2">
-              <div>
-                <b>ผู้ขาย :</b> {SELLER_INFO.company}
-              </div>
-              <div>
-                <b>ที่อยู่ :</b> {SELLER_INFO.address}
-              </div>
-              <div>
-                <b>เลขประจำตัวผู้เสียภาษี :</b> {SELLER_INFO.taxId}
-              </div>
-              <div>
-                <b>เว็บไซต์ :</b> {SELLER_INFO.website}
-              </div>
-              <div>
-                <b>โทร :</b> {SELLER_INFO.phone}
-              </div>
-              <div>
-                <b>วันครบกำหนด:</b>{" "}
-                {formatDate(document.due_date || document.dueDate)}
-              </div>
+          )}
+          {type === "quotation" && (
+            <div>
+              <b>วันหมดอายุ:</b>{" "}
+              {formatDate(document.valid_until || document.validUntil)}
             </div>
-          </>
-        );
-      case "receipt":
-        return (
-          <>
-            <div className="font-bold text-lg text-blue-900">
-              ใบเสร็จรับเงิน
-            </div>
-            <div className="mt-2">
-              <div>
-                <b>ผู้ขาย :</b> {SELLER_INFO.company}
-              </div>
-              <div>
-                <b>ที่อยู่ :</b> {SELLER_INFO.address}
-              </div>
-              <div>
-                <b>เลขประจำตัวผู้เสียภาษี :</b> {SELLER_INFO.taxId}
-              </div>
-              <div>
-                <b>เว็บไซต์ :</b> {SELLER_INFO.website}
-              </div>
-              <div>
-                <b>โทร :</b> {SELLER_INFO.phone}
-              </div>
-              <div>
-                <b>วันที่รับเงิน:</b>{" "}
-                {formatDate((document as any).payment_date)}
-              </div>
-            </div>
-          </>
-        );
-      default:
-        return null;
-    }
-  };
+          )}
+        </div>
+      </div>
+    </div>
+  );
 
+  // Section ข้อมูลลูกค้า (แสดงใต้ header ก่อนตาราง)
+  const renderCustomerInfo = () => (
+    <div className="bg-blue-50 rounded-lg border border-blue-200 px-6 py-3 mb-4 max-w-2xl shadow-sm">
+      <div className="font-bold text-blue-700 mb-2">ข้อมูลลูกค้า</div>
+      <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-800">
+        <div className="font-bold">ชื่อลูกค้า</div>
+        <div>{document.customer_name || "-"}</div>
+        <div className="font-bold">ที่อยู่</div>
+        <div>{document.customer_address || "-"}</div>
+        <div className="font-bold">เลขผู้เสียภาษี</div>
+        <div>{document.customer_tax_id || "-"}</div>
+        <div className="font-bold">โทร</div>
+        <div>{document.customer_phone || "-"}</div>
+        <div className="font-bold">อีเมล</div>
+        <div>{document.customer_email || "-"}</div>
+      </div>
+    </div>
+  );
+
+  // ตารางสินค้า: เพิ่มคอลัมน์ 'ส่วนลด' และ 'ภาษี'
   const renderTable = () => {
-    switch (type) {
-      case "quotation":
-      case "invoice":
-        return (
-          <table className="w-full border mb-4 text-xs">
-            <thead className="bg-blue-100 text-blue-900">
-              <tr>
-                <th className="border p-1">#</th>
-                <th className="border p-1">รายการ</th>
-                <th className="border p-1">จำนวน</th>
-                <th className="border p-1">หน่วย</th>
-                <th className="border p-1">ราคา</th>
-                <th className="border p-1">ส่วนลด</th>
-                <th className="border p-1">VAT</th>
-                <th className="border p-1">มูลค่าก่อนภาษี</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="text-center text-muted-foreground">
-                    ไม่มีรายการสินค้า/บริการ
+    return (
+      <table className="w-full border border-gray-300 mb-6 text-xs rounded-lg overflow-hidden shadow-sm">
+        <thead className="bg-gray-100 text-gray-900">
+          <tr>
+            <th className="border border-gray-300 p-2 w-8 font-bold">ลำดับ</th>
+            <th className="border border-gray-300 p-2 w-[30%] text-left font-bold">
+              รายการสินค้า
+            </th>
+            <th className="border border-gray-300 p-2 w-12 font-bold">จำนวน</th>
+            <th className="border border-gray-300 p-2 w-20 text-right font-bold">
+              ราคาต่อหน่วย
+            </th>
+            <th className="border border-gray-300 p-2 w-20 text-right font-bold">
+              ส่วนลด
+            </th>
+            <th className="border border-gray-300 p-2 w-14 text-center font-bold">
+              VAT
+            </th>
+            <th className="border border-gray-300 p-2 w-24 text-right font-bold">
+              ราคารวม
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.length === 0 ? (
+            <tr>
+              <td
+                colSpan={7}
+                className="text-center text-muted-foreground py-4"
+              >
+                ไม่มีรายการสินค้า/บริการ
+              </td>
+            </tr>
+          ) : (
+            items.map((item, idx) => {
+              const prod = productMap[item.product_id];
+              const qty = (item as any).quantity ?? (item as any).qty ?? 1;
+              const unitPrice = item.unitPrice ?? item.unit_price ?? 0;
+              const discount = item.discount ?? 0;
+              const discountType =
+                item.discount_type ?? item.discountType ?? "thb";
+              let discountAmount = 0;
+              if (discountType === "percentage") {
+                discountAmount = unitPrice * qty * (discount / 100);
+              } else {
+                discountAmount = discount * qty;
+              }
+              const vat = (item.tax ?? item.tax_amount) || 0;
+              return (
+                <tr key={idx}>
+                  <td className="border border-gray-300 p-2 text-center">
+                    {idx + 1}
+                  </td>
+                  <td className="border border-gray-300 p-2 text-left">
+                    {prod?.name ||
+                      item.product_name ||
+                      item.productTitle ||
+                      item.description ||
+                      "-"}
+                  </td>
+                  <td className="border border-gray-300 p-2 text-center">
+                    {qty}
+                  </td>
+                  <td className="border border-gray-300 p-2 text-right">
+                    {formatCurrency(unitPrice)}
+                  </td>
+                  <td className="border border-gray-300 p-2 text-right">
+                    {discountAmount > 0 ? formatCurrency(discountAmount) : "-"}
+                  </td>
+                  <td className="border border-gray-300 p-2 text-center">
+                    {vat ? `${vat}%` : "-"}
+                  </td>
+                  <td className="border border-gray-300 p-2 text-right">
+                    {formatCurrency(unitPrice * qty - discountAmount)}
                   </td>
                 </tr>
-              ) : (
-                items.map((item, idx) => {
-                  const prod = productMap[item.product_id];
-                  return (
-                    <tr key={idx}>
-                      <td className="border p-1 text-center">{idx + 1}</td>
-                      <td className="border p-1">
-                        {prod?.name ||
-                          item.product_name ||
-                          item.productTitle ||
-                          item.description ||
-                          "-"}
-                      </td>
-                      <td className="border p-1 text-center">
-                        {(item as any).quantity ?? (item as any).qty ?? "-"}
-                      </td>
-                      <td className="border p-1 text-center">
-                        {prod?.unit || item.unit || "-"}
-                      </td>
-                      <td className="border p-1 text-right">
-                        {formatCurrency(item.unitPrice ?? item.unit_price ?? 0)}
-                      </td>
-                      <td className="border p-1 text-right">
-                        {(() => {
-                          const discount = item.discount ?? 0;
-                          const qty =
-                            (item as any).quantity ?? (item as any).qty ?? 1;
-                          const unitPrice =
-                            item.unitPrice ?? item.unit_price ?? 0;
-                          const discountType =
-                            item.discount_type ?? item.discountType ?? "thb";
-                          let discountAmount = 0;
-                          if (discountType === "percentage") {
-                            discountAmount = unitPrice * qty * (discount / 100);
-                          } else {
-                            discountAmount = discount * qty;
-                          }
-                          return formatCurrency(discountAmount);
-                        })()}
-                      </td>
-                      <td className="border p-1 text-center">
-                        {((item as any).tax ?? (item as any).tax_amount)
-                          ? `${(item as any).tax ?? (item as any).tax_amount}%`
-                          : "-"}
-                      </td>
-                      <td className="border p-1 text-right">
-                        {formatCurrency(
-                          item.amountBeforeTax ?? item.amount_before_tax ?? 0
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        );
-      case "receipt":
-        return (
-          <table className="w-full border mb-4 text-xs">
-            <thead className="bg-blue-100 text-blue-900">
-              <tr>
-                <th className="border p-1">#</th>
-                <th className="border p-1">รายการ</th>
-                <th className="border p-1">จำนวน</th>
-                <th className="border p-1">หน่วย</th>
-                <th className="border p-1">ราคา</th>
-                <th className="border p-1">รวม</th>
+              );
+            })
+          )}
+          {/* แถวว่างสำหรับเขียนเพิ่ม */}
+          {[...Array(5 - items.length > 0 ? 5 - items.length : 0)].map(
+            (_, i) => (
+              <tr key={"empty-" + i}>
+                <td className="border border-gray-300 p-2 text-center">
+                  &nbsp;
+                </td>
+                <td className="border border-gray-300 p-2 text-left">&nbsp;</td>
+                <td className="border border-gray-300 p-2 text-center">
+                  &nbsp;
+                </td>
+                <td className="border border-gray-300 p-2 text-right">
+                  &nbsp;
+                </td>
+                <td className="border border-gray-300 p-2 text-right">
+                  &nbsp;
+                </td>
+                <td className="border border-gray-300 p-2 text-center">
+                  &nbsp;
+                </td>
+                <td className="border border-gray-300 p-2 text-right">
+                  &nbsp;
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {items.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="text-center text-muted-foreground">
-                    ไม่มีรายการสินค้า/บริการ
-                  </td>
-                </tr>
-              ) : (
-                items.map((item, idx) => {
-                  const prod = productMap[item.product_id];
-                  const qty = (item as any).quantity ?? (item as any).qty ?? 1;
-                  const unitPrice = item.unitPrice ?? item.unit_price ?? 0;
-                  return (
-                    <tr key={idx}>
-                      <td className="border p-1 text-center">{idx + 1}</td>
-                      <td className="border p-1">
-                        {prod?.name ||
-                          item.product_name ||
-                          item.productTitle ||
-                          item.description ||
-                          "-"}
-                      </td>
-                      <td className="border p-1 text-center">{qty}</td>
-                      <td className="border p-1 text-center">
-                        {prod?.unit || item.unit || "-"}
-                      </td>
-                      <td className="border p-1 text-right">
-                        {formatCurrency(unitPrice)}
-                      </td>
-                      <td className="border p-1 text-right">
-                        {formatCurrency(unitPrice * qty)}
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        );
-      default:
-        return null;
-    }
+            )
+          )}
+        </tbody>
+      </table>
+    );
   };
 
+  // สรุปยอด: เพิ่มส่วนลด, ภาษี, หัก ณ ที่จ่าย
   const renderSummary = () => {
-    switch (type) {
-      case "quotation":
-        return (
-          <div className="flex justify-end mb-2">
-            <div className="w-full max-w-xs space-y-1">
-              <div className="flex justify-between mb-1">
-                <span>มูลค่าสินค้าหรือค่าบริการ</span>
-                <span>{formatCurrency(summary.subtotal)}</span>
-              </div>
-              {summary.discount > 0 && (
-                <div className="flex justify-between mb-1 text-destructive">
-                  <span>ส่วนลด</span>
-                  <span>-{formatCurrency(summary.discount)}</span>
-                </div>
-              )}
-              <div className="flex justify-between mb-1">
-                <span>มูลค่าหลังหักส่วนลด</span>
-                <span>
-                  {formatCurrency(
-                    Number(summary.subtotal ?? 0) -
-                      Number(summary.discount ?? 0)
-                  )}
-                </span>
-              </div>
-              <div className="flex justify-between mb-1">
-                <span>ภาษีมูลค่าเพิ่ม 7%</span>
-                <span>{formatCurrency(summary.tax)}</span>
-              </div>
-              <div className="flex justify-between mb-1">
-                <span>รวมเป็นเงิน</span>
-                <span>{formatCurrency(summary.total)}</span>
-              </div>
-              <div className="flex justify-between font-bold text-lg">
-                <span>จำนวนเงินทั้งสิ้น</span>
-                <span>
-                  {formatCurrency(document.total_amount ?? summary.total)}
-                </span>
-              </div>
-              <div className="mt-2 text-xs text-gray-500">
-                * กรุณาชำระเงินภายในวันที่{" "}
-                {formatDate(document.valid_until || document.validUntil)}
-              </div>
-            </div>
+    return (
+      <div className="flex justify-end mb-2">
+        <div className="w-full max-w-xs space-y-1">
+          <div className="flex justify-between mb-1">
+            <span>มูลค่าสินค้าหรือค่าบริการ</span>
+            <span>{formatCurrency(summary.subtotal)}</span>
           </div>
-        );
-      case "invoice":
-        return (
-          <div className="flex justify-end mb-2">
-            <div className="w-full max-w-xs space-y-1">
-              <div className="flex justify-between mb-1">
-                <span>มูลค่าสินค้าหรือค่าบริการ</span>
-                <span>{formatCurrency(summary.subtotal)}</span>
-              </div>
-              {summary.discount > 0 && (
-                <div className="flex justify-between mb-1 text-destructive">
-                  <span>ส่วนลด</span>
-                  <span>-{formatCurrency(summary.discount)}</span>
-                </div>
-              )}
-              <div className="flex justify-between mb-1">
-                <span>มูลค่าหลังหักส่วนลด</span>
-                <span>
-                  {formatCurrency(
-                    Number(summary.subtotal ?? 0) -
-                      Number(summary.discount ?? 0)
-                  )}
-                </span>
-              </div>
-              <div className="flex justify-between mb-1">
-                <span>ภาษีมูลค่าเพิ่ม 7%</span>
-                <span>{formatCurrency(summary.tax)}</span>
-              </div>
-              <div className="flex justify-between mb-1">
-                <span>รวมเป็นเงิน</span>
-                <span>{formatCurrency(summary.total)}</span>
-              </div>
-              {Number(summary.withholdingTax) !== 0 && (
-                <div className="flex justify-between mb-1 text-yellow-700">
-                  <span>หัก ณ ที่จ่าย</span>
-                  <span>
-                    -{formatCurrency(Number(summary.withholdingTax ?? 0))}
-                  </span>
-                </div>
-              )}
-              <div className="flex justify-between font-bold text-lg">
-                <span>จำนวนเงินทั้งสิ้น</span>
-                <span>
-                  {formatCurrency(
-                    document.total_amount ??
-                      summary.total - summary.withholdingTax
-                  )}
-                </span>
-              </div>
-              <div className="mt-2 text-xs text-gray-500">
-                * กรุณาชำระเงินภายในวันที่{" "}
-                {formatDate(document.due_date || document.dueDate)}
-              </div>
+          {summary.discount > 0 && (
+            <div className="flex justify-between mb-1 text-destructive">
+              <span>ส่วนลด</span>
+              <span>-{formatCurrency(summary.discount)}</span>
             </div>
+          )}
+          <div className="flex justify-between mb-1">
+            <span>มูลค่าหลังหักส่วนลด</span>
+            <span>
+              {formatCurrency(
+                Number(summary.subtotal ?? 0) - Number(summary.discount ?? 0)
+              )}
+            </span>
           </div>
-        );
-      case "receipt":
-        return (
-          <div className="flex justify-end mb-2">
-            <div className="w-full max-w-xs space-y-1">
-              <div className="flex justify-between mb-1">
-                <span>รวมเป็นเงิน</span>
-                <span>{formatCurrency(summary.total)}</span>
-              </div>
-              <div className="flex justify-between font-bold text-lg">
-                <span>จำนวนเงินที่รับชำระ</span>
-                <span>
-                  {formatCurrency(document.total_amount ?? summary.total)}
-                </span>
-              </div>
-              <div className="mt-2 text-xs text-gray-500">
-                * ขอบคุณที่ใช้บริการ
-              </div>
+          {summary.tax > 0 && (
+            <div className="flex justify-between mb-1">
+              <span>ภาษีมูลค่าเพิ่ม 7%</span>
+              <span>{formatCurrency(summary.tax)}</span>
             </div>
+          )}
+          {summary.withholdingTax > 0 && (
+            <div className="flex justify-between mb-1 text-yellow-700">
+              <span>หัก ณ ที่จ่าย</span>
+              <span>-{formatCurrency(summary.withholdingTax)}</span>
+            </div>
+          )}
+          <div className="flex justify-between font-bold text-lg">
+            <span>จำนวนเงินทั้งสิ้น</span>
+            <span>
+              {formatCurrency(
+                Number(
+                  document.total_amount ??
+                    summary.total - summary.withholdingTax
+                )
+              )}
+            </span>
           </div>
-        );
-      default:
-        return null;
-    }
+        </div>
+      </div>
+    );
   };
 
   const renderFooter = () => {
@@ -672,8 +550,8 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
         );
       case "receipt":
         return (
-          <div className="mt-4 text-center text-green-700 font-bold text-lg">
-            ขอบคุณที่ใช้บริการ
+          <div className="mt-4 thankyou text-green-700 font-bold text-lg">
+            ขอขอบพระคุณที่ไว้วางใจใช้บริการ
           </div>
         );
       default:
@@ -682,44 +560,150 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
   };
   // --- End Section Helper Functions ---
 
+  // เพิ่มฟังก์ชัน handlePrint
+  const handlePrint = () => {
+    const printContent =
+      window.document.querySelector(".print-area")?.innerHTML;
+    const printWindow = window.open("", "", "width=900,height=1200");
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>พิมพ์เอกสาร</title>
+          <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+          <style>
+            /* สำหรับหน้าจอปกติ */
+            .print-area {
+              width: 100%;
+              max-width: 794px;      /* A4 ที่ 96dpi */
+              margin: 32px auto;     /* ขอบขาวรอบ ๆ */
+              background: #fff;
+              border-radius: 12px;
+              box-shadow: 0 4px 32px #0002;
+              padding: 32px 24px;
+            }
+            .company-title {
+              margin-bottom: 12px;
+            }
+            .document-title {
+              margin-top: 20px;
+            }
+            @media print {
+              html, body {
+                width: 210mm;
+                height: 297mm;
+                margin: 0;
+                padding: 0;
+                overflow: hidden;
+              }
+              .no-print {
+                display: none !important;
+              }
+              .print-area {
+                width: 210mm !important;
+                height: 297mm !important;
+                max-width: 210mm;
+                max-height: 297mm;
+                overflow: hidden !important;
+                transform: scale(0.91);
+                transform-origin: top left;
+                page-break-inside: avoid !important;
+                page-break-before: avoid !important;
+                page-break-after: avoid !important;
+                margin: 0 !important;
+                border-radius: 0 !important;
+                box-shadow: none !important;
+                padding: 0 12mm !important;
+              }
+              .header-row, table, .summary-box, .note-box {
+                width: 100% !important;
+                margin: 0 !important;
+                max-width: 100% !important;
+              }
+              .company-title {
+                margin-bottom: 10px;
+              }
+              .document-title {
+                margin-left: auto;
+                margin-top: 0;
+                margin-bottom: 0;
+                align-self: flex-start;
+                font-size: 2.1rem;
+                font-weight: bold;
+                color: #2563eb;
+                text-align: right;
+                white-space: nowrap;
+              }
+              table, tr, td, th, .summary-box, .note-box {
+                page-break-inside: avoid !important;
+              }
+            }
+            .modal-scroll {
+              max-height: 90vh;
+              overflow-y: auto;
+            }
+          </style>
+        </head>
+        <body onload="window.print();window.close();">
+          <div class="print-area">
+            ${printContent}
+          </div>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40 print:bg-transparent">
-      <div className="bg-white rounded shadow-lg p-8 w-full max-w-3xl print:relative print:shadow-none print:p-0 print:bg-white relative text-[15px] print-area font-sans">
-        {/* ปุ่มปิดขวาบน */}
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 text-gray-500 hover:text-red-600 text-2xl font-bold print:hidden"
-          aria-label="ปิด"
+      <div className="bg-white rounded shadow-lg p-8 w-full max-w-3xl print:relative print:shadow-none print:p-0 print:bg-white relative text-[15px] font-sans">
+        <div
+          className="modal-scroll"
+          style={{ maxHeight: "90vh", overflowY: "auto" }}
         >
-          &times;
-        </button>
-        {/* Header */}
-        <div className="flex justify-between items-start mb-4 border-b-2 border-blue-200 pb-4">
-          <div>{renderHeader()}</div>
-          <div className="text-right min-w-[180px]">
-            <div>
-              <b>เลขที่เอกสาร :</b>{" "}
-              {document.document_number || document.documentNumber || "-"}
+          <div className="print-area">
+            {/* ปุ่มปิดขวาบน */}
+            <button
+              onClick={onClose}
+              className="absolute top-4 right-4 text-gray-500 hover:text-red-600 text-2xl font-bold print:hidden no-print"
+              aria-label="ปิด"
+            >
+              &times;
+            </button>
+            {/* Header */}
+            <div className="flex flex-col mb-4 border-b-2 border-blue-200 pb-4">
+              <div className="flex justify-between items-start">
+                <div>{renderHeader()}</div>
+                {/* เส้น header */}
+                <hr className="border-blue-200 mb-2" />
+              </div>
+              {renderCustomerInfo()}
             </div>
-            <div>
-              <b>วันที่ :</b>{" "}
-              {formatDate(document.issue_date || document.documentDate)}
+            {/* Table */}
+            <div className="overflow-x-auto">{renderTable()}</div>
+            {/* Summary */}
+            <div className="mt-2 mb-4">{renderSummary()}</div>
+            {/* Footer */}
+            <div className="border-t-2 border-blue-200 pt-4 mt-6">
+              {renderFooter()}
             </div>
-            {document.related_document_id && (
-              <div className="mt-2 text-xs text-muted-foreground">
-                {relatedDocument === null ? (
-                  "ไม่พบเอกสารอ้างอิง"
-                ) : (
-                  <span>
-                    เลขที่เอกสารอ้างอิง:{" "}
-                    {relatedDocument?.document_number || "-"}
-                  </span>
-                )}
+            {/* กล่องหมายเหตุ (ถ้ามี) */}
+            {document.notes && (
+              <div className="mt-4 p-3 bg-yellow-50 rounded text-sm text-yellow-900 border border-yellow-200 max-w-xl mx-auto">
+                <span className="font-semibold">หมายเหตุ: </span>
+                {document.notes}
               </div>
             )}
-            <div className="mt-2 flex justify-end print:hidden">
+            {/* ช่องเซ็นชื่อ */}
+            <div className="flex justify-end mt-10 print:mt-16">
+              <div className="text-center">
+                <div className="h-12 border-b border-gray-400 w-48 mx-auto mb-1"></div>
+                <div className="text-xs text-gray-500">(ผู้มีอำนาจลงนาม)</div>
+              </div>
+            </div>
+            {/* ปุ่มปริ้นเอกสาร (ล่างสุดของ modal) */}
+            <div className="flex justify-end mt-6 print:hidden no-print">
               <button
-                onClick={() => window.print()}
+                onClick={handlePrint}
                 className="flex items-center gap-2 px-3 py-1.5 rounded bg-blue-100 hover:bg-blue-200 text-blue-800 font-semibold shadow-sm border border-blue-200 transition-all duration-150"
                 aria-label="ปริ้นเอกสาร"
                 title="ปริ้นเอกสาร"
@@ -729,57 +713,6 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
                 <span className="hidden sm:inline">ปริ้นเอกสาร</span>
               </button>
             </div>
-          </div>
-        </div>
-
-        {/* Customer */}
-        <div className="bg-blue-50 rounded p-3 mb-4 flex flex-col md:flex-row md:items-center md:justify-between gap-2 border border-blue-100">
-          <div>
-            <b>ลูกค้า :</b>{" "}
-            {document.customer_name || document.customer?.name || "-"}
-          </div>
-          <div>
-            <b>ที่อยู่ :</b>{" "}
-            {document.customer_address || document.customer?.address || "-"}
-          </div>
-          <div>
-            <b>โทร :</b>{" "}
-            {document.customer_phone || document.customer?.phone || "-"}
-          </div>
-          <div>
-            <b>อีเมล :</b>{" "}
-            {document.customer_email || document.customer?.email || "-"}
-          </div>
-          <div>
-            <b>เลขประจำตัวผู้เสียภาษี :</b>{" "}
-            {document.customer_tax_id || document.customer?.tax_id || "-"}
-          </div>
-        </div>
-
-        {/* Table */}
-        <div className="overflow-x-auto">{renderTable()}</div>
-
-        {/* Summary */}
-        <div className="mt-2 mb-4">{renderSummary()}</div>
-
-        {/* Footer */}
-        <div className="border-t-2 border-blue-200 pt-4 mt-6">
-          {renderFooter()}
-        </div>
-
-        {/* กล่องหมายเหตุ (ถ้ามี) */}
-        {document.notes && (
-          <div className="mt-4 p-3 bg-yellow-50 rounded text-sm text-yellow-900 border border-yellow-200 max-w-xl mx-auto">
-            <span className="font-semibold">หมายเหตุ: </span>
-            {document.notes}
-          </div>
-        )}
-
-        {/* ช่องเซ็นชื่อ */}
-        <div className="flex justify-end mt-10 print:mt-16">
-          <div className="text-center">
-            <div className="h-12 border-b border-gray-400 w-48 mx-auto mb-1"></div>
-            <div className="text-xs text-gray-500">(ผู้มีอำนาจลงนาม)</div>
           </div>
         </div>
       </div>
