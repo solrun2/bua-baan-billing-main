@@ -125,6 +125,8 @@ export const DocumentForm: FC<DocumentFormProps> = ({
     "กำหนดเอง",
   ] as const;
 
+  const [receiptMode, setReceiptMode] = useState<"basic" | "advanced">("basic");
+
   function createDefaultItem(): DocumentItem {
     return {
       id: `item-${Date.now()}`,
@@ -1351,7 +1353,29 @@ export const DocumentForm: FC<DocumentFormProps> = ({
         {documentType === "receipt" && (
           <Card className="mb-6">
             <CardHeader>
-              <CardTitle>ข้อมูลเพิ่มเติม</CardTitle>
+              <CardTitle>รับชำระเงิน</CardTitle>
+              <div className="flex gap-4 mt-2">
+                <label className="flex items-center gap-1">
+                  <input
+                    type="radio"
+                    name="receiptMode"
+                    value="basic"
+                    checked={receiptMode === "basic"}
+                    onChange={() => setReceiptMode("basic")}
+                  />
+                  พื้นฐาน
+                </label>
+                <label className="flex items-center gap-1">
+                  <input
+                    type="radio"
+                    name="receiptMode"
+                    value="advanced"
+                    checked={receiptMode === "advanced"}
+                    onChange={() => setReceiptMode("advanced")}
+                  />
+                  ขั้นสูง
+                </label>
+              </div>
             </CardHeader>
             <CardContent className="space-y-6">
               {/* ช่องทางการรับชำระเงิน */}
@@ -1360,14 +1384,29 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                 {paymentChannels.map((c, idx) => (
                   <div key={idx} className="mb-2">
                     <div className="flex items-center gap-2 mb-2">
-                      <input type="checkbox" checked={c.enabled} onChange={e => updatePaymentChannel(idx, "enabled", e.target.checked)} />
-                      <span className="font-medium">ช่องทางการรับชำระเงิน {idx + 1}</span>
+                      <input
+                        type="checkbox"
+                        checked={c.enabled}
+                        onChange={(e) =>
+                          updatePaymentChannel(idx, "enabled", e.target.checked)
+                        }
+                      />
+                      <span className="font-medium">
+                        ช่องทางการรับชำระเงิน {idx + 1}
+                      </span>
                     </div>
                     {c.enabled && (
                       <div className="grid grid-cols-12 gap-2 items-center bg-white/80 p-2 rounded-md border">
                         <div className="col-span-3">
-                          <Select value={c.method} onValueChange={v => updatePaymentChannel(idx, "method", v)}>
-                            <SelectTrigger><SelectValue placeholder="รับชำระโดย" /></SelectTrigger>
+                          <Select
+                            value={c.method}
+                            onValueChange={(v) =>
+                              updatePaymentChannel(idx, "method", v)
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="รับชำระโดย" />
+                            </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="cash">เงินสด</SelectItem>
                               <SelectItem value="transfer">โอนเงิน</SelectItem>
@@ -1376,116 +1415,316 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                           </Select>
                         </div>
                         <div className="col-span-3">
-                          <input type="number" className="input w-full" placeholder="จำนวนเงินที่รับชำระ" value={c.amount} onChange={e => updatePaymentChannel(idx, "amount", e.target.value)} />
+                          <Input
+                            type="number"
+                            className="input w-full"
+                            placeholder="จำนวนเงินที่รับชำระ"
+                            value={c.amount}
+                            onChange={(e) =>
+                              updatePaymentChannel(
+                                idx,
+                                "amount",
+                                e.target.value
+                              )
+                            }
+                          />
                         </div>
                         <div className="col-span-5">
-                          <input type="text" className="input w-full" placeholder="หมายเหตุ" maxLength={20} value={c.note} onChange={e => updatePaymentChannel(idx, "note", e.target.value)} />
+                          <Input
+                            type="text"
+                            className="input w-full"
+                            placeholder="หมายเหตุ"
+                            maxLength={20}
+                            value={c.note}
+                            onChange={(e) =>
+                              updatePaymentChannel(idx, "note", e.target.value)
+                            }
+                          />
                         </div>
                         <div className="col-span-1 flex items-center">
-                          {paymentChannels.length > 1 && <Button size="icon" variant="ghost" onClick={() => removePaymentChannel(idx)}>-</Button>}
+                          {paymentChannels.length > 1 && (
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => removePaymentChannel(idx)}
+                            >
+                              -
+                            </Button>
+                          )}
                         </div>
                       </div>
                     )}
                   </div>
                 ))}
-                <Button type="button" variant="outline" size="sm" onClick={addPaymentChannel} className="mt-2">+ เพิ่มช่องทางการรับชำระเงิน</Button>
+                {paymentChannels.some((c) => c.enabled) && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={addPaymentChannel}
+                    className="mt-2"
+                  >
+                    + เพิ่มช่องทางการรับชำระเงิน
+                  </Button>
+                )}
               </div>
-              {/* ค่าธรรมเนียม/ปรับปรุง */}
-              <div className="border rounded-lg p-4 mb-2 bg-blue-50">
-                <div className="font-semibold mb-2">ค่าธรรมเนียม หรือรายการปรับปรุง</div>
-                {fees.map((f, idx) => (
-                  <div key={idx} className="mb-2">
-                    <div className="flex items-center gap-2 mb-2">
-                      <input type="checkbox" checked={f.enabled} onChange={e => updateFee(idx, "enabled", e.target.checked)} />
-                      <span className="font-medium">ค่าธรรมเนียม/ปรับปรุง {idx + 1}</span>
+              {/* เฉพาะขั้นสูง */}
+              {receiptMode === "advanced" && (
+                <>
+                  {/* ค่าธรรมเนียม/ปรับปรุง */}
+                  <div className="border rounded-lg p-4 mb-2 bg-blue-50">
+                    <div className="font-semibold mb-2">
+                      ค่าธรรมเนียม หรือรายการปรับปรุง
                     </div>
-                    {f.enabled && (
-                      <div className="grid grid-cols-12 gap-2 items-center bg-white/80 p-2 rounded-md border">
-                        <div className="col-span-2">
-                          <Select value={f.type} onValueChange={v => updateFee(idx, "type", v)}>
-                            <SelectTrigger><SelectValue placeholder="ประเภท" /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="fee">ปรับปรุง</SelectItem>
-                              <SelectItem value="other">อื่นๆ</SelectItem>
-                            </SelectContent>
-                          </Select>
+                    {fees.map((f, idx) => (
+                      <div key={idx} className="mb-2">
+                        <div className="flex items-center gap-2 mb-2">
+                          <input
+                            type="checkbox"
+                            checked={f.enabled}
+                            onChange={(e) =>
+                              updateFee(idx, "enabled", e.target.checked)
+                            }
+                          />
+                          <span className="font-medium">
+                            ค่าธรรมเนียม/ปรับปรุง {idx + 1}
+                          </span>
                         </div>
-                        <div className="col-span-3">
-                          <Select value={f.account} onValueChange={v => updateFee(idx, "account", v)}>
-                            <SelectTrigger><SelectValue placeholder="บัญชีที่เกี่ยวข้อง" /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="530501">530501 - ค่าธรรมเนียมธนาคาร</SelectItem>
-                              <SelectItem value="530502">530502 - ค่าธรรมเนียมอื่นๆ</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="col-span-3">
-                          <input type="number" className="input w-full" placeholder="จำนวนเงินปรับปรุง" value={f.amount} onChange={e => updateFee(idx, "amount", e.target.value)} />
-                        </div>
-                        <div className="col-span-3">
-                          <input type="text" className="input w-full" placeholder="หมายเหตุ" maxLength={20} value={f.note} onChange={e => updateFee(idx, "note", e.target.value)} />
-                        </div>
-                        <div className="col-span-1 flex items-center">
-                          {fees.length > 1 && <Button size="icon" variant="ghost" onClick={() => removeFee(idx)}>-</Button>}
-                        </div>
+                        {f.enabled && (
+                          <div className="grid grid-cols-12 gap-2 items-center bg-white/80 p-2 rounded-md border">
+                            <div className="col-span-2">
+                              <Select
+                                value={f.type}
+                                onValueChange={(v) => updateFee(idx, "type", v)}
+                              >
+                                <SelectTrigger className="w-full">
+                                  <SelectValue placeholder="ประเภท" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="fee">ปรับปรุง</SelectItem>
+                                  <SelectItem value="other">อื่นๆ</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="col-span-3">
+                              <Select
+                                value={f.account}
+                                onValueChange={(v) =>
+                                  updateFee(idx, "account", v)
+                                }
+                              >
+                                <SelectTrigger className="w-full">
+                                  <SelectValue placeholder="บัญชีที่เกี่ยวข้อง" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="530501">
+                                    530501 - ค่าธรรมเนียมธนาคาร
+                                  </SelectItem>
+                                  <SelectItem value="530502">
+                                    530502 - ค่าธรรมเนียมอื่นๆ
+                                  </SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="col-span-3">
+                              <Input
+                                type="number"
+                                className="w-full"
+                                placeholder="จำนวนเงินปรับปรุง"
+                                value={f.amount}
+                                onChange={(e) =>
+                                  updateFee(idx, "amount", e.target.value)
+                                }
+                              />
+                            </div>
+                            <div className="col-span-3">
+                              <Input
+                                type="text"
+                                className="w-full"
+                                placeholder="หมายเหตุ"
+                                maxLength={20}
+                                value={f.note}
+                                onChange={(e) =>
+                                  updateFee(idx, "note", e.target.value)
+                                }
+                              />
+                            </div>
+                            <div className="col-span-1 flex items-center">
+                              {fees.length > 1 && (
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  onClick={() => removeFee(idx)}
+                                >
+                                  -
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </div>
+                    ))}
+                    {fees.some((f) => f.enabled) && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={addFee}
+                        className="mt-2"
+                      >
+                        + เพิ่มค่าธรรมเนียม หรือรายการปรับปรุง
+                      </Button>
                     )}
                   </div>
-                ))}
-                <Button type="button" variant="outline" size="sm" onClick={addFee} className="mt-2">+ เพิ่มค่าธรรมเนียม หรือรายการปรับปรุง</Button>
-              </div>
-              {/* ตัดชำระกับเอกสาร */}
-              <div className="border rounded-lg p-4 mb-2 bg-blue-50">
-                <div className="font-semibold mb-2">ตัดชำระกับเอกสาร</div>
-                {offsetDocs.map((d, idx) => (
-                  <div key={idx} className="mb-2">
-                    <div className="flex items-center gap-2 mb-2">
-                      <input type="checkbox" checked={d.enabled} onChange={e => updateOffsetDoc(idx, "enabled", e.target.checked)} />
-                      <span className="font-medium">ตัดชำระกับเอกสาร {idx + 1}</span>
-                    </div>
-                    {d.enabled && (
-                      <div className="grid grid-cols-12 gap-2 items-center bg-white/80 p-2 rounded-md border">
-                        <div className="col-span-3">
-                          <Select value={d.docType} onValueChange={v => updateOffsetDoc(idx, "docType", v)}>
-                            <SelectTrigger><SelectValue placeholder="ประเภทเอกสาร" /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="invoice">ใบแจ้งหนี้</SelectItem>
-                              <SelectItem value="credit">ใบลดหนี้</SelectItem>
-                            </SelectContent>
-                          </Select>
+                  {/* ตัดชำระกับเอกสาร */}
+                  <div className="border rounded-lg p-4 mb-2 bg-blue-50">
+                    <div className="font-semibold mb-2">ตัดชำระกับเอกสาร</div>
+                    {offsetDocs.map((d, idx) => (
+                      <div key={idx} className="mb-2">
+                        <div className="flex items-center gap-2 mb-2">
+                          <input
+                            type="checkbox"
+                            checked={d.enabled}
+                            onChange={(e) =>
+                              updateOffsetDoc(idx, "enabled", e.target.checked)
+                            }
+                          />
+                          <span className="font-medium">
+                            ตัดชำระกับเอกสาร {idx + 1}
+                          </span>
                         </div>
-                        <div className="col-span-3">
-                          <Select value={d.docNumber} onValueChange={v => updateOffsetDoc(idx, "docNumber", v)}>
-                            <SelectTrigger><SelectValue placeholder="เลขที่เอกสาร" /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="INV-2025-0001">INV-2025-0001</SelectItem>
-                              <SelectItem value="CR-2025-0001">CR-2025-0001</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="col-span-3">
-                          <input type="number" className="input w-full" placeholder="จำนวนเงินที่รับชำระ" value={d.amount} onChange={e => updateOffsetDoc(idx, "amount", e.target.value)} />
-                        </div>
-                        <div className="col-span-2">
-                          <input type="text" className="input w-full" placeholder="หมายเหตุ" maxLength={20} value={d.note} onChange={e => updateOffsetDoc(idx, "note", e.target.value)} />
-                        </div>
-                        <div className="col-span-1 flex items-center">
-                          {offsetDocs.length > 1 && <Button size="icon" variant="ghost" onClick={() => removeOffsetDoc(idx)}>-</Button>}
-                        </div>
+                        {d.enabled && (
+                          <div className="grid grid-cols-12 gap-2 items-center bg-white/80 p-2 rounded-md border">
+                            <div className="col-span-3">
+                              <Select
+                                value={d.docType}
+                                onValueChange={(v) =>
+                                  updateOffsetDoc(idx, "docType", v)
+                                }
+                              >
+                                <SelectTrigger className="w-full">
+                                  <SelectValue placeholder="ประเภทเอกสาร" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="invoice">
+                                    ใบแจ้งหนี้
+                                  </SelectItem>
+                                  <SelectItem value="credit">
+                                    ใบลดหนี้
+                                  </SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="col-span-3">
+                              <Select
+                                value={d.docNumber}
+                                onValueChange={(v) =>
+                                  updateOffsetDoc(idx, "docNumber", v)
+                                }
+                              >
+                                <SelectTrigger className="w-full">
+                                  <SelectValue placeholder="เลขที่เอกสาร" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="INV-2025-0001">
+                                    INV-2025-0001
+                                  </SelectItem>
+                                  <SelectItem value="CR-2025-0001">
+                                    CR-2025-0001
+                                  </SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="col-span-3">
+                              <Input
+                                type="number"
+                                className="w-full"
+                                placeholder="จำนวนเงินที่รับชำระ"
+                                value={d.amount}
+                                onChange={(e) =>
+                                  updateOffsetDoc(idx, "amount", e.target.value)
+                                }
+                              />
+                            </div>
+                            <div className="col-span-2">
+                              <Input
+                                type="text"
+                                className="w-full"
+                                placeholder="หมายเหตุ"
+                                maxLength={20}
+                                value={d.note}
+                                onChange={(e) =>
+                                  updateOffsetDoc(idx, "note", e.target.value)
+                                }
+                              />
+                            </div>
+                            <div className="col-span-1 flex items-center">
+                              {offsetDocs.length > 1 && (
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  onClick={() => removeOffsetDoc(idx)}
+                                >
+                                  -
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </div>
+                    ))}
+                    {offsetDocs.some((d) => d.enabled) && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={addOffsetDoc}
+                        className="mt-2"
+                      >
+                        + ตัดชำระกับเอกสาร
+                      </Button>
                     )}
                   </div>
-                ))}
-                <Button type="button" variant="outline" size="sm" onClick={addOffsetDoc} className="mt-2">+ ตัดชำระกับเอกสาร</Button>
-              </div>
+                </>
+              )}
               {/* สรุปยอด */}
               <div className="flex flex-col items-end bg-blue-50 rounded-lg p-4">
                 <div className="flex flex-col gap-1 w-full max-w-xs">
-                  <div className="flex justify-between"><span>ปรับปรุงรวม :</span><span>{totalFee.toLocaleString(undefined, {minimumFractionDigits:2})} บาท</span></div>
-                  <div className="flex justify-between"><span>ตัดชำระ :</span><span>{totalOffset.toLocaleString(undefined, {minimumFractionDigits:2})} บาท</span></div>
-                  <div className="flex justify-between font-bold text-lg"><span>รับชำระรวมทั้งสิ้น</span><span>{(summary.netTotalAmount ?? 0).toLocaleString(undefined, {minimumFractionDigits:2})} บาท</span></div>
+                  <div className="flex justify-between">
+                    <span>ปรับปรุงรวม :</span>
+                    <span>
+                      {totalFee.toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                      })}{" "}
+                      บาท
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>ตัดชำระ :</span>
+                    <span>
+                      {totalOffset.toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                      })}{" "}
+                      บาท
+                    </span>
+                  </div>
+                  <div className="flex justify-between font-bold text-lg">
+                    <span>รับชำระรวมทั้งสิ้น</span>
+                    <span>
+                      {(summary.netTotalAmount ?? 0).toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                      })}{" "}
+                      บาท
+                    </span>
+                  </div>
                 </div>
-                <div className="text-xs text-gray-500 mt-1">ต้องรับชำระเงินอีก {(summary.netTotalAmount ?? 0).toLocaleString(undefined, {minimumFractionDigits:2})} บาท</div>
+                <div className="text-xs text-gray-500 mt-1">
+                  ต้องรับชำระเงินอีก{" "}
+                  {(summary.netTotalAmount ?? 0).toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                  })}{" "}
+                  บาท
+                </div>
               </div>
             </CardContent>
           </Card>
