@@ -19,6 +19,7 @@ import { DocumentForm } from "../sub/create/DocumentForm";
 import InvoiceForm from "../sub/invoice/InvoiceForm";
 import DocumentFilter from "../../components/DocumentFilter";
 import { Link } from "react-router-dom";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const Invoice = () => {
   const navigate = useNavigate();
@@ -61,6 +62,7 @@ const Invoice = () => {
   useEffect(() => {
     const loadInvoices = async () => {
       try {
+        console.log("[Invoice] เริ่มโหลดข้อมูลใบแจ้งหนี้");
         setLoading(true);
         const data = await apiService.getDocuments();
         const invoicesData = data
@@ -75,12 +77,17 @@ const Invoice = () => {
             status: doc.status,
           }));
         setInvoices(invoicesData);
+        console.log("[Invoice] โหลดข้อมูลสำเร็จ:", {
+          total: data.length,
+          invoices: invoicesData.length,
+        });
         // log all documentDate
         console.log(
-          "ALL DOCS",
+          "[Invoice] วันที่เอกสารทั้งหมด:",
           invoicesData.map((i) => i.documentDate)
         );
       } catch (err) {
+        console.error("[Invoice] เกิดข้อผิดพลาดในการโหลดข้อมูล:", err);
         setError((err as Error).message);
       } finally {
         setLoading(false);
@@ -103,18 +110,26 @@ const Invoice = () => {
   };
 
   const handleViewClick = async (invoice: any) => {
-    // ดึงข้อมูลเต็มของ invoice จาก backend โดยตรง (ไม่ใช้ allDocs)
-    const fullDoc = await apiService.getDocumentById(invoice.id);
-    setSelectedInvoice(fullDoc);
-    setIsModalOpen(true);
+    try {
+      console.log("[Invoice] ดูรายละเอียดใบแจ้งหนี้:", invoice.number);
+      // ดึงข้อมูลเต็มของ invoice จาก backend โดยตรง (ไม่ใช้ allDocs)
+      const fullDoc = await apiService.getDocumentById(invoice.id);
+      setSelectedInvoice(fullDoc);
+      setIsModalOpen(true);
+    } catch (error) {
+      console.error("[Invoice] เกิดข้อผิดพลาดในการดูรายละเอียด:", error);
+      toast.error("ไม่สามารถดูรายละเอียดได้");
+    }
   };
 
   const handleEditClick = (invoice: any) => {
+    console.log("[Invoice] แก้ไขใบแจ้งหนี้:", invoice.number);
     navigate(`/documents/invoice/edit/${invoice.id}`);
   };
 
   const handleEditSave = async (data: any) => {
     try {
+      console.log("[Invoice] บันทึกการแก้ไข:", data.documentNumber);
       await apiService.updateDocument(data.id, data);
       toast.success("บันทึกใบแจ้งหนี้สำเร็จ");
       setEditInvoiceData(null);
@@ -135,25 +150,29 @@ const Invoice = () => {
           status: doc.status,
         }));
       setInvoices(invoicesData);
+      console.log("[Invoice] รีเฟรชข้อมูลสำเร็จ");
     } catch (e) {
+      console.error("[Invoice] เกิดข้อผิดพลาดในการบันทึก:", e);
       toast.error("บันทึกไม่สำเร็จ");
     }
   };
 
   const handleEditCancel = () => {
+    console.log("[Invoice] ยกเลิกการแก้ไข");
     setEditInvoiceData(null);
   };
 
   const handleDeleteClick = async (id: number) => {
     if (window.confirm("Are you sure you want to delete this invoice?")) {
       try {
+        console.log("[Invoice] ลบใบแจ้งหนี้ ID:", id);
         await apiService.deleteDocument(id.toString());
         setInvoices((prevInvoices) =>
           prevInvoices.filter((invoice) => invoice.id !== id)
         );
         toast.success("ลบใบแจ้งหนี้เรียบร้อยแล้ว");
       } catch (error) {
-        console.error("Failed to delete invoice:", error);
+        console.error("[Invoice] เกิดข้อผิดพลาดในการลบ:", error);
         toast.error("เกิดข้อผิดพลาดในการลบใบแจ้งหนี้");
         setError((error as Error).message);
       }
@@ -187,6 +206,11 @@ const Invoice = () => {
     let year = parseInt(y, 10);
     if (year > 2400) year -= 543;
     return `${year}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+  };
+
+  const handleFilterChange = (newFilters: any) => {
+    console.log("[Invoice] เปลี่ยน filter:", newFilters);
+    setFilters(newFilters);
   };
 
   // ฟังก์ชันกรองข้อมูล
@@ -267,8 +291,8 @@ const Invoice = () => {
   });
 
   // หลัง filter
-  console.log("FILTER", filters.dateFrom, typeof filters.dateFrom);
-  console.log("AFTER FILTER", filteredInvoices.length);
+  console.log("[Invoice] Filter:", filters.dateFrom, typeof filters.dateFrom);
+  console.log("[Invoice] หลัง filter:", filteredInvoices.length);
 
   return (
     <div className="space-y-6">
@@ -304,7 +328,7 @@ const Invoice = () => {
           </div>
         </div>
         <DocumentFilter
-          onFilterChange={setFilters}
+          onFilterChange={handleFilterChange}
           initialFilters={filters}
           statusOptions={[
             { value: "all", label: "ทั้งหมด" },
@@ -323,8 +347,9 @@ const Invoice = () => {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="flex justify-center items-center py-10">
-              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            <div className="space-y-4">
+              <Skeleton className="h-8 w-48" />
+              <Skeleton className="h-64 w-full" />
             </div>
           ) : error ? (
             <div className="text-center py-10 text-red-500">
@@ -418,7 +443,7 @@ const Invoice = () => {
                             แก้ไข
                           </Button>
                           <Button
-                            variant="destructive"
+                            variant="outline"
                             size="sm"
                             onClick={() => handleDeleteClick(invoice.id)}
                           >
@@ -432,14 +457,31 @@ const Invoice = () => {
               </table>
             </div>
           )}
-          <InvoiceModal
-            open={isModalOpen}
-            onClose={() => setIsModalOpen(false)}
-            invoice={selectedInvoice}
-          />
         </CardContent>
       </Card>
+
+      {/* Modal */}
+      {selectedInvoice && (
+        <InvoiceModal
+          open={isModalOpen}
+          onClose={() => {
+            setIsModalOpen(false);
+            setSelectedInvoice(null);
+          }}
+          invoice={selectedInvoice}
+        />
+      )}
+
+      {/* Edit Form */}
+      {editInvoiceData && (
+        <InvoiceForm
+          initialData={editInvoiceData}
+          onSave={handleEditSave}
+          onCancel={handleEditCancel}
+        />
+      )}
     </div>
   );
 };
+
 export default Invoice;

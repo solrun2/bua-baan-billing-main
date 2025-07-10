@@ -56,6 +56,7 @@ import { ProductForm } from "./ProductForm";
 import { getCustomerById } from "@/pages/services/customerService";
 import { getProductById } from "@/pages/services/productService";
 import { documentService } from "@/pages/services/documentService";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export interface DocumentFormProps {
   onCancel: () => void;
@@ -81,20 +82,12 @@ export const DocumentForm: FC<DocumentFormProps> = ({
   pageTitle,
   pageSubtitle,
 }: DocumentFormProps) => {
-  console.log("DocumentForm: initialData:", initialData);
-  console.log(
-    "DocumentForm: items:",
-    initialData.items,
-    "typeof:",
-    typeof initialData.items,
-    "length:",
-    initialData.items?.length
-  );
-  if (Array.isArray(initialData.items)) {
-    initialData.items.forEach((item, idx) => {
-      console.log(`DocumentForm: items[${idx}]`, item);
-    });
-  }
+  console.log("[DocumentForm] เริ่มต้นฟอร์ม:", {
+    documentType,
+    editMode,
+    hasInitialData: !!initialData,
+    itemsCount: initialData?.items?.length || 0,
+  });
 
   const [isSaving, setIsSaving] = useState(false);
   const navigate = useNavigate();
@@ -147,9 +140,8 @@ export const DocumentForm: FC<DocumentFormProps> = ({
   }
 
   // 1. สร้าง state ฟอร์มแบบ pre-fill ทุก field จาก initialData (editMode)
-  const [form, setForm] = useState(() => ({
-    ...initialData,
-    items: (initialData.items || []).map((item) => {
+  const [form, setForm] = useState(() => {
+    const items = (initialData.items || []).map((item) => {
       let withholdingTax: number | "custom" = 0;
       if (item.withholding_tax_option === "กำหนดเอง") {
         withholdingTax = "custom";
@@ -173,9 +165,19 @@ export const DocumentForm: FC<DocumentFormProps> = ({
         withholdingTax,
         withholdingTaxAmount: item.withholdingTaxAmount ?? 0,
         customWithholdingTaxAmount: item.customWithholdingTaxAmount ?? 0,
-      };
-    }) as DocumentItem[],
-  }));
+      } as DocumentItem;
+    });
+
+    console.log("[DocumentForm] สร้าง state ฟอร์ม:", {
+      itemsCount: items.length,
+      documentNumber: initialData.documentNumber,
+    });
+
+    return {
+      ...initialData,
+      items,
+    };
+  });
 
   // เพิ่ม netTotalAmount ใน state summary
   const [summary, setSummary] = useState<
@@ -190,14 +192,43 @@ export const DocumentForm: FC<DocumentFormProps> = ({
   });
   const [netTotal, setNetTotal] = useState(0);
 
+  // Optimize: Memoize summary calculation
+  const calculatedSummary = useMemo(() => {
+    if (form.items.length === 0) {
+      return {
+        subtotal: 0,
+        discount: 0,
+        tax: 0,
+        total: 0,
+        withholdingTax: 0,
+        netTotalAmount: 0,
+      };
+    }
+
+    return calculateDocumentSummary(form.items);
+  }, [form.items]);
+
+  // Update summary when calculatedSummary changes
+  useEffect(() => {
+    setSummary(calculatedSummary);
+    setNetTotal(calculatedSummary.total);
+  }, [calculatedSummary]);
+
   // handle เปลี่ยนค่าในฟอร์ม
-  const handleFormChange = (field: string, value: any) => {
-    setForm((prev) => ({
-      ...prev,
-      [field]: value,
-      summary: prev.summary ?? summary,
-    }));
-  };
+  const handleFormChange = useCallback(
+    (field: string, value: any) => {
+      console.log("[DocumentForm] เปลี่ยนค่า:", field, value);
+      setForm(
+        (prev) =>
+          ({
+            ...prev,
+            [field]: value,
+            summary: prev.summary ?? summary,
+          }) as typeof form
+      );
+    },
+    [summary]
+  );
 
   // handle เปลี่ยนค่าใน customer
   const handleCustomerChange = (
@@ -264,13 +295,22 @@ export const DocumentForm: FC<DocumentFormProps> = ({
   const addNewItem = () => {
     const newItem = createDefaultItem();
     const calculatedItem = updateItemWithCalculations(newItem);
-    setForm((prev) => ({ ...prev, items: [...prev.items, calculatedItem] }));
+    setForm(
+      (prev) =>
+        ({
+          ...prev,
+          items: [...prev.items, calculatedItem],
+        }) as typeof form
+    );
   };
   const removeItem = (id: string) => {
-    setForm((prev) => ({
-      ...prev,
-      items: prev.items.filter((item) => item.id !== id),
-    }));
+    setForm(
+      (prev) =>
+        ({
+          ...prev,
+          items: prev.items.filter((item) => item.id !== id),
+        }) as typeof form
+    );
   };
 
   // handle เลือกลูกค้า

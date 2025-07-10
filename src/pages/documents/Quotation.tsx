@@ -16,11 +16,13 @@ import QuotationModal from "@/pages/sub/quotation/QuotationModal";
 import { calculateDocumentSummary } from "@/calculate/documentCalculations";
 import { formatCurrency } from "../../lib/utils";
 import DocumentFilter from "../../components/DocumentFilter";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const Quotation = () => {
   const navigate = useNavigate();
 
   const handleCreateNew = () => {
+    console.log("[Quotation] สร้างใบเสนอราคาใหม่");
     navigate("/documents/quotation/new");
   };
 
@@ -38,6 +40,7 @@ const Quotation = () => {
   useEffect(() => {
     const loadQuotations = async () => {
       try {
+        console.log("[Quotation] เริ่มโหลดข้อมูลใบเสนอราคา");
         setLoading(true);
         const data = await apiService.getDocuments();
         const quotationsData = data
@@ -60,12 +63,17 @@ const Quotation = () => {
             };
           });
         setQuotations(quotationsData);
+        console.log("[Quotation] โหลดข้อมูลสำเร็จ:", {
+          total: data.length,
+          quotations: quotationsData.length,
+        });
         // log all documentDate
         console.log(
-          "ALL DOCS",
+          "[Quotation] วันที่เอกสารทั้งหมด:",
           quotationsData.map((i) => i.documentDate)
         );
       } catch (err) {
+        console.error("[Quotation] เกิดข้อผิดพลาดในการโหลดข้อมูล:", err);
         setError((err as Error).message);
       } finally {
         setLoading(false);
@@ -90,30 +98,35 @@ const Quotation = () => {
 
   const handleViewClick = useCallback(async (quotation: any) => {
     try {
+      console.log("[Quotation] ดูรายละเอียดใบเสนอราคา:", quotation.number);
       const allDocs = await apiService.getDocuments();
       const fullDoc = allDocs.find((doc: any) => doc.id === quotation.id);
       setSelectedQuotation(fullDoc);
       setIsModalOpen(true);
     } catch (err) {
+      console.error("[Quotation] เกิดข้อผิดพลาดในการดูรายละเอียด:", err);
       setSelectedQuotation(null);
       setIsModalOpen(false);
+      toast.error("ไม่สามารถดูรายละเอียดได้");
     }
   }, []);
 
   const handleEditClick = (id: any) => {
+    console.log("[Quotation] แก้ไขใบเสนอราคา ID:", id);
     navigate(`/documents/quotation/edit/${id}`);
   };
 
   const handleDeleteClick = async (id: any) => {
     if (window.confirm("Are you sure you want to delete this quotation?")) {
       try {
+        console.log("[Quotation] ลบใบเสนอราคา ID:", id);
         await apiService.deleteDocument(id.toString());
         setQuotations((prevQuotations) =>
           prevQuotations.filter((q) => q.id !== id)
         );
         toast.success("ลบใบเสนอราคาเรียบร้อยแล้ว");
       } catch (error) {
-        console.error("Failed to delete quotation:", error);
+        console.error("[Quotation] เกิดข้อผิดพลาดในการลบ:", error);
         toast.error("เกิดข้อผิดพลาดในการลบใบเสนอราคา");
         setError((error as Error).message);
       }
@@ -158,6 +171,11 @@ const Quotation = () => {
     const date = new Date(Date.UTC(y, m - 1, d));
     return isNaN(date.getTime()) ? null : date;
   }
+
+  const handleFilterChange = (newFilters: any) => {
+    console.log("[Quotation] เปลี่ยน filter:", newFilters);
+    setFilters(newFilters);
+  };
 
   const filteredQuotations = quotations.filter((q) => {
     if (
@@ -236,8 +254,8 @@ const Quotation = () => {
   });
 
   // หลัง filter
-  console.log("FILTER", filters.dateFrom, typeof filters.dateFrom);
-  console.log("AFTER FILTER", filteredQuotations.length);
+  console.log("[Quotation] Filter:", filters.dateFrom, typeof filters.dateFrom);
+  console.log("[Quotation] หลัง filter:", filteredQuotations.length);
 
   return (
     <div className="space-y-6">
@@ -271,7 +289,7 @@ const Quotation = () => {
           </div>
         </div>
         <DocumentFilter
-          onFilterChange={setFilters}
+          onFilterChange={handleFilterChange}
           initialFilters={filters}
           statusOptions={[
             { value: "all", label: "ทั้งหมด" },
@@ -290,8 +308,9 @@ const Quotation = () => {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="flex justify-center items-center py-10">
-              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            <div className="space-y-4">
+              <Skeleton className="h-8 w-48" />
+              <Skeleton className="h-64 w-full" />
             </div>
           ) : error ? (
             <div className="text-center py-10 text-red-500">
@@ -319,7 +338,7 @@ const Quotation = () => {
                       วันที่
                     </th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground">
-                      ยืนราคาถึงวันที่
+                      วันหมดอายุ
                     </th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground">
                       จำนวนเงิน
@@ -345,18 +364,10 @@ const Quotation = () => {
                         {quotation.customer}
                       </td>
                       <td className="py-3 px-4 text-muted-foreground">
-                        {quotation.documentDate
-                          ? new Date(
-                              toAD(quotation.documentDate)
-                            ).toLocaleDateString("en-GB")
-                          : "-"}
+                        {quotation.date}
                       </td>
                       <td className="py-3 px-4 text-muted-foreground">
-                        {quotation.validUntil
-                          ? new Date(
-                              toAD(quotation.validUntil)
-                            ).toLocaleDateString("en-GB")
-                          : "-"}
+                        {quotation.validUntil}
                       </td>
                       <td className="py-3 px-4 font-medium text-foreground">
                         <span>{formatCurrency(quotation.netTotal)}</span>
@@ -385,7 +396,7 @@ const Quotation = () => {
                             แก้ไข
                           </Button>
                           <Button
-                            variant="destructive"
+                            variant="outline"
                             size="sm"
                             onClick={() => handleDeleteClick(quotation.id)}
                           >
@@ -399,13 +410,20 @@ const Quotation = () => {
               </table>
             </div>
           )}
-          <QuotationModal
-            open={isModalOpen}
-            onClose={() => setIsModalOpen(false)}
-            quotation={selectedQuotation}
-          />
         </CardContent>
       </Card>
+
+      {/* Modal */}
+      {selectedQuotation && (
+        <QuotationModal
+          open={isModalOpen}
+          onClose={() => {
+            setIsModalOpen(false);
+            setSelectedQuotation(null);
+          }}
+          quotation={selectedQuotation}
+        />
+      )}
     </div>
   );
 };

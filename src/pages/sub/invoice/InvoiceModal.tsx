@@ -1,14 +1,32 @@
 import React from "react";
 import DocumentModal from "../DocumentModal";
+import { DocumentData } from "@/types/document";
 
 interface InvoiceModalProps {
   open: boolean;
   onClose: () => void;
-  invoice: any;
+  invoice: DocumentData;
 }
 
-const InvoiceModal: React.FC<InvoiceModalProps> = ({ open, onClose, invoice }) => (
-  <DocumentModal type="invoice" document={invoice} open={open} onClose={onClose} />
-);
+const InvoiceModal: React.FC<InvoiceModalProps> = ({
+  open,
+  onClose,
+  invoice,
+}) => {
+  console.log("[InvoiceModal] แสดง Modal:", {
+    isOpen: open,
+    documentNumber: invoice?.documentNumber,
+    hasItems: !!invoice?.items?.length,
+  });
+
+  return (
+    <DocumentModal
+      type="invoice"
+      document={invoice as any}
+      open={open}
+      onClose={onClose}
+    />
+  );
+};
 
 export default InvoiceModal;
