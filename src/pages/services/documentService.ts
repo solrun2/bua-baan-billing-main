@@ -85,9 +85,23 @@ export const documentService = {
 
   // Generate a new document number based on type
   generateNewDocumentNumber(type: 'quotation' | 'invoice' | 'receipt' | 'tax_invoice'): string {
+    // ใช้ cache เพื่อเพิ่มประสิทธิภาพ
+    const cacheKey = `doc_number_${type}`;
+    const cached = sessionStorage.getItem(cacheKey);
+    
+    if (cached) {
+      return cached;
+    }
+    
     const documents = this.getAll();
     const existingNumbers = documents.map(doc => doc.documentNumber);
-    return generateDocumentNumber(type, existingNumbers);
+    const newNumber = generateDocumentNumber(type, existingNumbers);
+    
+    // cache ไว้ 5 นาที
+    sessionStorage.setItem(cacheKey, newNumber);
+    setTimeout(() => sessionStorage.removeItem(cacheKey), 5 * 60 * 1000);
+    
+    return newNumber;
   },
 
   // Delete a document by ID

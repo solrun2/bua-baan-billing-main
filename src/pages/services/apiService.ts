@@ -387,11 +387,13 @@ function mapDocumentFromBackend(doc: any): DocumentData {
 
 const getDocumentById = async (id: string): Promise<DocumentData> => {
   try {
+    console.log(`Fetching document with ID: ${id}`);
     const response = await fetch(`${API_BASE_URL}/documents/${id}`);
     if (!response.ok) {
       throw new Error("Failed to fetch document by ID");
     }
     const doc = await response.json();
+    console.log(`Document fetched successfully:`, doc);
     return mapDocumentFromBackend(doc);
   } catch (error) {
     console.error("Error fetching document by ID:", error);

@@ -34,7 +34,10 @@ const Receipt = () => {
     const loadReceipts = async () => {
       try {
         setLoading(true);
+        console.log("Loading receipts...");
         const data = await apiService.getDocuments();
+        console.log("Documents loaded:", data.length);
+
         // กรองใบเสร็จที่ไม่มีเลขที่เอกสารจริง (mock) ออก
         const receiptsData = data
           .filter((doc) => doc.document_type === "RECEIPT")
@@ -47,13 +50,11 @@ const Receipt = () => {
             ...doc,
             total_amount: Number(doc.total_amount),
           }));
+
+        console.log("Filtered receipts:", receiptsData.length);
         setReceipts(receiptsData);
-        // log all documentDate
-        console.log(
-          "ALL DOCS",
-          receiptsData.map((i) => i.issue_date)
-        );
       } catch (err) {
+        console.error("Error loading receipts:", err);
         setError((err as Error).message);
       } finally {
         setLoading(false);

@@ -31,7 +31,7 @@ const ReceiptForm = ({
 }: ReceiptFormProps) => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false); // เปลี่ยนจาก true เป็น false
   const [isClient, setIsClient] = useState(false);
   const [initialData, setInitialData] =
     useState<EnsureDocumentType<DocumentData>>();
@@ -40,27 +40,7 @@ const ReceiptForm = ({
   // โหลดข้อมูลใบเสร็จเมื่อ editMode และมี id
   useEffect(() => {
     const fetchData = async () => {
-      setIsLoading(true);
-      if (editMode && id) {
-        try {
-          const data = await apiService.getDocumentById(id);
-          console.log("API response (ReceiptForm)", data); // เพิ่ม log ตรงนี้
-          setInitialData({
-            ...data,
-            documentType: "receipt",
-            status: data.status || "ชำระแล้ว",
-            priceType: data.priceType || "exclusive",
-          });
-          setIsEditing(true);
-        } catch (err) {
-          toast.error("ไม่พบใบเสร็จ");
-        } finally {
-          setIsLoading(false);
-          setIsClient(true);
-        }
-        return;
-      }
-      // กรณีสร้างใหม่หรือรับ initialData จาก props
+      // กรณีสร้างใหม่หรือรับ initialData จาก props - ไม่ต้องโหลด
       if (externalInitialData) {
         setInitialData({
           ...externalInitialData,
@@ -69,38 +49,61 @@ const ReceiptForm = ({
           priceType: externalInitialData.priceType || "exclusive",
         });
         setIsEditing(true);
-        setIsLoading(false);
         setIsClient(true);
         return;
       }
-      // For new document, generate a document number
-      const newNumber = documentService.generateNewDocumentNumber("receipt");
-      setInitialData({
-        id: `rc_${Date.now()}`,
-        documentNumber: newNumber,
-        documentType: "receipt",
-        customer: { name: "", tax_id: "", phone: "", address: "" },
-        items: [],
-        summary: {
-          subtotal: 0,
-          discount: 0,
-          tax: 0,
-          total: 0,
-          withholdingTax: 0,
-        },
-        notes: "",
-        documentDate: new Date().toISOString().split("T")[0],
-        dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-          .toISOString()
-          .split("T")[0],
-        reference: "",
-        status: "ชำระแล้ว",
-        priceType: "exclusive",
-      });
-      setIsEditing(false);
-      setIsLoading(false);
-      setIsClient(true);
+
+      // กรณีสร้างใหม่ - สร้างข้อมูลเริ่มต้นทันที
+      if (!editMode || !id) {
+        const newNumber = documentService.generateNewDocumentNumber("receipt");
+        setInitialData({
+          id: `rc_${Date.now()}`,
+          documentNumber: newNumber,
+          documentType: "receipt",
+          customer: { name: "", tax_id: "", phone: "", address: "" },
+          items: [],
+          summary: {
+            subtotal: 0,
+            discount: 0,
+            tax: 0,
+            total: 0,
+            withholdingTax: 0,
+          },
+          notes: "",
+          documentDate: new Date().toISOString().split("T")[0],
+          dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+            .toISOString()
+            .split("T")[0],
+          reference: "",
+          status: "ชำระแล้ว",
+          priceType: "exclusive",
+        });
+        setIsEditing(false);
+        setIsClient(true);
+        return;
+      }
+
+      // กรณีแก้ไข - โหลดข้อมูลจาก API
+      setIsLoading(true);
+      try {
+        const data = await apiService.getDocumentById(id);
+        console.log("API response (ReceiptForm)", data);
+        setInitialData({
+          ...data,
+          documentType: "receipt",
+          status: data.status || "ชำระแล้ว",
+          priceType: data.priceType || "exclusive",
+        });
+        setIsEditing(true);
+      } catch (err) {
+        toast.error("ไม่พบใบเสร็จ");
+        navigate("/documents/receipt"); // กลับไปหน้าหลักถ้าไม่พบข้อมูล
+      } finally {
+        setIsLoading(false);
+        setIsClient(true);
+      }
     };
+
     fetchData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editMode, id, externalInitialData]);
@@ -180,8 +183,43 @@ const ReceiptForm = ({
 
   if (!isClient || isLoading || !initialData) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin" />
+      <div className="container mx-auto py-6">
+        <div className="space-y-6">
+          {/* Header Skeleton */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-gray-200 rounded-xl animate-pulse"></div>
+              <div className="space-y-2">
+                <div className="h-6 w-48 bg-gray-200 rounded animate-pulse"></div>
+                <div className="h-4 w-32 bg-gray-200 rounded animate-pulse"></div>
+              </div>
+            </div>
+          </div>
+
+          {/* Form Skeleton */}
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="space-y-2">
+                  <div className="h-4 w-20 bg-gray-200 rounded animate-pulse"></div>
+                  <div className="h-10 w-full bg-gray-200 rounded animate-pulse"></div>
+                </div>
+              ))}
+            </div>
+
+            <div className="space-y-4">
+              <div className="h-4 w-24 bg-gray-200 rounded animate-pulse"></div>
+              <div className="space-y-2">
+                {[1, 2, 3].map((i) => (
+                  <div
+                    key={i}
+                    className="h-16 w-full bg-gray-200 rounded animate-pulse"
+                  ></div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
