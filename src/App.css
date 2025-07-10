@@ -40,3 +40,28 @@
 .read-the-docs {
   color: #888;
 }
+
+@media print {
+  /* ซ่อน Navbar, Sidebar, Search bar, ปุ่ม, ส่วนหัวที่ไม่ต้องการปริ้น */
+  .app-navbar,
+  .app-sidebar,
+  .search-bar,
+  .page-header,
+  .not-print,
+  header,
+  nav,
+  .print-hide {
+    display: none !important;
+  }
+  /* ให้เฉพาะ .print-area แสดงเต็มหน้ากระดาษ */
+  .print-area {
+    position: static !important;
+    width: 100% !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    background: white !important;
+  }
+  body {
+    background: white !important;
+  }
+}
