@@ -1077,30 +1077,32 @@ export const DocumentForm: FC<DocumentFormProps> = ({
               </div>
 
               {/* สวิตช์ออกใบกำกับภาษี */}
-              <div className="space-y-2">
-                <Label className="flex items-center gap-1">
-                  การออกใบกำกับภาษี
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Info className="w-4 h-4 text-gray-400" />
-                      </TooltipTrigger>
-                    </Tooltip>
-                  </TooltipProvider>
-                </Label>
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    id="tax-invoice"
-                    checked={form.issueTaxInvoice}
-                    onCheckedChange={(value) =>
-                      handleFormChange("issueTaxInvoice", value)
-                    }
-                  />
-                  <Label htmlFor="tax-invoice" className="text-blue-600">
-                    ใบกำกับภาษี
+              {(documentType === "invoice" || documentType === "receipt") && (
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-1">
+                    การออกใบกำกับภาษี
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="w-4 h-4 text-gray-400" />
+                        </TooltipTrigger>
+                      </Tooltip>
+                    </TooltipProvider>
                   </Label>
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="tax-invoice"
+                      checked={form.issueTaxInvoice}
+                      onCheckedChange={(value) =>
+                        handleFormChange("issueTaxInvoice", value)
+                      }
+                    />
+                    <Label htmlFor="tax-invoice" className="text-blue-600">
+                      ใบกำกับภาษี
+                    </Label>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -1353,8 +1355,48 @@ export const DocumentForm: FC<DocumentFormProps> = ({
         {documentType === "receipt" && (
           <Card className="mb-6 border border-green-200 bg-green-50">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <div className="font-bold text-lg text-green-900">
-                รับชำระเงินครั้งที่ 1
+              <div className="flex flex-row items-center gap-6">
+                <div className="font-bold text-lg text-green-900">
+                  รับชำระเงินครั้งที่ 1
+                </div>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="receiptMode"
+                      value="basic"
+                      checked={receiptMode === "basic"}
+                      onChange={() => setReceiptMode("basic")}
+                    />
+                    <span
+                      className={
+                        receiptMode === "basic"
+                          ? "text-green-700 font-semibold"
+                          : "text-gray-500"
+                      }
+                    >
+                      พื้นฐาน
+                    </span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="receiptMode"
+                      value="advanced"
+                      checked={receiptMode === "advanced"}
+                      onChange={() => setReceiptMode("advanced")}
+                    />
+                    <span
+                      className={
+                        receiptMode === "advanced"
+                          ? "text-green-700 font-semibold"
+                          : "text-gray-500"
+                      }
+                    >
+                      ขั้นสูง
+                    </span>
+                  </label>
+                </div>
               </div>
               <div>
                 <Label className="mr-2">วันที่ชำระ:</Label>
@@ -1429,152 +1471,166 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                   </div>
                 )}
               </div>
-              <hr className="my-4 border-green-200" />
-              {/* ค่าธรรมเนียม หรือรายการปรับปรุง */}
-              <div>
-                <label className="flex items-center gap-2 mb-2">
-                  <input
-                    type="checkbox"
-                    checked={fees[0]?.enabled}
-                    onChange={(e) => updateFee(0, "enabled", e.target.checked)}
-                  />
-                  <span className="font-medium text-green-900">
-                    ค่าธรรมเนียม หรือรายการปรับปรุง
-                  </span>
-                </label>
-                {fees[0]?.enabled && (
-                  <div className="grid grid-cols-12 gap-4 items-center bg-white p-4 rounded-lg border border-green-100">
-                    <div className="col-span-2">
-                      <Select
-                        value={fees[0].type}
-                        onValueChange={(v) => updateFee(0, "type", v)}
-                      >
-                        <SelectTrigger className="bg-white border-green-100">
-                          <SelectValue placeholder="ประเภท" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="fee">ปรับปรุง</SelectItem>
-                          <SelectItem value="other">อื่นๆ</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="col-span-3">
-                      <Select
-                        value={fees[0].account}
-                        onValueChange={(v) => updateFee(0, "account", v)}
-                      >
-                        <SelectTrigger className="bg-white border-green-100">
-                          <SelectValue placeholder="บัญชีที่เกี่ยวข้อง" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="530501">
-                            530501 - ค่าธรรมเนียมธนาคาร
-                          </SelectItem>
-                          <SelectItem value="530502">
-                            530502 - ค่าธรรมเนียมอื่นๆ
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="col-span-3">
-                      <Input
-                        type="number"
-                        className="bg-white border-green-100"
-                        placeholder="จำนวนเงินปรับปรุง"
-                        value={fees[0].amount}
-                        onChange={(e) => updateFee(0, "amount", e.target.value)}
-                      />
-                    </div>
-                    <div className="col-span-3">
-                      <Input
-                        type="text"
-                        className="bg-white border-green-100"
-                        placeholder="หมายเหตุ"
-                        maxLength={20}
-                        value={fees[0].note}
-                        onChange={(e) => updateFee(0, "note", e.target.value)}
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-              <hr className="my-4 border-green-200" />
-              {/* ตัดชำระกับเอกสาร */}
-              <div>
-                <label className="flex items-center gap-2 mb-2">
-                  <input
-                    type="checkbox"
-                    checked={offsetDocs[0]?.enabled}
-                    onChange={(e) =>
-                      updateOffsetDoc(0, "enabled", e.target.checked)
-                    }
-                  />
-                  <span className="font-medium text-purple-900">
-                    ตัดชำระกับเอกสาร
-                  </span>
-                </label>
-                {offsetDocs[0]?.enabled && (
-                  <div className="grid grid-cols-12 gap-4 items-center bg-white p-4 rounded-lg border border-purple-100">
-                    <div className="col-span-3">
-                      <Select
-                        value={offsetDocs[0].docType}
-                        onValueChange={(v) => updateOffsetDoc(0, "docType", v)}
-                      >
-                        <SelectTrigger className="bg-white border-purple-100">
-                          <SelectValue placeholder="ประเภทเอกสาร" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="invoice">ใบแจ้งหนี้</SelectItem>
-                          <SelectItem value="credit">ใบลดหนี้</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="col-span-3">
-                      <Select
-                        value={offsetDocs[0].docNumber}
-                        onValueChange={(v) =>
-                          updateOffsetDoc(0, "docNumber", v)
-                        }
-                      >
-                        <SelectTrigger className="bg-white border-purple-100">
-                          <SelectValue placeholder="เลขที่เอกสาร" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="INV-2025-0001">
-                            INV-2025-0001
-                          </SelectItem>
-                          <SelectItem value="CR-2025-0001">
-                            CR-2025-0001
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="col-span-3">
-                      <Input
-                        type="number"
-                        className="bg-white border-purple-100"
-                        placeholder="จำนวนเงินที่รับชำระ"
-                        value={offsetDocs[0].amount}
+              {receiptMode === "advanced" && (
+                <>
+                  <hr className="my-4 border-green-200" />
+                  {/* ค่าธรรมเนียม หรือรายการปรับปรุง */}
+                  <div>
+                    <label className="flex items-center gap-2 mb-2">
+                      <input
+                        type="checkbox"
+                        checked={fees[0]?.enabled}
                         onChange={(e) =>
-                          updateOffsetDoc(0, "amount", e.target.value)
+                          updateFee(0, "enabled", e.target.checked)
                         }
                       />
-                    </div>
-                    <div className="col-span-2">
-                      <Input
-                        type="text"
-                        className="bg-white border-purple-100"
-                        placeholder="หมายเหตุ"
-                        maxLength={20}
-                        value={offsetDocs[0].note}
-                        onChange={(e) =>
-                          updateOffsetDoc(0, "note", e.target.value)
-                        }
-                      />
-                    </div>
+                      <span className="font-medium text-green-900">
+                        ค่าธรรมเนียม หรือรายการปรับปรุง
+                      </span>
+                    </label>
+                    {fees[0]?.enabled && (
+                      <div className="grid grid-cols-12 gap-4 items-center bg-white p-4 rounded-lg border border-green-100">
+                        <div className="col-span-2">
+                          <Select
+                            value={fees[0].type}
+                            onValueChange={(v) => updateFee(0, "type", v)}
+                          >
+                            <SelectTrigger className="bg-white border-green-100">
+                              <SelectValue placeholder="ประเภท" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="fee">ปรับปรุง</SelectItem>
+                              <SelectItem value="other">อื่นๆ</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="col-span-3">
+                          <Select
+                            value={fees[0].account}
+                            onValueChange={(v) => updateFee(0, "account", v)}
+                          >
+                            <SelectTrigger className="bg-white border-green-100">
+                              <SelectValue placeholder="บัญชีที่เกี่ยวข้อง" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="530501">
+                                530501 - ค่าธรรมเนียมธนาคาร
+                              </SelectItem>
+                              <SelectItem value="530502">
+                                530502 - ค่าธรรมเนียมอื่นๆ
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="col-span-3">
+                          <Input
+                            type="number"
+                            className="bg-white border-green-100"
+                            placeholder="จำนวนเงินปรับปรุง"
+                            value={fees[0].amount}
+                            onChange={(e) =>
+                              updateFee(0, "amount", e.target.value)
+                            }
+                          />
+                        </div>
+                        <div className="col-span-3">
+                          <Input
+                            type="text"
+                            className="bg-white border-green-100"
+                            placeholder="หมายเหตุ"
+                            maxLength={20}
+                            value={fees[0].note}
+                            onChange={(e) =>
+                              updateFee(0, "note", e.target.value)
+                            }
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
+                  <hr className="my-4 border-green-200" />
+                  {/* ตัดชำระกับเอกสาร */}
+                  <div>
+                    <label className="flex items-center gap-2 mb-2">
+                      <input
+                        type="checkbox"
+                        checked={offsetDocs[0]?.enabled}
+                        onChange={(e) =>
+                          updateOffsetDoc(0, "enabled", e.target.checked)
+                        }
+                      />
+                      <span className="font-medium text-purple-900">
+                        ตัดชำระกับเอกสาร
+                      </span>
+                    </label>
+                    {offsetDocs[0]?.enabled && (
+                      <div className="grid grid-cols-12 gap-4 items-center bg-white p-4 rounded-lg border border-purple-100">
+                        <div className="col-span-3">
+                          <Select
+                            value={offsetDocs[0].docType}
+                            onValueChange={(v) =>
+                              updateOffsetDoc(0, "docType", v)
+                            }
+                          >
+                            <SelectTrigger className="bg-white border-purple-100">
+                              <SelectValue placeholder="ประเภทเอกสาร" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="invoice">
+                                ใบแจ้งหนี้
+                              </SelectItem>
+                              <SelectItem value="credit">ใบลดหนี้</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="col-span-3">
+                          <Select
+                            value={offsetDocs[0].docNumber}
+                            onValueChange={(v) =>
+                              updateOffsetDoc(0, "docNumber", v)
+                            }
+                          >
+                            <SelectTrigger className="bg-white border-purple-100">
+                              <SelectValue placeholder="เลขที่เอกสาร" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="INV-2025-0001">
+                                INV-2025-0001
+                              </SelectItem>
+                              <SelectItem value="CR-2025-0001">
+                                CR-2025-0001
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="col-span-3">
+                          <Input
+                            type="number"
+                            className="bg-white border-purple-100"
+                            placeholder="จำนวนเงินที่รับชำระ"
+                            value={offsetDocs[0].amount}
+                            onChange={(e) =>
+                              updateOffsetDoc(0, "amount", e.target.value)
+                            }
+                          />
+                        </div>
+                        <div className="col-span-2">
+                          <Input
+                            type="text"
+                            className="bg-white border-purple-100"
+                            placeholder="หมายเหตุ"
+                            maxLength={20}
+                            value={offsetDocs[0].note}
+                            onChange={(e) =>
+                              updateOffsetDoc(0, "note", e.target.value)
+                            }
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
               {/* กล่องสรุปยอดล่างสุด */}
               <div className="flex flex-col items-end bg-white border border-green-200 rounded-xl p-4 text-green-900 shadow-sm mt-6">
                 <div className="flex flex-col gap-2 w-full max-w-xs">
