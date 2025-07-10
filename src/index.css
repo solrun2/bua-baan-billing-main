@@ -104,3 +104,56 @@
 .gradient-card {
   background: linear-gradient(135deg, #f7f8f4 0%, #f9faf7 100%);
 }
+
+@media print {
+  body {
+    background: #fff !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  .print-area {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    background: #fff !important;
+    color: #000 !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+  }
+  .print\:hidden,
+  .no-print {
+    display: none !important;
+  }
+  .print\:block {
+    display: block !important;
+  }
+  header,
+  nav,
+  .navbar,
+  .sidebar,
+  .search-bar,
+  .breadcrumb,
+  .app-header,
+  .app-footer,
+  .main-header,
+  .layout-header,
+  .page-header,
+  .top-bar,
+  .toolbar,
+  .logo-bar,
+  .container:not(.print-area) {
+    display: none !important;
+  }
+  table {
+    width: 100% !important;
+    font-size: 12pt !important;
+  }
+  .container,
+  .modal,
+  .print-area {
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+  }
+}

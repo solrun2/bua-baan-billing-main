@@ -137,3 +137,28 @@ export type WithholdingTaxOption =
   | "10%"
   | "15%"
   | "กำหนดเอง";
+
+export type ReceiptDetails = {
+  id?: number;
+  document_id: number;
+  payment_date?: string;
+  payment_method?: string;
+  payment_reference?: string;
+  /**
+   * ตัวอย่าง payment_channels: [
+   *   { channel: 'เงินสด', amount: 1000 },
+   *   { channel: 'โอน', amount: 500, bank: 'SCB', ref: 'xxx' }
+   * ]
+   * ตัวอย่าง fees: [
+   *   { type: 'ค่าธรรมเนียม', amount: 20 }
+   * ]
+   * ตัวอย่าง offset_docs: [
+   *   { doc_no: 'INV-001', amount: 100 }
+   * ]
+   * net_total_receipt: 1400
+   */
+  payment_channels?: any[];
+  fees?: any[];
+  offset_docs?: any[];
+  net_total_receipt?: number;
+};

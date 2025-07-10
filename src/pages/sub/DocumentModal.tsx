@@ -284,7 +284,7 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40 print:bg-transparent">
-      <div className="bg-white rounded shadow-lg p-8 w-full max-w-3xl print:relative print:shadow-none print:p-0 print:bg-white relative text-[14px]">
+      <div className="bg-white rounded shadow-lg p-8 w-full max-w-3xl print:relative print:shadow-none print:p-0 print:bg-white relative text-[14px] print-area">
         {/* ปุ่มปิดขวาบน */}
         <button
           onClick={onClose}
@@ -317,6 +317,7 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
               </div>
             </div>
           </div>
+          {/* ใน div ขวาบน (ที่มีเลขที่เอกสาร/วันที่) */}
           <div className="text-right">
             <div>
               <b>เลขที่เอกสาร :</b>{" "}
@@ -359,6 +360,19 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
                 )}
               </div>
             )}
+            {/* ปุ่ม Print ใต้เลขที่เอกสาร/วันที่ */}
+            <div className="mt-2 flex justify-end print:hidden">
+              <button
+                onClick={() => window.print()}
+                className="flex items-center gap-2 px-3 py-1.5 rounded bg-blue-100 hover:bg-blue-200 text-blue-800 font-semibold shadow-sm border border-blue-200 transition-all duration-150"
+                aria-label="ปริ้นเอกสาร"
+                title="ปริ้นเอกสาร"
+                type="button"
+              >
+                <span className="text-lg">🖨️</span>
+                <span className="hidden sm:inline">ปริ้นเอกสาร</span>
+              </button>
+            </div>
           </div>
         </div>
 

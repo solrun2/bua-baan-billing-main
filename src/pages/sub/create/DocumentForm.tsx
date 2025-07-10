@@ -720,10 +720,10 @@ export const DocumentForm: FC<DocumentFormProps> = ({
     { enabled: true, method: "", amount: 0, note: "" },
   ]);
   const [fees, setFees] = useState([
-    { enabled: true, type: "", account: "", amount: 0, note: "" },
+    { enabled: false, type: "", account: "", amount: 0, note: "" },
   ]);
   const [offsetDocs, setOffsetDocs] = useState([
-    { enabled: true, docType: "", docNumber: "", amount: 0, note: "" },
+    { enabled: false, docType: "", docNumber: "", amount: 0, note: "" },
   ]);
 
   // ฟังก์ชันเพิ่ม/ลบ/แก้ไขแต่ละกลุ่ม
@@ -742,7 +742,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
   const addFee = () =>
     setFees([
       ...fees,
-      { enabled: true, type: "", account: "", amount: 0, note: "" },
+      { enabled: false, type: "", account: "", amount: 0, note: "" },
     ]);
   const removeFee = (idx: number) => setFees(fees.filter((_, i) => i !== idx));
   const updateFee = (idx: number, field: string, value: any) =>
@@ -751,7 +751,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
   const addOffsetDoc = () =>
     setOffsetDocs([
       ...offsetDocs,
-      { enabled: true, docType: "", docNumber: "", amount: 0, note: "" },
+      { enabled: false, docType: "", docNumber: "", amount: 0, note: "" },
     ]);
   const removeOffsetDoc = (idx: number) =>
     setOffsetDocs(offsetDocs.filter((_, i) => i !== idx));

@@ -1,11 +1,11 @@
-const sqlite3 = require('sqlite3').verbose();
+const sqlite3 = require("sqlite3").verbose();
 
 // Connect to SQLite database
-const db = new sqlite3.Database('./billing.db', (err) => {
+const db = new sqlite3.Database("./billing.db", (err) => {
   if (err) {
-    console.error('Error opening database', err.message);
+    console.error("Error opening database", err.message);
   } else {
-    console.log('Connected to the SQLite database.');
+    console.log("Connected to the SQLite database.");
     db.serialize(() => {
       // Create customers table
       db.run(`CREATE TABLE IF NOT EXISTS customers (
@@ -48,7 +48,26 @@ const db = new sqlite3.Database('./billing.db', (err) => {
         FOREIGN KEY (document_id) REFERENCES documents (id)
       )`);
 
-      console.log('Tables created or already exist.');
+      // ตรวจสอบ/สร้าง/อัปเดต receipt_details ให้มี field ใหม่
+      const alterReceiptDetails = async (db) => {
+        await db
+          .run(`ALTER TABLE receipt_details ADD COLUMN payment_channels TEXT`)
+          .catch(() => {});
+        await db
+          .run(`ALTER TABLE receipt_details ADD COLUMN fees TEXT`)
+          .catch(() => {});
+        await db
+          .run(`ALTER TABLE receipt_details ADD COLUMN offset_docs TEXT`)
+          .catch(() => {});
+        await db
+          .run(
+            `ALTER TABLE receipt_details ADD COLUMN net_total_receipt REAL DEFAULT 0`
+          )
+          .catch(() => {});
+      };
+      // เรียกใช้ alterReceiptDetails(db) หลังเชื่อมต่อ db สำเร็จ
+
+      console.log("Tables created or already exist.");
     });
   }
 });

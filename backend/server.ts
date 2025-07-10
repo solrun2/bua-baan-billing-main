@@ -821,8 +821,18 @@ app.post("/api/documents", async (req: Request, res: Response) => {
       payment_method
     ) {
       await conn.query(
-        "INSERT INTO receipt_details (document_id, payment_date, payment_method, payment_reference) VALUES (?, ?, ?, ?)",
-        [documentId, payment_date, payment_method, payment_reference]
+        `INSERT INTO receipt_details (document_id, payment_date, payment_method, payment_reference, payment_channels, fees, offset_docs, net_total_receipt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          documentId,
+          payment_date,
+          payment_method,
+          payment_reference,
+          JSON.stringify(req.body.payment_channels || []),
+          JSON.stringify(req.body.fees || []),
+          JSON.stringify(req.body.offset_docs || []),
+          req.body.net_total_receipt || 0,
+        ]
       );
     }
 
@@ -1000,6 +1010,37 @@ app.get("/api/documents/:id", async (req, res) => {
         invoice_details = invoiceRows[0];
       }
     }
+    // ดึง receipt_details ถ้าเป็น RECEIPT
+    let receipt_details = null;
+    if (doc.document_type && doc.document_type.toLowerCase() === "receipt") {
+      const receiptRows = await pool.query(
+        "SELECT * FROM receipt_details WHERE document_id = ?",
+        [id]
+      );
+      if (Array.isArray(receiptRows) && receiptRows.length > 0) {
+        receipt_details = receiptRows[0];
+        // แปลง JSON field กลับเป็น object
+        if (receipt_details.payment_channels) {
+          try {
+            receipt_details.payment_channels = JSON.parse(
+              receipt_details.payment_channels
+            );
+          } catch {}
+        }
+        if (receipt_details.fees) {
+          try {
+            receipt_details.fees = JSON.parse(receipt_details.fees);
+          } catch {}
+        }
+        if (receipt_details.offset_docs) {
+          try {
+            receipt_details.offset_docs = JSON.parse(
+              receipt_details.offset_docs
+            );
+          } catch {}
+        }
+      }
+    }
     // ดึง items ของเอกสารนี้
     let items = await pool.query(
       "SELECT * FROM document_items WHERE document_id = ?",
@@ -1025,6 +1066,7 @@ app.get("/api/documents/:id", async (req, res) => {
       items_recursive,
       summary, // summary สดจาก items_recursive
       ...(invoice_details ? { invoice_details } : {}),
+      ...(receipt_details ? { receipt_details } : {}),
     };
     // แนบ due_date ใน root object ด้วย ถ้ามี invoice_details
     if (invoice_details && invoice_details.due_date) {
@@ -1154,8 +1196,17 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
       payment_method
     ) {
       await conn.query(
-        "UPDATE receipt_details SET payment_date = ?, payment_method = ?, payment_reference = ? WHERE document_id = ?",
-        [payment_date, payment_method, payment_reference, id]
+        `UPDATE receipt_details SET payment_date = ?, payment_method = ?, payment_reference = ?, payment_channels = ?, fees = ?, offset_docs = ?, net_total_receipt = ? WHERE document_id = ?`,
+        [
+          payment_date,
+          payment_method,
+          payment_reference,
+          JSON.stringify(req.body.payment_channels || []),
+          JSON.stringify(req.body.fees || []),
+          JSON.stringify(req.body.offset_docs || []),
+          req.body.net_total_receipt || 0,
+          id,
+        ]
       );
     }
 

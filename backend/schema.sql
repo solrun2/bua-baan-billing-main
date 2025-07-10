@@ -38,35 +38,18 @@ CREATE TABLE `invoice_details` (
     ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE `receipt_details` (
-  `document_id` INT PRIMARY KEY,
-  `payment_date` DATETIME NOT NULL,
-  `payment_method` VARCHAR(100),
-  `payment_reference` VARCHAR(255),
-  CONSTRAINT `fk_receipt_document`
-    FOREIGN KEY (`document_id`) 
-    REFERENCES `documents`(`id`) 
-    ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE IF NOT EXISTS receipt_details (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    document_id INTEGER NOT NULL,
+    payment_date TEXT,
+    payment_method TEXT,
+    payment_reference TEXT,
+    payment_channels TEXT, -- JSON array
+    fees TEXT, -- JSON array
+    offset_docs TEXT, -- JSON array
+    net_total_receipt REAL DEFAULT 0,
+    FOREIGN KEY(document_id) REFERENCES documents(id)
+);
 
 CREATE TABLE `document_items` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `document_id` int(11) NOT NULL,
-  `product_id` varchar(64) DEFAULT NULL,
-  `product_name` varchar(255) NOT NULL,
-  `unit` varchar(50) DEFAULT NULL,
-  `quantity` decimal(10,2) NOT NULL DEFAULT 1.00,
-  `unit_price` decimal(10,2) NOT NULL DEFAULT 0.00,
-  `amount` decimal(15,2) NOT NULL DEFAULT 0.00,
-  `description` text DEFAULT NULL,
-  `withholding_tax_amount` decimal(10,2) DEFAULT 0.00,
-  `amount_before_tax` decimal(15,2) DEFAULT 0.00,
-  `discount` decimal(15,2) DEFAULT 0.00,
-  `discount_type` enum('thb','percentage') DEFAULT 'thb',
-  `tax` decimal(5,2) DEFAULT 7.00,
-  `tax_amount` decimal(15,2) DEFAULT 0.00,
-  `withholding_tax_option` enum('ไม่ระบุ','ไม่มี','1%','1.5%','2%','3%','5%','10%','15%','กำหนดเอง') NOT NULL DEFAULT 'ไม่ระบุ',
-  PRIMARY KEY (`id`),
-  KEY `document_id` (`document_id`),
-  CONSTRAINT `document_items_ibfk_1` FOREIGN KEY (`document_id`) REFERENCES `documents` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=86 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci
+  `id`

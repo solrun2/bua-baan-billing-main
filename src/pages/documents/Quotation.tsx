@@ -207,7 +207,7 @@ const Quotation = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between no-print">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center">
             <FileText className="w-6 h-6 text-blue-600" />
@@ -224,7 +224,7 @@ const Quotation = () => {
       </div>
 
       {/* Actions */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4 no-print">
         <div className="flex-1 max-w-md">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -293,7 +293,7 @@ const Quotation = () => {
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground">
                       สถานะ
                     </th>
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground no-print">
                       การดำเนินการ
                     </th>
                   </tr>
@@ -326,7 +326,7 @@ const Quotation = () => {
                           {quotation.status}
                         </span>
                       </td>
-                      <td className="py-3 px-4">
+                      <td className="py-3 px-4 no-print">
                         <div className="flex items-center gap-2">
                           <Button
                             variant="outline"

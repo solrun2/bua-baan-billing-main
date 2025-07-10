@@ -94,9 +94,12 @@ const ProductAutocomplete = ({
               <div className="flex-1 flex items-center">
                 <div className="flex-1 flex items-center">
                   <div
-                    className={`w-full bg-transparent border-none outline-none text-left ${
-                      !value ? "text-muted-foreground" : ""
-                    }`}
+                    className={`w-full bg-transparent border-none outline-none text-left truncate`}
+                    style={{
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                    }}
                   >
                     {value && value.id && (value.title || value.name)
                       ? `${value.title || value.name}`
@@ -153,7 +156,14 @@ const ProductAutocomplete = ({
                       className="flex items-start justify-between w-full px-4 py-3 hover:bg-gray-100 dark:hover:bg-gray-800"
                     >
                       <div className="flex flex-col flex-1 min-w-0">
-                        <span className="text-gray-900 dark:text-white font-medium truncate">
+                        <span
+                          className="text-gray-900 dark:text-white font-medium truncate"
+                          style={{
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                          }}
+                        >
                           {product.title || product.name}
                         </span>
                         {(product.description || product.property_info) && (
