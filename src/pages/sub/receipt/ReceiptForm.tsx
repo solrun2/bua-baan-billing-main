@@ -83,11 +83,39 @@ const ReceiptForm = ({
         return;
       }
 
-      // กรณีแก้ไข - โหลดข้อมูลจาก API
+      // กรณีแก้ไข - ตรวจสอบ cache ก่อน
+      const cacheKey = `receipt_${id}`;
+      const cachedData = sessionStorage.getItem(cacheKey);
+
+      if (cachedData) {
+        try {
+          const parsedData = JSON.parse(cachedData);
+          console.log("Using cached data for receipt:", id);
+          setInitialData({
+            ...parsedData,
+            documentType: "receipt",
+            status: parsedData.status || "ชำระแล้ว",
+            priceType: parsedData.priceType || "exclusive",
+          });
+          setIsEditing(true);
+          setIsClient(true);
+          return;
+        } catch (err) {
+          console.log("Invalid cached data, fetching from API");
+        }
+      }
+
+            // กรณีแก้ไข - โหลดข้อมูลจาก API
       setIsLoading(true);
       try {
+        console.log("Fetching receipt data from API:", id);
         const data = await apiService.getDocumentById(id);
         console.log("API response (ReceiptForm)", data);
+        
+        // Cache ข้อมูลไว้ 10 นาที
+        sessionStorage.setItem(cacheKey, JSON.stringify(data));
+        setTimeout(() => sessionStorage.removeItem(cacheKey), 10 * 60 * 1000);
+        
         setInitialData({
           ...data,
           documentType: "receipt",
@@ -96,7 +124,9 @@ const ReceiptForm = ({
         });
         setIsEditing(true);
       } catch (err) {
-        toast.error("ไม่พบใบเสร็จ");
+        console.error("Error fetching receipt:", err);
+        const errorMessage = err instanceof Error ? err.message : "ไม่พบใบเสร็จ";
+        toast.error(errorMessage);
         navigate("/documents/receipt"); // กลับไปหน้าหลักถ้าไม่พบข้อมูล
       } finally {
         setIsLoading(false);

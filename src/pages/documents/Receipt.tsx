@@ -291,8 +291,13 @@ const Receipt = () => {
               </CardHeader>
               <CardContent>
                 {loading ? (
-                  <div className="flex justify-center items-center py-10">
-                    <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                  <div className="space-y-4">
+                    <div className="flex justify-center items-center py-10">
+                      <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                    </div>
+                    <div className="text-center text-sm text-muted-foreground">
+                      กำลังโหลดข้อมูลใบเสร็จ...
+                    </div>
                   </div>
                 ) : error ? (
                   <div className="text-center py-10 text-red-500">

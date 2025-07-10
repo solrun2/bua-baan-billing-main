@@ -388,7 +388,17 @@ function mapDocumentFromBackend(doc: any): DocumentData {
 const getDocumentById = async (id: string): Promise<DocumentData> => {
   try {
     console.log(`Fetching document with ID: ${id}`);
-    const response = await fetch(`${API_BASE_URL}/documents/${id}`);
+
+    // เพิ่ม timeout เพื่อป้องกันการรอนานเกินไป
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 วินาที
+
+    const response = await fetch(`${API_BASE_URL}/documents/${id}`, {
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
     if (!response.ok) {
       throw new Error("Failed to fetch document by ID");
     }
@@ -397,6 +407,9 @@ const getDocumentById = async (id: string): Promise<DocumentData> => {
     return mapDocumentFromBackend(doc);
   } catch (error) {
     console.error("Error fetching document by ID:", error);
+    if (error.name === "AbortError") {
+      throw new Error("Request timeout - โหลดข้อมูลนานเกินไป");
+    }
     throw error;
   }
 };

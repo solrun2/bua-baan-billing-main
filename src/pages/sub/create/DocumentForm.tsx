@@ -456,8 +456,9 @@ export const DocumentForm: FC<DocumentFormProps> = ({
   useEffect(() => {
     async function fillEditData() {
       if (editMode && initialData.customer?.id) {
-        // ดึงข้อมูลลูกค้า
-        const customer = await getCustomerById(String(initialData.customer.id));
+        // ใช้ข้อมูลลูกค้าที่มีอยู่แล้ว ไม่ต้องโหลดใหม่
+        const customer = initialData.customer;
+
         // ใช้ข้อมูลสินค้าในเอกสาร ไม่ fetch product เพิ่ม
         const items = (initialData.items || []).map((item) => {
           // normalize discountType ให้ถูกต้อง
@@ -500,19 +501,17 @@ export const DocumentForm: FC<DocumentFormProps> = ({
         });
         setForm((prev) => ({
           ...prev,
-          customer: customer
-            ? {
-                id:
-                  typeof customer.id === "string"
-                    ? parseInt(customer.id, 10)
-                    : customer.id,
-                name: customer.name,
-                tax_id: customer.tax_id,
-                phone: customer.phone,
-                address: customer.address,
-                email: customer.email,
-              }
-            : prev.customer,
+          customer: {
+            id:
+              typeof customer.id === "string"
+                ? parseInt(customer.id, 10)
+                : customer.id,
+            name: customer.name,
+            tax_id: customer.tax_id,
+            phone: customer.phone,
+            address: customer.address,
+            email: customer.email,
+          },
           items,
         }));
         // คำนวณ summary ใหม่ทันทีหลัง normalize items
