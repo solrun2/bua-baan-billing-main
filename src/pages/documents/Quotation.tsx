@@ -169,7 +169,6 @@ const Quotation = () => {
     }
     // กรองวันที่สร้าง (>= dateFrom)
     if (filters.dateFrom) {
-      // สร้าง filterDate แบบ UTC เพื่อหลีกเลี่ยงปัญหา timezone
       const filterDate = new Date(
         Date.UTC(
           filters.dateFrom.getFullYear(),
@@ -178,29 +177,26 @@ const Quotation = () => {
         )
       );
       const docDate = parseLocalDate(q.documentDate);
-      // debug log
+      const docDateStr = docDate ? docDate.toLocaleDateString("en-CA") : "";
+      const filterDateStr = filterDate.toLocaleDateString("en-CA");
       console.log(
-        "docDate",
+        "[DEBUG] docDate:",
         q.documentDate,
-        typeof q.documentDate,
-        "parsed",
-        docDate,
-        "filterDate",
-        filterDate,
-        "filterDate ISO",
-        filterDate.toISOString(),
-        typeof filterDate
+        "->",
+        docDateStr,
+        "| filterDate:",
+        filterDateStr
       );
       if (!docDate) {
         console.log("SKIP: docDate invalid", q.documentDate);
         return false;
       }
-      // เปรียบเทียบวันที่แบบ string เพื่อความแม่นยำ
-      const docDateStr = docDate.toISOString().split("T")[0];
-      const filterDateStr = filterDate.toISOString().split("T")[0];
-      console.log("Comparing dates:", docDateStr, ">=", filterDateStr);
       if (docDateStr < filterDateStr) {
-        console.log("SKIP: docDate", docDateStr, "< filterDate", filterDateStr);
+        console.log(
+          "SKIP: docDateStr < filterDateStr",
+          docDateStr,
+          filterDateStr
+        );
         return false;
       }
     }
@@ -214,17 +210,23 @@ const Quotation = () => {
         )
       );
       const docDate = parseLocalDate(q.validUntil);
+      const docDateStr = docDate ? docDate.toLocaleDateString("en-CA") : "";
+      const filterDateToStr = filterDateTo.toLocaleDateString("en-CA");
+      console.log(
+        "[DEBUG] (TO) docDate:",
+        q.validUntil,
+        "->",
+        docDateStr,
+        "| filterDateTo:",
+        filterDateToStr
+      );
       if (!docDate) {
         return false;
       }
-      const docDateStr = docDate.toISOString().split("T")[0];
-      const filterDateToStr = filterDateTo.toISOString().split("T")[0];
-      console.log("Comparing end dates:", docDateStr, "<=", filterDateToStr);
       if (docDateStr > filterDateToStr) {
         console.log(
-          "SKIP: docDate",
+          "SKIP: docDateStr > filterDateToStr",
           docDateStr,
-          "> filterDateTo",
           filterDateToStr
         );
         return false;

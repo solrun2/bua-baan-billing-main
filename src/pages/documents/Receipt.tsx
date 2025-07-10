@@ -201,8 +201,8 @@ const Receipt = () => {
         )
       );
       const docDate = parseLocalDate(r.issue_date);
-      const docDateStr = docDate ? docDate.toISOString().split("T")[0] : "";
-      const filterDateStr = filterDate.toISOString().split("T")[0];
+      const docDateStr = docDate ? docDate.toLocaleDateString("en-CA") : "";
+      const filterDateStr = filterDate.toLocaleDateString("en-CA");
       console.log(
         "[DEBUG] docDate:",
         r.issue_date,
@@ -234,8 +234,8 @@ const Receipt = () => {
         )
       );
       const docDate = parseLocalDate(r.issue_date);
-      const docDateStr = docDate ? docDate.toISOString().split("T")[0] : "";
-      const filterDateToStr = filterDateTo.toISOString().split("T")[0];
+      const docDateStr = docDate ? docDate.toLocaleDateString("en-CA") : "";
+      const filterDateToStr = filterDateTo.toLocaleDateString("en-CA");
       console.log(
         "[DEBUG] (TO) docDate:",
         r.issue_date,

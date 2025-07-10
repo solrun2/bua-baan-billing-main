@@ -173,11 +173,6 @@ export const DocumentFilter: React.FC<DocumentFilterProps> = ({
                       </span>
                     )}
                   </div>
-                  {dateFrom && (
-                    <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>
-                      วันที่ที่เลือก: {dateFrom.toLocaleDateString("en-GB")}
-                    </div>
-                  )}
                 </div>
                 <span>ถึง</span>
                 <div
