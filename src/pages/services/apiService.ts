@@ -311,11 +311,12 @@ const getDocumentNumbers = async (
 function mapDocumentFromBackend(doc: any): DocumentData {
   // Helper function to format date as yyyy-MM-dd
   const formatDate = (dateStr: string | undefined) => {
-    if (!dateStr) return "";
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return dateStr;
-    // Return yyyy-MM-dd
-    return d.toISOString().split("T")[0];
+    if (!dateStr || typeof dateStr !== "string") {
+      return "";
+    }
+    // Safely take the first 10 characters, which represents YYYY-MM-DD
+    // This avoids any timezone conversion issues from new Date()
+    return dateStr.substring(0, 10);
   };
   return {
     id: doc.id?.toString(),
