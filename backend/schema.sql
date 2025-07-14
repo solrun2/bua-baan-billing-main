@@ -18,38 +18,53 @@ CREATE TABLE `documents` (
   `customer_email` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `document_number` (`document_number`)
-) ENGINE=InnoDB AUTO_INCREMENT=63 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci
+) ENGINE=InnoDB AUTO_INCREMENT=138 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci
 
 CREATE TABLE `quotation_details` (
-  `document_id` INT PRIMARY KEY,
-  `valid_until` DATE NOT NULL,
-  CONSTRAINT `fk_quotation_document`
-    FOREIGN KEY (`document_id`) 
-    REFERENCES `documents`(`id`) 
-    ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `document_id` int(11) NOT NULL,
+  `valid_until` date NOT NULL,
+  PRIMARY KEY (`document_id`),
+  CONSTRAINT `fk_quotation_document` FOREIGN KEY (`document_id`) REFERENCES `documents` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci
 
 CREATE TABLE `invoice_details` (
-  `document_id` INT PRIMARY KEY,
-  `due_date` DATE NOT NULL,
-  CONSTRAINT `fk_invoice_document`
-    FOREIGN KEY (`document_id`) 
-    REFERENCES `documents`(`id`) 
-    ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `document_id` int(11) NOT NULL,
+  `due_date` date NOT NULL,
+  PRIMARY KEY (`document_id`),
+  CONSTRAINT `fk_invoice_document` FOREIGN KEY (`document_id`) REFERENCES `documents` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci
 
-CREATE TABLE IF NOT EXISTS receipt_details (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    document_id INTEGER NOT NULL,
-    payment_date TEXT,
-    payment_method TEXT,
-    payment_reference TEXT,
-    payment_channels TEXT, -- JSON array
-    fees TEXT, -- JSON array
-    offset_docs TEXT, -- JSON array
-    net_total_receipt REAL DEFAULT 0,
-    FOREIGN KEY(document_id) REFERENCES documents(id)
-);
+CREATE TABLE `receipt_details` (
+  `document_id` int(11) NOT NULL,
+  `payment_date` datetime NOT NULL,
+  `payment_method` varchar(100) DEFAULT NULL,
+  `payment_reference` varchar(255) DEFAULT NULL,
+  `payment_channels` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`payment_channels`)),
+  `fees` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`fees`)),
+  `offset_docs` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`offset_docs`)),
+  `net_total_receipt` decimal(15,2) DEFAULT 0.00,
+  PRIMARY KEY (`document_id`),
+  CONSTRAINT `fk_receipt_document` FOREIGN KEY (`document_id`) REFERENCES `documents` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci
 
 CREATE TABLE `document_items` (
-  `id`
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `document_id` int(11) NOT NULL,
+  `product_id` varchar(64) DEFAULT NULL,
+  `product_name` varchar(255) NOT NULL,
+  `unit` varchar(50) DEFAULT NULL,
+  `quantity` decimal(10,2) NOT NULL DEFAULT 1.00,
+  `unit_price` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `amount` decimal(15,2) NOT NULL DEFAULT 0.00,
+  `description` text DEFAULT NULL,
+  `withholding_tax_amount` decimal(10,2) DEFAULT 0.00,
+  `withholding_tax_option` enum('ไม่ระบุ','ไม่มี','1%','1.5%','2%','3%','5%','10%','15%','กำหนดเอง') NOT NULL DEFAULT 'ไม่ระบุ',
+  `amount_before_tax` decimal(15,2) DEFAULT 0.00,
+  `discount` decimal(15,2) DEFAULT 0.00,
+  `discount_type` enum('thb','percentage') DEFAULT 'thb',
+  `tax` decimal(5,2) DEFAULT 7.00,
+  `tax_amount` decimal(15,2) DEFAULT 0.00,
+  PRIMARY KEY (`id`),
+  KEY `document_id` (`document_id`),
+  CONSTRAINT `document_items_ibfk_1` FOREIGN KEY (`document_id`) REFERENCES `documents` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=224 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci
