@@ -340,15 +340,19 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
       <div className="font-bold text-blue-700 mb-2">ข้อมูลลูกค้า</div>
       <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-800">
         <div className="font-bold">ชื่อลูกค้า</div>
-        <div>{document.customer_name || "-"}</div>
+        <div>{document.customer_name || document.customer?.name || "-"}</div>
         <div className="font-bold">ที่อยู่</div>
-        <div>{document.customer_address || "-"}</div>
+        <div>
+          {document.customer_address || document.customer?.address || "-"}
+        </div>
         <div className="font-bold">เลขผู้เสียภาษี</div>
-        <div>{document.customer_tax_id || "-"}</div>
+        <div>
+          {document.customer_tax_id || document.customer?.tax_id || "-"}
+        </div>
         <div className="font-bold">โทร</div>
-        <div>{document.customer_phone || "-"}</div>
+        <div>{document.customer_phone || document.customer?.phone || "-"}</div>
         <div className="font-bold">อีเมล</div>
-        <div>{document.customer_email || "-"}</div>
+        <div>{document.customer_email || document.customer?.email || "-"}</div>
       </div>
     </div>
   );
@@ -467,47 +471,108 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
 
   // สรุปยอด: เพิ่มส่วนลด, ภาษี, หัก ณ ที่จ่าย
   const renderSummary = () => {
+    // แปลง discount เป็น number เสมอ (รองรับ string/number/comma)
+    const discountValue = Number(
+      (summary.discount ?? 0).toString().replace(/,/g, "")
+    );
+    // คำนวณยอดก่อนหักส่วนลด (รวมราคาก่อนลดของทุกแถว)
+    const grossTotal = items.reduce((sum, item) => {
+      const qty = (item as any).quantity ?? (item as any).qty ?? 1;
+      const unitPrice = item.unitPrice ?? item.unit_price ?? 0;
+      return sum + unitPrice * qty;
+    }, 0);
+    // คำนวณส่วนลดรวม (รวมส่วนลดของทุกแถว)
+    const totalDiscount = items.reduce((sum, item) => {
+      const qty = (item as any).quantity ?? (item as any).qty ?? 1;
+      const unitPrice = item.unitPrice ?? item.unit_price ?? 0;
+      const discount = item.discount ?? 0;
+      const discountType = item.discount_type ?? item.discountType ?? "thb";
+      let discountAmount = 0;
+      if (discountType === "percentage") {
+        discountAmount = unitPrice * qty * (discount / 100);
+      } else {
+        discountAmount = discount * qty;
+      }
+      return sum + discountAmount;
+    }, 0);
+    // รวม withholding tax จาก summary หรือจากทุกแถว
+    const summaryWithholdingTax =
+      typeof summary.withholdingTax === "number" && summary.withholdingTax > 0
+        ? summary.withholdingTax
+        : items.reduce(
+            (sum, item) =>
+              sum +
+              (typeof item.withholdingTaxAmount === "number"
+                ? item.withholdingTaxAmount
+                : typeof item.withholding_tax_amount === "number"
+                  ? item.withholding_tax_amount
+                  : 0),
+            0
+          );
     return (
       <div className="flex justify-end mb-2">
-        <div className="w-full max-w-xs space-y-1">
-          <div className="flex justify-between mb-1">
-            <span>มูลค่าสินค้าหรือค่าบริการ</span>
-            <span>{formatCurrency(summary.subtotal)}</span>
-          </div>
-          {summary.discount > 0 && (
+        <div className="w-full max-w-xs space-y-1 bg-blue-50 rounded-lg p-4 shadow-sm">
+          {totalDiscount > 0 && (
+            <div className="flex justify-between mb-1">
+              <span>ยอดก่อนหักส่วนลด</span>
+              <span className="font-semibold">
+                {formatCurrency(grossTotal)}
+              </span>
+            </div>
+          )}
+          {totalDiscount > 0 && (
             <div className="flex justify-between mb-1 text-destructive">
-              <span>ส่วนลด</span>
-              <span>-{formatCurrency(summary.discount)}</span>
+              <span>ส่วนลดรวม</span>
+              <span>-{formatCurrency(totalDiscount)}</span>
             </div>
           )}
           <div className="flex justify-between mb-1">
-            <span>มูลค่าหลังหักส่วนลด</span>
-            <span>
-              {formatCurrency(
-                Number(summary.subtotal ?? 0) - Number(summary.discount ?? 0)
-              )}
+            <span>มูลค่าสินค้าหรือค่าบริการ</span>
+            <span className="font-semibold">
+              {formatCurrency(summary.subtotal)}
             </span>
           </div>
+          {discountValue > 0 && (
+            <>
+              <div className="flex justify-between mb-1 text-destructive">
+                <span>ส่วนลด</span>
+                <span>-{formatCurrency(discountValue)}</span>
+              </div>
+              <div className="flex justify-between mb-1">
+                <span>มูลค่าหลังหักส่วนลด</span>
+                <span className="font-semibold">
+                  {formatCurrency(
+                    Number(summary.subtotal ?? 0) - discountValue
+                  )}
+                </span>
+              </div>
+            </>
+          )}
           {summary.tax > 0 && (
             <div className="flex justify-between mb-1">
               <span>ภาษีมูลค่าเพิ่ม 7%</span>
               <span>{formatCurrency(summary.tax)}</span>
             </div>
           )}
-          {summary.withholdingTax > 0 && (
-            <div className="flex justify-between mb-1 text-yellow-700">
-              <span>หัก ณ ที่จ่าย</span>
-              <span>-{formatCurrency(summary.withholdingTax)}</span>
-            </div>
-          )}
-          <div className="flex justify-between font-bold text-lg">
-            <span>จำนวนเงินทั้งสิ้น</span>
+          <div className="flex justify-between mb-1 font-semibold">
+            <span>ยอดรวมหลังรวมภาษี</span>
             <span>
               {formatCurrency(
-                Number(
-                  document.total_amount ??
-                    summary.total - summary.withholdingTax
-                )
+                Number(summary.subtotal ?? 0) + Number(summary.tax ?? 0)
+              )}
+            </span>
+          </div>
+          <div className="flex justify-between mb-1 text-yellow-700">
+            <span>หัก ณ ที่จ่าย</span>
+            <span>-{formatCurrency(summaryWithholdingTax)}</span>
+          </div>
+          <div className="flex justify-between font-bold text-lg border-t border-blue-200 pt-2 mt-2">
+            <span>จำนวนเงินทั้งสิ้น</span>
+            <span className="text-blue-700">
+              {formatCurrency(
+                Number(summary.subtotal ?? 0) +
+                  Number(summary.tax ?? 0) -
+                  summaryWithholdingTax
               )}
             </span>
           </div>

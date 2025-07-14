@@ -153,7 +153,7 @@ const Receipt = () => {
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case "สมบูรณ์":
+      case "ชำระแล้ว":
         return "bg-green-100 text-green-700";
       case "ยกเลิก":
         return "bg-red-100 text-red-700";
@@ -202,7 +202,7 @@ const Receipt = () => {
           initialFilters={filters}
           statusOptions={[
             { value: "all", label: "สถานะทั้งหมด" },
-            { value: "สมบูรณ์", label: "สมบูรณ์" },
+            { value: "ชำระแล้ว", label: "ชำระแล้ว" },
             { value: "ยกเลิก", label: "ยกเลิก" },
           ]}
         />
