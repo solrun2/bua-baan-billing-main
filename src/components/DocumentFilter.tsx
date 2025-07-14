@@ -21,8 +21,8 @@ import { th } from "date-fns/locale";
 // --- Interfaces ---
 interface FilterProps {
   status?: string | null;
-  dateFrom?: string | null; // <-- เปลี่ยนเป็น string
-  dateTo?: string | null; // <-- เปลี่ยนเป็น string
+  dateFrom?: string | null;
+  dateTo?: string | null;
 }
 
 interface DocumentFilterProps {
@@ -37,26 +37,30 @@ const DocumentFilter: React.FC<DocumentFilterProps> = ({
   statusOptions = [],
 }) => {
   const [isOpen, setIsOpen] = useState(false);
-
-  // State ภายใน Popover จะใช้ Date object เพื่อให้ Calendar ทำงานได้
   const [tempStatus, setTempStatus] = useState(initialFilters?.status || "all");
   const [tempDateFrom, setTempDateFrom] = useState<Date | null>(null);
   const [tempDateTo, setTempDateTo] = useState<Date | null>(null);
 
-  // เมื่อ Popover เปิด, ให้ตั้งค่า temp state จาก initialFilters (ที่เป็น string)
+  // ✨ State ควบคุมการเปิด-ปิดของแต่ละ Popover Calendar
+  const [isFromCalendarOpen, setIsFromCalendarOpen] = useState(false);
+  const [isToCalendarOpen, setIsToCalendarOpen] = useState(false);
+
   useEffect(() => {
     if (isOpen) {
       setTempStatus(initialFilters.status || "all");
       setTempDateFrom(
-        initialFilters.dateFrom ? new Date(initialFilters.dateFrom) : null
+        initialFilters.dateFrom
+          ? new Date(initialFilters.dateFrom + "T12:00:00Z")
+          : null
       );
       setTempDateTo(
-        initialFilters.dateTo ? new Date(initialFilters.dateTo) : null
+        initialFilters.dateTo
+          ? new Date(initialFilters.dateTo + "T12:00:00Z")
+          : null
       );
     }
   }, [isOpen, initialFilters]);
 
-  // เมื่อกด "ใช้ตัวกรอง", แปลง Date กลับเป็น string YYYY-MM-DD
   const handleApply = () => {
     onFilterChange({
       status: tempStatus,
@@ -114,7 +118,10 @@ const DocumentFilter: React.FC<DocumentFilterProps> = ({
 
           <div className="space-y-2">
             <label className="text-sm font-medium">วันที่เริ่มต้น</label>
-            <Popover>
+            <Popover
+              open={isFromCalendarOpen}
+              onOpenChange={setIsFromCalendarOpen}
+            >
               <PopoverTrigger asChild>
                 <Button
                   variant={"outline"}
@@ -136,7 +143,11 @@ const DocumentFilter: React.FC<DocumentFilterProps> = ({
                   locale={th}
                   mode="single"
                   selected={tempDateFrom || undefined}
-                  onSelect={setTempDateFrom}
+                  onSelect={(day) => {
+                    setTempDateFrom(day || null);
+                    setIsFromCalendarOpen(false); // ✨ ปิด Popover เมื่อเลือก
+                  }}
+                  initialFocus
                 />
               </PopoverContent>
             </Popover>
@@ -144,7 +155,7 @@ const DocumentFilter: React.FC<DocumentFilterProps> = ({
 
           <div className="space-y-2">
             <label className="text-sm font-medium">วันที่สิ้นสุด</label>
-            <Popover>
+            <Popover open={isToCalendarOpen} onOpenChange={setIsToCalendarOpen}>
               <PopoverTrigger asChild>
                 <Button
                   variant={"outline"}
@@ -166,7 +177,11 @@ const DocumentFilter: React.FC<DocumentFilterProps> = ({
                   locale={th}
                   mode="single"
                   selected={tempDateTo || undefined}
-                  onSelect={setTempDateTo}
+                  onSelect={(day) => {
+                    setTempDateTo(day || null);
+                    setIsToCalendarOpen(false); // ✨ ปิด Popover เมื่อเลือก
+                  }}
+                  initialFocus
                 />
               </PopoverContent>
             </Popover>
