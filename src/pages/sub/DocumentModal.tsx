@@ -23,6 +23,8 @@ interface DocumentItem {
   tax_amount?: number;
   withholdingTaxAmount?: number;
   withholding_tax_amount?: number;
+  originalUnitPrice?: number;
+  original_unit_price?: number;
 }
 
 interface DocumentSummary {
@@ -225,19 +227,49 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
     return d.toLocaleDateString("th-TH");
   };
 
+  // Helper สำหรับคำนวณ Net (มูลค่าก่อนภาษี) ของแต่ละแถว
+  function getNetUnitPrice(item: DocumentItem, priceType: string) {
+    const taxRate = (item.tax ?? 7) / 100;
+    if (priceType === "INCLUDE_VAT") {
+      return (item.originalUnitPrice ?? 0) / (1 + taxRate);
+    }
+    return item.originalUnitPrice ?? 0;
+  }
+
   if (!open) return null;
   const labels = typeLabels[type];
 
   // เลือก items ที่จะแสดง (logic เดียวกันทุก type)
+  // 1. map original_unit_price => originalUnitPrice
   const items: DocumentItem[] =
     Array.isArray(document.items) && document.items.length > 0
-      ? document.items
+      ? document.items.map((item) => ({
+          ...item,
+          originalUnitPrice:
+            item.original_unit_price ??
+            item.originalUnitPrice ??
+            item.unitPrice ??
+            item.unit_price ??
+            0,
+          unitPrice:
+            item.unitPrice ?? item.unit_price ?? item.original_unit_price ?? 0,
+        }))
       : Array.isArray(document.items_recursive)
         ? document.items_recursive.map((item) => ({
             ...item,
             productId: item.productId ?? item.product_id,
             productTitle: item.productTitle ?? item.product_name,
-            unitPrice: item.unitPrice ?? item.unit_price,
+            originalUnitPrice:
+              item.original_unit_price ??
+              item.originalUnitPrice ??
+              item.unitPrice ??
+              item.unit_price ??
+              0,
+            unitPrice:
+              item.unitPrice ??
+              item.unit_price ??
+              item.original_unit_price ??
+              0,
             amountBeforeTax: item.amountBeforeTax ?? item.amount_before_tax,
             discountType: item.discountType ?? item.discount_type,
             taxAmount: item.taxAmount ?? item.tax_amount,
@@ -358,6 +390,7 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
   );
 
   // ตารางสินค้า: เพิ่มคอลัมน์ 'ส่วนลด' และ 'ภาษี'
+  // 2. renderTable: ใช้ originalUnitPrice เป็นหลัก
   const renderTable = () => {
     return (
       <table className="w-full border border-gray-300 mb-6 text-xs rounded-lg overflow-hidden shadow-sm">
@@ -396,7 +429,12 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
             items.map((item, idx) => {
               const prod = productMap[item.product_id];
               const qty = (item as any).quantity ?? (item as any).qty ?? 1;
-              const unitPrice = item.unitPrice ?? item.unit_price ?? 0;
+              const unitPrice =
+                item.originalUnitPrice ??
+                item.original_unit_price ??
+                item.unitPrice ??
+                item.unit_price ??
+                0;
               const discount = item.discount ?? 0;
               const discountType =
                 item.discount_type ?? item.discountType ?? "thb";
@@ -422,7 +460,7 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
                   <td className="border border-gray-300 p-2 text-center">
                     {qty}
                   </td>
-                  <td className="border border-gray-300 p-2 text-right">
+                  <td className="border border-gray-300 p-2 text-right bg-yellow-100 font-bold text-yellow-700">
                     {formatCurrency(unitPrice)}
                   </td>
                   <td className="border border-gray-300 p-2 text-right">
@@ -470,6 +508,7 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
   };
 
   // สรุปยอด: เพิ่มส่วนลด, ภาษี, หัก ณ ที่จ่าย
+  // 3. renderSummary: เวลาคำนวณ grossTotal, totalDiscount ให้ใช้ originalUnitPrice เป็นหลัก
   const renderSummary = () => {
     // แปลง discount เป็น number เสมอ (รองรับ string/number/comma)
     const discountValue = Number(
@@ -478,13 +517,23 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
     // คำนวณยอดก่อนหักส่วนลด (รวมราคาก่อนลดของทุกแถว)
     const grossTotal = items.reduce((sum, item) => {
       const qty = (item as any).quantity ?? (item as any).qty ?? 1;
-      const unitPrice = item.unitPrice ?? item.unit_price ?? 0;
-      return sum + unitPrice * qty;
+      const netUnitPrice = getNetUnitPrice(
+        item,
+        (document as any).price_type ||
+          (document as any).priceType ||
+          "EXCLUDE_VAT"
+      );
+      return sum + netUnitPrice * qty;
     }, 0);
     // คำนวณส่วนลดรวม (รวมส่วนลดของทุกแถว)
     const totalDiscount = items.reduce((sum, item) => {
       const qty = (item as any).quantity ?? (item as any).qty ?? 1;
-      const unitPrice = item.unitPrice ?? item.unit_price ?? 0;
+      const unitPrice =
+        item.originalUnitPrice ??
+        item.original_unit_price ??
+        item.unitPrice ??
+        item.unit_price ??
+        0;
       const discount = item.discount ?? 0;
       const discountType = item.discount_type ?? item.discountType ?? "thb";
       let discountAmount = 0;

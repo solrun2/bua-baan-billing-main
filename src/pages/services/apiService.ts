@@ -46,6 +46,12 @@ const prepareDocumentData = (document: DocumentData): any => {
     unit: item.unit ?? "",
     quantity: Number(item.quantity ?? 1),
     unit_price: Number(item.unitPrice ?? (item as any).unit_price ?? 0),
+    original_unit_price: Number(
+      item.originalUnitPrice ??
+        (item as any).original_unit_price ??
+        (item as any).unit_price ??
+        0
+    ), // ส่ง original_unit_price เสมอ
     amount: Number(item.amount ?? 0),
     description: item.description ?? "",
     withholding_tax_amount: Number(

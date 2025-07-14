@@ -636,13 +636,22 @@ async function createDocumentFromServer(data: any, pool: any) {
     // ถ้าเป็นเอกสารลูก (มี related_document_id และไม่ใช่ QUOTATION) จะไม่ insert document_items ใหม่
     if (!related_document_id || document_type.toLowerCase() === "quotation") {
       for (const item of items as any[]) {
+        // ถ้า priceType เป็น INCLUDE_VAT ให้แปลง unit_price เป็น Net จาก original_unit_price
+        let originalUnitPrice = item.original_unit_price ?? 0; // ห้าม fallback เป็น unit_price เด็ดขาด
+        let unitPrice = originalUnitPrice;
+        const priceType = data.priceType || data.price_type || "EXCLUDE_VAT";
+        if (priceType === "INCLUDE_VAT") {
+          const taxRate = (item.tax ?? 7) / 100;
+          unitPrice = originalUnitPrice / (1 + taxRate);
+        }
         const params = [
           documentId,
           item.product_id ?? null,
           item.productTitle ?? item.product_name ?? "",
           item.unit ?? "",
           item.quantity ?? 1,
-          item.unit_price ?? 0,
+          unitPrice, // unit_price (Net ถ้า INCLUDE_VAT)
+          originalUnitPrice, // original_unit_price
           item.amount ?? 0,
           item.description ?? "",
           item.withholding_tax_amount ?? 0,
@@ -655,8 +664,8 @@ async function createDocumentFromServer(data: any, pool: any) {
         ];
         await conn.query(
           `INSERT INTO document_items (
-            document_id, product_id, product_name, unit, quantity, unit_price, amount, description, withholding_tax_amount, withholding_tax_option, amount_before_tax, discount, discount_type, tax, tax_amount
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            document_id, product_id, product_name, unit, quantity, unit_price, original_unit_price, amount, description, withholding_tax_amount, withholding_tax_option, amount_before_tax, discount, discount_type, tax, tax_amount
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           params
         );
       }
@@ -792,7 +801,7 @@ app.post("/api/documents", async (req: Request, res: Response) => {
         customer.address || "",
         customer.phone || "",
         customer.email || "",
-        req.body.price_type || "EXCLUDE_VAT",
+        req.body.priceType || "EXCLUDE_VAT",
       ]
     );
 
@@ -853,27 +862,38 @@ app.post("/api/documents", async (req: Request, res: Response) => {
         document_type.toLowerCase() !== "receipt")
     ) {
       for (const item of items) {
+        // ถ้า priceType เป็น INCLUDE_VAT ให้แปลง unit_price เป็น Net จาก original_unit_price
+        let originalUnitPrice =
+          item.original_unit_price ?? item.unit_price ?? 0;
+        let unitPrice = originalUnitPrice;
+        const priceType =
+          req.body.priceType || req.body.price_type || "EXCLUDE_VAT";
+        if (priceType === "INCLUDE_VAT") {
+          const taxRate = (item.tax ?? 7) / 100;
+          unitPrice = originalUnitPrice / (1 + taxRate);
+        }
         const params = [
           documentId, // document_id
           item.product_id ?? null, // product_id
           item.productTitle ?? item.product_name ?? "", // product_name
           item.unit ?? "", // unit
           item.quantity ?? 1, // quantity
-          item.unit_price ?? 0, // unit_price
+          unitPrice, // unit_price (Net ถ้า INCLUDE_VAT)
+          originalUnitPrice, // original_unit_price
           item.amount ?? 0, // amount
           item.description ?? "", // description
-          item.withholding_tax_amount ?? 0, // withholding_tax_amount
-          item.withholding_tax_option ?? -1, // withholding_tax_option
-          item.amount_before_tax ?? 0, // amount_before_tax
-          item.discount ?? 0, // discount
-          item.discount_type ?? item.discountType ?? "thb", // discount_type
-          item.tax ?? 0, // tax
-          item.tax_amount ?? 0, // tax_amount
+          item.withholding_tax_amount ?? 0,
+          item.withholding_tax_option ?? "ไม่ระบุ",
+          item.amount_before_tax ?? 0,
+          item.discount ?? 0,
+          item.discount_type ?? item.discountType ?? "thb",
+          item.tax ?? 0,
+          item.tax_amount ?? 0,
         ];
         await conn.query(
           `INSERT INTO document_items (
-            document_id, product_id, product_name, unit, quantity, unit_price, amount, description, withholding_tax_amount, withholding_tax_option, amount_before_tax, discount, discount_type, tax, tax_amount
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            document_id, product_id, product_name, unit, quantity, unit_price, original_unit_price, amount, description, withholding_tax_amount, withholding_tax_option, amount_before_tax, discount, discount_type, tax, tax_amount
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           params
         );
       }
@@ -1170,7 +1190,7 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
         customer.address || "",
         customer.phone || "",
         customer.email || "",
-        req.body.price_type || "EXCLUDE_VAT",
+        req.body.priceType || "EXCLUDE_VAT",
         id,
       ]
     );
@@ -1215,17 +1235,27 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
     // 3. ลบ items เดิม แล้ว insert ใหม่
     await conn.query("DELETE FROM document_items WHERE document_id = ?", [id]);
     for (const item of items) {
+      // ถ้า priceType เป็น INCLUDE_VAT ให้แปลง unit_price เป็น Net จาก original_unit_price
+      let originalUnitPrice = item.original_unit_price ?? 0; // ห้าม fallback เป็น unit_price เด็ดขาด
+      let unitPrice = originalUnitPrice;
+      const priceType =
+        req.body.priceType || req.body.price_type || "EXCLUDE_VAT";
+      if (priceType === "INCLUDE_VAT") {
+        const taxRate = (item.tax ?? 7) / 100;
+        unitPrice = originalUnitPrice / (1 + taxRate);
+      }
       const params = [
         id,
         item.product_id ?? null,
         item.product_name ?? "",
         item.unit ?? "",
         item.quantity ?? 1,
-        item.unit_price ?? 0,
+        unitPrice, // unit_price (Net ถ้า INCLUDE_VAT)
+        originalUnitPrice, // original_unit_price
         item.amount ?? 0,
         item.description ?? "",
         item.withholding_tax_amount ?? 0,
-        item.withholding_tax_option ?? -1,
+        item.withholding_tax_option ?? "ไม่ระบุ",
         item.amount_before_tax ?? 0,
         item.discount ?? 0,
         item.discount_type ?? "thb",
@@ -1234,8 +1264,8 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
       ];
       await conn.query(
         `INSERT INTO document_items (
-          document_id, product_id, product_name, unit, quantity, unit_price, amount, description, withholding_tax_amount, withholding_tax_option, amount_before_tax, discount, discount_type, tax, tax_amount
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          document_id, product_id, product_name, unit, quantity, unit_price, original_unit_price, amount, description, withholding_tax_amount, withholding_tax_option, amount_before_tax, discount, discount_type, tax, tax_amount
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         params
       );
     }

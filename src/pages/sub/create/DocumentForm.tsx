@@ -96,6 +96,15 @@ function mapPriceTypeToDocumentItem(
   return "EXCLUDE_VAT";
 }
 
+// Helper สำหรับคำนวณ Net (มูลค่าก่อนภาษี) ของแต่ละแถว
+function getNetUnitPrice(item: DocumentItem, priceType: string) {
+  const taxRate = (item.tax ?? 7) / 100;
+  if (priceType === "INCLUDE_VAT") {
+    return (item.originalUnitPrice ?? 0) / (1 + taxRate);
+  }
+  return item.originalUnitPrice ?? 0;
+}
+
 export const DocumentForm: FC<DocumentFormProps> = ({
   onCancel,
   onSave,
@@ -154,6 +163,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
       unit: "",
       quantity: 1,
       unitPrice: 0,
+      originalUnitPrice: 0, // เพิ่ม
       priceType: priceType || "EXCLUDE_VAT",
       discount: 0,
       discountType: "thb",
@@ -185,9 +195,16 @@ export const DocumentForm: FC<DocumentFormProps> = ({
       } else if (typeof item.withholdingTax === "number") {
         withholdingTax = item.withholdingTax;
       }
+      // normalize discountType
+      let normalizedDiscountType: "thb" | "percentage" = "thb";
+      if (item.discountType === "percentage") {
+        normalizedDiscountType = "percentage";
+      }
       return {
         ...item,
-        discountType: item.discountType ?? "thb",
+        originalUnitPrice: item.originalUnitPrice ?? item.unitPrice ?? 0, // map จาก backend
+        unitPrice: item.unitPrice ?? 0, // fallback
+        discountType: normalizedDiscountType,
         withholding_tax_option: item.withholding_tax_option ?? "ไม่ระบุ",
         withholdingTax,
         withholdingTaxAmount: item.withholdingTaxAmount ?? 0,
@@ -246,12 +263,27 @@ export const DocumentForm: FC<DocumentFormProps> = ({
       };
     }
     // แปลง priceType ของแต่ละ item ก่อนส่งเข้า calculateDocumentSummary
-    const mappedItems = form.items.map((item) => ({
-      ...item,
-      priceType: mapPriceTypeToBaseItem(item.priceType),
-    }));
+    const mappedItems = form.items.map((item) => {
+      let mappedPriceType: "inclusive" | "exclusive" | "none" = "exclusive";
+      let mappedTax = item.tax;
+      if (form.priceType === "INCLUDE_VAT") {
+        mappedPriceType = "inclusive";
+      } else if (form.priceType === "NO_VAT") {
+        mappedPriceType = "none";
+        mappedTax = 0;
+      } else {
+        mappedPriceType = "exclusive";
+      }
+      return {
+        ...item,
+        unitPrice: item.originalUnitPrice, // ราคาตั้งต้นเสมอ
+        originalUnitPrice: item.originalUnitPrice,
+        priceType: mappedPriceType,
+        tax: mappedTax,
+      };
+    });
     return calculateDocumentSummary(mappedItems);
-  }, [form.items]);
+  }, [form.items, form.priceType]);
 
   // Update summary when calculatedSummary changes
   useEffect(() => {
@@ -413,24 +445,17 @@ export const DocumentForm: FC<DocumentFormProps> = ({
             if (item.discountType === "percentage") {
               normalizedDiscountType = "percentage";
             }
-            // เตรียมข้อมูล item
-            const mergedItem = {
+            // เตรียมข้อมูล item (spread ...item ก่อน แล้ว override)
+            const mergedItem: DocumentItem = {
               ...item,
               id: item.id ?? `item-${Date.now()}`,
-              productId: product.id
-                ? product.id.toString()
-                : (item.productId ?? ""),
+              productId: product.id ? product.id.toString() : (item.productId ?? ""),
               productTitle: product.title ?? item.productTitle ?? "",
               description: product.description ?? item.description ?? "",
-              unitPrice:
-                typeof product.price === "number"
-                  ? product.price
-                  : (item.unitPrice ?? 0),
+              originalUnitPrice: typeof product.price === "number" ? product.price : (item.originalUnitPrice ?? 0), // แก้ให้ใช้ราคาสินค้าใหม่
+              unitPrice: typeof product.price === "number" ? product.price : (item.unitPrice ?? 0), // แก้ให้ใช้ราคาสินค้าใหม่
               unit: product.unit ?? item.unit ?? "",
-              tax:
-                typeof product.vat_rate === "number"
-                  ? product.vat_rate
-                  : (item.tax ?? 7),
+              tax: typeof product.vat_rate === "number" ? product.vat_rate : (item.tax ?? 7),
               discount: item.discount ?? 0,
               discountType: normalizedDiscountType,
               withholding_tax_option: item.withholding_tax_option ?? "ไม่ระบุ",
@@ -438,10 +463,10 @@ export const DocumentForm: FC<DocumentFormProps> = ({
               isEditing: false,
             };
             // ลบ field ที่เกี่ยวกับผลลัพธ์การคำนวณ
-            delete mergedItem.amount;
-            delete mergedItem.amountBeforeTax;
-            delete mergedItem.taxAmount;
-            delete mergedItem.withholdingTaxAmount;
+            delete (mergedItem as any).amount;
+            delete (mergedItem as any).amountBeforeTax;
+            delete (mergedItem as any).taxAmount;
+            delete (mergedItem as any).withholdingTaxAmount;
             // Logic sync withholdingTax ตาม withholding_tax_option
             if (mergedItem.withholding_tax_option === "กำหนดเอง") {
               mergedItem.withholdingTax = "custom";
@@ -464,9 +489,11 @@ export const DocumentForm: FC<DocumentFormProps> = ({
             // แปลง priceType ก่อนส่งเข้า updateItemWithCalculations
             const calculated = updateItemWithCalculations({
               ...mergedItem,
+              discountType: normalizedDiscountType, // ให้ type ตรง
               priceType: mapPriceTypeToBaseItem(mergedItem.priceType),
             });
             return {
+              ...mergedItem,
               ...calculated,
               priceType: mapPriceTypeToDocumentItem(calculated.priceType) as
                 | "EXCLUDE_VAT"
@@ -593,6 +620,8 @@ export const DocumentForm: FC<DocumentFormProps> = ({
             id: item.id ?? `item-${Date.now()}`,
             discountType: normalizedDiscountType,
             isEditing: false,
+            originalUnitPrice: (item as any).original_unit_price ?? item.originalUnitPrice ?? item.unitPrice ?? 0, // fallback อัตโนมัติสำหรับข้อมูลเก่า
+            unitPrice: item.unitPrice ?? 0,
           };
           // ลบ field ที่เกี่ยวกับผลลัพธ์การคำนวณ
           delete mergedItem.amount;
@@ -720,6 +749,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
       unit: item.unit ?? "",
       quantity: item.quantity ?? 1,
       unit_price: item.unitPrice ?? 0,
+      original_unit_price: item.originalUnitPrice ?? item.unitPrice ?? 0, // ส่ง original_unit_price
       amount: item.amount ?? 0,
       description: item.description ?? "",
       withholding_tax_amount: item.withholdingTaxAmount ?? 0,
@@ -1306,14 +1336,10 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                       <Label>ราคาต่อหน่วย</Label>
                       <Input
                         type="number"
-                        value={
-                          typeof item.unitPrice === "number"
-                            ? item.unitPrice
-                            : 0
-                        }
+                        value={item.originalUnitPrice?.toFixed(2) ?? "0.00"}
                         readOnly
                         placeholder="0.00"
-                        className="bg-gray-100 dark:bg-gray-800"
+                        className="bg-yellow-100 font-bold text-yellow-700 text-right"
                       />
                     </div>
                     <div className="space-y-2">
@@ -1353,10 +1379,13 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                     <div className="space-y-2">
                       <Label>ภาษี</Label>
                       <Select
-                        value={String(item.tax)}
+                        value={String(
+                          form.priceType === "NO_VAT" ? 0 : item.tax
+                        )}
                         onValueChange={(value) =>
                           handleItemChange(item.id, "tax", parseInt(value))
                         }
+                        disabled={form.priceType === "NO_VAT"}
                       >
                         <SelectTrigger>
                           <SelectValue />
@@ -1372,14 +1401,10 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                       <Input
                         type="text"
                         readOnly
-                        value={
-                          typeof item.amountBeforeTax === "number" &&
-                          !isNaN(item.amountBeforeTax)
-                            ? item.amountBeforeTax.toLocaleString("th-TH", {
-                                minimumFractionDigits: 2,
-                              })
-                            : "0.00"
-                        }
+                        value={getNetUnitPrice(
+                          item,
+                          form.priceType
+                        ).toLocaleString("th-TH", { minimumFractionDigits: 2 })}
                         className="font-semibold bg-muted"
                       />
                     </div>

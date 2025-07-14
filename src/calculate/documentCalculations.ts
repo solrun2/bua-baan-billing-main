@@ -3,6 +3,7 @@ import { DocumentSummary } from "@/types/document";
 interface BaseItem {
   quantity: number;
   unitPrice: number;
+  originalUnitPrice?: number;
   priceType: "inclusive" | "exclusive" | "none";
   discount: number;
   discountType: "thb" | "percentage";
@@ -30,11 +31,19 @@ export const calculateItemAmounts = (item: BaseItem): CalculatedItem => {
       ? item.withholdingTax / 100
       : 0;
 
-  // Adjust unitPrice if it's tax-inclusive
-  const priceBeforeTaxPerUnit =
-    item.priceType === "inclusive" && taxRate > 0
-      ? item.unitPrice / (1 + taxRate)
-      : item.unitPrice;
+  // ใช้ originalUnitPrice ถ้ามี (Net)
+  let priceBeforeTaxPerUnit = item.unitPrice;
+  if (typeof item.originalUnitPrice === "number") {
+    if (item.priceType === "inclusive" && taxRate > 0) {
+      priceBeforeTaxPerUnit = item.originalUnitPrice / (1 + taxRate);
+    } else {
+      priceBeforeTaxPerUnit = item.originalUnitPrice;
+    }
+  } else if (item.priceType === "inclusive" && taxRate > 0) {
+    priceBeforeTaxPerUnit = item.unitPrice / (1 + taxRate);
+  }
+  // ถ้า priceType === 'none' ให้ tax = 0
+  const effectiveTaxRate = item.priceType === "none" ? 0 : taxRate;
 
   // Calculate subtotal from the (potentially adjusted) unit price
   const subtotal = item.quantity * priceBeforeTaxPerUnit;
@@ -43,13 +52,14 @@ export const calculateItemAmounts = (item: BaseItem): CalculatedItem => {
   const discountAmount =
     item.discountType === "percentage"
       ? (subtotal * item.discount) / 100
-      : item.discount * item.quantity; // For THB discount, it's per unit, so multiply by quantity
+      : item.discount * item.quantity;
 
   // Calculate amount before tax
   const amountBeforeTax = subtotal - discountAmount;
 
   // Calculate tax amount from the amount after discount, but only if priceType is not 'none'
-  const taxAmount = item.priceType !== "none" ? amountBeforeTax * taxRate : 0;
+  const taxAmount =
+    effectiveTaxRate > 0 ? amountBeforeTax * effectiveTaxRate : 0;
 
   // Calculate withholding tax amount for the item
   let withholdingTaxAmount = 0;

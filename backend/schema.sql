@@ -56,6 +56,7 @@ CREATE TABLE `document_items` (
   `unit` varchar(50) DEFAULT NULL,
   `quantity` decimal(10,2) NOT NULL DEFAULT 1.00,
   `unit_price` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `original_unit_price` decimal(10,2) DEFAULT NULL, -- ราคาต่อหน่วยต้นฉบับ
   `amount` decimal(15,2) NOT NULL DEFAULT 0.00,
   `description` text DEFAULT NULL,
   `withholding_tax_amount` decimal(10,2) DEFAULT 0.00,
