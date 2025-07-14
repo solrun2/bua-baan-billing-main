@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom"; // Import Link
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { FileText, Plus, Search, AlertTriangle, Loader2 } from "lucide-react";
@@ -11,6 +11,8 @@ import DocumentFilter from "../../components/DocumentFilter";
 import { sortData } from "@/utils/sortUtils";
 import { searchData } from "@/utils/searchUtils";
 import { format } from "date-fns";
+import { th } from "date-fns/locale";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface QuotationItem {
   id: string;
@@ -34,8 +36,8 @@ const Quotation = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [filters, setFilters] = useState<{
     status?: string;
-    dateFrom?: string | null; // <-- รับค่าเป็น string
-    dateTo?: string | null; // <-- รับค่าเป็น string
+    dateFrom?: string | null;
+    dateTo?: string | null;
   }>({ status: "all", dateFrom: null, dateTo: null });
   const [searchText, setSearchText] = useState("");
   const [sortColumn, setSortColumn] = useState<string>("dateValue");
@@ -58,16 +60,16 @@ const Quotation = () => {
               id: doc.id,
               number: doc.document_number,
               customer: doc.customer_name,
-              date: format(issueDate, "d MMM yyyy"),
+              date: format(issueDate, "d MMM yy", { locale: th }),
               dateValue: issueDate.getTime(),
               validUntil: validUntilDate
-                ? format(validUntilDate, "d MMM yyyy")
+                ? format(validUntilDate, "d MMM yy", { locale: th })
                 : "-",
               validUntilValue: validUntilDate?.getTime() || 0,
               netTotal:
                 doc.summary?.netTotalAmount ?? Number(doc.total_amount ?? 0),
               status: doc.status,
-              documentDate: format(issueDate, "yyyy-MM-dd"), // <-- เก็บเป็น YYYY-MM-DD เสมอ
+              documentDate: format(issueDate, "yyyy-MM-dd"),
             };
           });
         setQuotations(quotationsData);
@@ -81,7 +83,6 @@ const Quotation = () => {
     loadQuotations();
   }, []);
 
-  const handleCreateNew = () => navigate("/documents/quotation/new");
   const handleSort = (column: string) => {
     if (sortColumn === column)
       setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
@@ -126,21 +127,17 @@ const Quotation = () => {
   const filteredAndSortedQuotations = useMemo(() => {
     let result = searchData(quotations, searchText, ["number", "customer"]);
 
-    // ✨✨✨ การกรองโดยใช้ String Comparison โดยตรง ✨✨✨
     result = result.filter((q) => {
       const isStatusMatch =
         !filters.status ||
         filters.status === "all" ||
         q.status === filters.status;
       if (!isStatusMatch) return false;
-
-      const docDate = q.documentDate; // 'YYYY-MM-DD'
-
+      const docDate = q.documentDate;
       const isAfterFrom =
         !filters.dateFrom || !docDate || docDate >= filters.dateFrom;
       const isBeforeTo =
         !filters.dateTo || !docDate || docDate <= filters.dateTo;
-
       return isAfterFrom && isBeforeTo;
     });
 
@@ -164,7 +161,8 @@ const Quotation = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between no-print">
+      {/* Header */}
+      <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center">
             <FileText className="w-6 h-6 text-blue-600" />
@@ -174,22 +172,27 @@ const Quotation = () => {
             <p className="text-gray-400">จัดการใบเสนอราคาทั้งหมด</p>
           </div>
         </div>
-        <Button className="flex items-center gap-2" onClick={handleCreateNew}>
-          <Plus className="w-4 h-4" />
-          สร้างใบเสนอราคาใหม่
-        </Button>
+        <Link to="/documents/quotation/new">
+          <Button className="flex items-center gap-2">
+            <Plus className="w-4 h-4" />
+            สร้างใบเสนอราคาใหม่
+          </Button>
+        </Link>
       </div>
 
-      <div className="flex flex-col md:flex-row items-center justify-between gap-4 no-print">
-        <div className="relative flex-1 w-full md:max-w-md">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <input
-            type="text"
-            placeholder="ค้นหาเลขที่เอกสาร, ชื่อลูกค้า..."
-            className="w-full pl-10 pr-4 py-2 border rounded-lg"
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-          />
+      {/* Actions */}
+      <div className="flex items-center gap-4">
+        <div className="flex-1 max-w-md">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="ค้นหาใบเสนอราคา..."
+              className="w-full pl-10 pr-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+            />
+          </div>
         </div>
         <DocumentFilter
           onFilterChange={handleFilterChange}
@@ -204,107 +207,120 @@ const Quotation = () => {
         />
       </div>
 
+      {/* Content */}
       <Card className="border border-border/40">
         <CardHeader>
           <CardTitle>รายการใบเสนอราคา</CardTitle>
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="flex justify-center p-10">
-              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            <div className="space-y-4">
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-64 w-full" />
             </div>
           ) : error ? (
-            <div className="text-center p-10 text-red-500">
-              <AlertTriangle className="mx-auto w-8 h-8 mb-2" />
-              <p>{error}</p>
-            </div>
-          ) : filteredAndSortedQuotations.length === 0 ? (
-            <div className="text-center p-10 text-muted-foreground">
-              <FileText className="mx-auto w-12 h-12 mb-4" />
-              <h3 className="text-lg font-semibold">ไม่พบข้อมูล</h3>
-              <p>ลองเปลี่ยนเงื่อนไขการค้นหาหรือตัวกรอง</p>
+            <div className="text-center py-10 text-red-500">
+              <AlertTriangle className="w-8 h-8 mx-auto mb-2" />
+              <p>เกิดข้อผิดพลาด: {error}</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full">
                 <thead>
-                  <tr className="border-b">
+                  <tr className="border-b border-border">
                     {[
                       { key: "number", label: "เลขที่" },
                       { key: "customer", label: "ลูกค้า" },
                       { key: "dateValue", label: "วันที่" },
                       { key: "validUntilValue", label: "วันหมดอายุ" },
-                      { key: "netTotal", label: "จำนวนเงิน" },
+                      { key: "netTotal", label: "ยอดเงิน" },
                       { key: "status", label: "สถานะ" },
                     ].map(({ key, label }) => (
                       <th
                         key={key}
-                        className="text-left p-3 font-medium text-muted-foreground cursor-pointer"
+                        className="text-left py-3 px-4 font-medium text-muted-foreground cursor-pointer select-none"
                         onClick={() => handleSort(key)}
                       >
                         {label}{" "}
-                        {sortColumn === key ? (
-                          sortDirection === "asc" ? (
-                            "▲"
-                          ) : (
-                            "▼"
-                          )
-                        ) : (
-                          <span className="text-gray-300">⇅</span>
-                        )}
+                        {sortColumn === key &&
+                          (sortDirection === "asc" ? "▲" : "▼")}
                       </th>
                     ))}
-                    <th className="text-left p-3 font-medium text-muted-foreground">
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground no-print">
                       การดำเนินการ
                     </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredAndSortedQuotations.map((q) => (
-                    <tr key={q.id} className="border-b hover:bg-muted/40">
-                      <td className="p-3 font-medium">{q.number}</td>
-                      <td className="p-3">{q.customer}</td>
-                      <td className="p-3 text-muted-foreground">{q.date}</td>
-                      <td className="p-3 text-muted-foreground">
-                        {q.validUntil}
-                      </td>
-                      <td className="p-3 font-medium text-right">
-                        {formatCurrency(q.netTotal)}
-                      </td>
-                      <td className="p-3">
-                        <span
-                          className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusBadge(q.status)}`}
-                        >
-                          {q.status}
-                        </span>
-                      </td>
-                      <td className="p-3">
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleViewClick(q)}
-                          >
-                            ดู
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleEditClick(q.id)}
-                          >
-                            แก้ไข
-                          </Button>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => handleDeleteClick(q.id)}
-                          >
-                            ลบ
-                          </Button>
-                        </div>
+                  {filteredAndSortedQuotations.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={7}
+                        className="text-center py-10 text-muted-foreground"
+                      >
+                        <FileText className="w-12 h-12 mx-auto mb-4" />
+                        <h3 className="text-lg font-semibold">
+                          ยังไม่มีใบเสนอราคา
+                        </h3>
+                        <p>เริ่มต้นสร้างใบเสนอราคาใหม่ได้เลย</p>
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    filteredAndSortedQuotations.map((q) => (
+                      <tr
+                        key={q.id}
+                        className="border-b border-border/40 hover:bg-muted/30 transition-colors"
+                      >
+                        <td className="py-3 px-4 font-medium text-foreground">
+                          {q.number}
+                        </td>
+                        <td className="py-3 px-4 text-foreground">
+                          {q.customer}
+                        </td>
+                        <td className="py-3 px-4 text-muted-foreground">
+                          {q.date}
+                        </td>
+                        <td className="py-3 px-4 text-muted-foreground">
+                          {q.validUntil}
+                        </td>
+                        <td className="py-3 px-4 font-medium text-foreground">
+                          {formatCurrency(q.netTotal)}
+                        </td>
+                        <td className="py-3 px-4">
+                          <span
+                            className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(q.status)}`}
+                          >
+                            {q.status}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 no-print">
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleViewClick(q)}
+                            >
+                              ดู
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleEditClick(q.id)}
+                            >
+                              แก้ไข
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => handleDeleteClick(q.id)}
+                            >
+                              ลบ
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
