@@ -5,7 +5,7 @@ export interface DocumentItem {
   unit: string;
   quantity: number;
   unitPrice: number;
-  priceType: "inclusive" | "exclusive" | "none";
+  priceType: "EXCLUDE_VAT" | "INCLUDE_VAT" | "NO_VAT";
   discount: number;
   discountType: "thb" | "percentage";
   tax: number;
@@ -65,7 +65,7 @@ export interface DocumentData {
   dueDate?: string; // Optional, for invoices
   reference: string;
   status: string;
-  priceType: "inclusive" | "exclusive" | "none";
+  priceType: "EXCLUDE_VAT" | "INCLUDE_VAT" | "NO_VAT";
   updatedAt?: string;
   tags?: string[];
   issueTaxInvoice?: boolean;
@@ -120,7 +120,7 @@ export interface DocumentPayload {
   dueDate?: string;
   reference: string;
   status: string;
-  priceType: "inclusive" | "exclusive" | "none";
+  priceType: "EXCLUDE_VAT" | "INCLUDE_VAT" | "NO_VAT";
   updatedAt?: string;
   tags?: string[];
   issueTaxInvoice?: boolean;

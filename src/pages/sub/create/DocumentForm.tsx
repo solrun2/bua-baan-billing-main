@@ -78,6 +78,24 @@ export interface DocumentFormProps {
 // เพิ่ม related_document_id ใน type DocumentData (workaround)
 type DocumentDataWithRelated = DocumentData & { related_document_id?: number };
 
+// ฟังก์ชันแปลง priceType ระหว่าง ENUM frontend/backend กับ ENUM ของ BaseItem
+function mapPriceTypeToBaseItem(
+  pt: "EXCLUDE_VAT" | "INCLUDE_VAT" | "NO_VAT"
+): "exclusive" | "inclusive" | "none" {
+  if (pt === "INCLUDE_VAT") return "inclusive";
+  if (pt === "NO_VAT") return "none";
+  return "exclusive";
+}
+
+// ฟังก์ชันแปลงกลับ priceType จาก BaseItem เป็น DocumentItem
+function mapPriceTypeToDocumentItem(
+  pt: "exclusive" | "inclusive" | "none"
+): "EXCLUDE_VAT" | "INCLUDE_VAT" | "NO_VAT" {
+  if (pt === "inclusive") return "INCLUDE_VAT";
+  if (pt === "none") return "NO_VAT";
+  return "EXCLUDE_VAT";
+}
+
 export const DocumentForm: FC<DocumentFormProps> = ({
   onCancel,
   onSave,
@@ -106,10 +124,11 @@ export const DocumentForm: FC<DocumentFormProps> = ({
   // Restore local state for create customer dialog
   const [isCreateCustomerOpen, setIsCreateCustomerOpen] = useState(false);
 
-  // Move createDefaultItem above form state
-  const [priceType, setPriceType] = useState<
-    "inclusive" | "exclusive" | "none"
-  >(initialData.priceType || "exclusive");
+  // ใช้ ENUM เดียวกับ backend
+  type PriceTypeEnum = "EXCLUDE_VAT" | "INCLUDE_VAT" | "NO_VAT";
+  const [priceType, setPriceType] = useState<PriceTypeEnum>(
+    (initialData.priceType as PriceTypeEnum) || "EXCLUDE_VAT"
+  );
 
   // 1. เพิ่มตัวเลือก ENUM สำหรับ Withholding Tax Option
   const WITHHOLDING_TAX_OPTIONS = [
@@ -135,7 +154,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
       unit: "",
       quantity: 1,
       unitPrice: 0,
-      priceType: priceType,
+      priceType: priceType || "EXCLUDE_VAT",
       discount: 0,
       discountType: "thb",
       tax: 7,
@@ -173,6 +192,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
         withholdingTax,
         withholdingTaxAmount: item.withholdingTaxAmount ?? 0,
         customWithholdingTaxAmount: item.customWithholdingTaxAmount ?? 0,
+        priceType: item.priceType || initialData.priceType || "EXCLUDE_VAT",
       } as DocumentItem;
     });
 
@@ -181,11 +201,25 @@ export const DocumentForm: FC<DocumentFormProps> = ({
       documentNumber: initialData.documentNumber,
     });
 
+    // เพิ่ม log debug
+    // console.log("[DEBUG] initialData.price_type:", initialData.price_type);
+
     return {
       ...initialData,
+      priceType: initialData.priceType || "EXCLUDE_VAT",
       items,
     };
   });
+
+  // sync form.priceType กับ initialData.priceType ทุกครั้งที่ initialData เปลี่ยน (เช่น async load)
+  useEffect(() => {
+    if (initialData.priceType && initialData.priceType !== form.priceType) {
+      setForm((prev) => ({
+        ...prev,
+        priceType: initialData.priceType,
+      }));
+    }
+  }, [initialData.priceType]);
 
   // เพิ่ม netTotalAmount ใน state summary
   const [summary, setSummary] = useState<
@@ -211,8 +245,12 @@ export const DocumentForm: FC<DocumentFormProps> = ({
         netTotalAmount: 0,
       };
     }
-
-    return calculateDocumentSummary(form.items);
+    // แปลง priceType ของแต่ละ item ก่อนส่งเข้า calculateDocumentSummary
+    const mappedItems = form.items.map((item) => ({
+      ...item,
+      priceType: mapPriceTypeToBaseItem(item.priceType),
+    }));
+    return calculateDocumentSummary(mappedItems);
   }, [form.items]);
 
   // Update summary when calculatedSummary changes
@@ -290,7 +328,19 @@ export const DocumentForm: FC<DocumentFormProps> = ({
             updatedItemState.customWithholdingTaxAmount =
               item.customWithholdingTaxAmount ?? 0;
           }
-          return updateItemWithCalculations(updatedItemState);
+          // แปลง priceType ก่อนส่งเข้า updateItemWithCalculations
+          const calculated = updateItemWithCalculations({
+            ...updatedItemState,
+            priceType: mapPriceTypeToBaseItem(updatedItemState.priceType),
+          });
+          // กำหนด priceType กลับเป็น ENUM DocumentItem
+          return {
+            ...calculated,
+            priceType: mapPriceTypeToDocumentItem(calculated.priceType) as
+              | "EXCLUDE_VAT"
+              | "INCLUDE_VAT"
+              | "NO_VAT",
+          };
         }
         return item;
       }),
@@ -300,12 +350,23 @@ export const DocumentForm: FC<DocumentFormProps> = ({
   // handle เพิ่ม/ลบ item
   const addNewItem = () => {
     const newItem = createDefaultItem();
-    const calculatedItem = updateItemWithCalculations(newItem);
+    // แปลง priceType ก่อนส่งเข้า updateItemWithCalculations
+    const calculatedItem = updateItemWithCalculations({
+      ...newItem,
+      priceType: mapPriceTypeToBaseItem(newItem.priceType),
+    });
+    const fixedItem = {
+      ...calculatedItem,
+      priceType: mapPriceTypeToDocumentItem(calculatedItem.priceType) as
+        | "EXCLUDE_VAT"
+        | "INCLUDE_VAT"
+        | "NO_VAT",
+    };
     setForm(
       (prev) =>
         ({
           ...prev,
-          items: [...prev.items, calculatedItem],
+          items: [...prev.items, fixedItem],
         }) as typeof form
     );
   };
@@ -400,8 +461,18 @@ export const DocumentForm: FC<DocumentFormProps> = ({
               mergedItem.withholdingTax =
                 Number(mergedItem.withholdingTax) || 0;
             }
-            // คำนวณใหม่
-            return updateItemWithCalculations(mergedItem) as DocumentItem;
+            // แปลง priceType ก่อนส่งเข้า updateItemWithCalculations
+            const calculated = updateItemWithCalculations({
+              ...mergedItem,
+              priceType: mapPriceTypeToBaseItem(mergedItem.priceType),
+            });
+            return {
+              ...calculated,
+              priceType: mapPriceTypeToDocumentItem(calculated.priceType) as
+                | "EXCLUDE_VAT"
+                | "INCLUDE_VAT"
+                | "NO_VAT",
+            };
           }
           return item;
         }),
@@ -421,7 +492,12 @@ export const DocumentForm: FC<DocumentFormProps> = ({
 
   // 3. สรุปรายการคำนวณสดจาก form.items
   useEffect(() => {
-    const newSummary = calculateDocumentSummary(form.items);
+    // แปลง priceType ของแต่ละ item ก่อนส่งเข้า calculateDocumentSummary
+    const mappedItems = form.items.map((item) => ({
+      ...item,
+      priceType: mapPriceTypeToBaseItem(item.priceType),
+    }));
+    const newSummary = calculateDocumentSummary(mappedItems);
     newSummary.netTotalAmount = newSummary.total - newSummary.withholdingTax;
     setSummary(newSummary);
   }, [form.items]);
@@ -541,8 +617,18 @@ export const DocumentForm: FC<DocumentFormProps> = ({
           } else if (typeof mergedItem.withholdingTax !== "number") {
             mergedItem.withholdingTax = Number(mergedItem.withholdingTax) || 0;
           }
-          // คำนวณใหม่
-          return updateItemWithCalculations(mergedItem) as DocumentItem;
+          // แปลง priceType ก่อนส่งเข้า updateItemWithCalculations
+          const calculated = updateItemWithCalculations({
+            ...mergedItem,
+            priceType: mapPriceTypeToBaseItem(mergedItem.priceType),
+          });
+          return {
+            ...calculated,
+            priceType: mapPriceTypeToDocumentItem(calculated.priceType) as
+              | "EXCLUDE_VAT"
+              | "INCLUDE_VAT"
+              | "NO_VAT",
+          };
         });
         setForm((prev) => ({
           ...prev,
@@ -560,7 +646,12 @@ export const DocumentForm: FC<DocumentFormProps> = ({
           items,
         }));
         // คำนวณ summary ใหม่ทันทีหลัง normalize items
-        const newSummary2 = calculateDocumentSummary(items);
+        // แปลง priceType ของแต่ละ item ก่อนส่งเข้า calculateDocumentSummary
+        const mappedItems = items.map((item) => ({
+          ...item,
+          priceType: mapPriceTypeToBaseItem(item.priceType),
+        }));
+        const newSummary2 = calculateDocumentSummary(mappedItems);
         newSummary2.netTotalAmount =
           newSummary2.total - newSummary2.withholdingTax;
         setSummary(newSummary2);
@@ -672,28 +763,35 @@ export const DocumentForm: FC<DocumentFormProps> = ({
       items: itemsToSave,
       summary: summary,
       notes: form.notes,
-      priceType: form.priceType,
+      priceType: form.priceType || "EXCLUDE_VAT",
       status: form.status,
       attachments: attachments,
     };
 
     // แปลง DocumentPayload เป็น DocumentData สำหรับบันทึก localStorage
-    const itemsForSave: DocumentItem[] = form.items.map((item, idx) => ({
-      ...item,
-      id: item.id ?? `item-${idx}-${Date.now()}`,
-      productTitle: item.productTitle ?? "",
-      unitPrice: item.unitPrice ?? 0,
-      priceType: item.priceType ?? form.priceType ?? "exclusive",
-      discountType: item.discountType ?? "thb",
-      withholding_tax_option: item.withholding_tax_option ?? "ไม่ระบุ",
-      withholdingTax: item.withholdingTax ?? 0,
-      customWithholdingTaxAmount: item.customWithholdingTaxAmount ?? 0,
-      amount: item.amount ?? 0,
-      amountBeforeTax: item.amountBeforeTax ?? 0,
-      taxAmount: item.taxAmount ?? 0,
-      withholdingTaxAmount: item.withholdingTaxAmount ?? 0,
-      isEditing: false,
-    }));
+    const itemsForSave: DocumentItem[] = form.items.map((item, idx) => {
+      let fixedPriceType: "EXCLUDE_VAT" | "INCLUDE_VAT" | "NO_VAT" =
+        "EXCLUDE_VAT";
+      if (item.priceType === "INCLUDE_VAT") fixedPriceType = "INCLUDE_VAT";
+      else if (item.priceType === "NO_VAT") fixedPriceType = "NO_VAT";
+      // ถ้าเป็น 'exclusive' หรืออื่นๆ ให้ fallback เป็น EXCLUDE_VAT
+      return {
+        ...item,
+        id: item.id ?? `item-${idx}-${Date.now()}`,
+        productTitle: item.productTitle ?? "",
+        unitPrice: item.unitPrice ?? 0,
+        priceType: fixedPriceType,
+        discountType: item.discountType ?? "thb",
+        withholding_tax_option: item.withholding_tax_option ?? "ไม่ระบุ",
+        withholdingTax: item.withholdingTax ?? 0,
+        customWithholdingTaxAmount: item.customWithholdingTaxAmount ?? 0,
+        amount: item.amount ?? 0,
+        amountBeforeTax: item.amountBeforeTax ?? 0,
+        taxAmount: item.taxAmount ?? 0,
+        withholdingTaxAmount: item.withholdingTaxAmount ?? 0,
+        isEditing: false,
+      };
+    });
     const dataForLocal: DocumentData = {
       ...dataToSave,
       id: initialData.id,
@@ -771,6 +869,11 @@ export const DocumentForm: FC<DocumentFormProps> = ({
     .filter((d) => d.enabled)
     .reduce((sum, d) => sum + Number(d.amount || 0), 0);
   const netTotal = totalPayment - totalFee - totalOffset;
+
+  // log debug form.priceType ทุกครั้งที่ render
+  useEffect(() => {
+    console.log("[DEBUG] form.priceType:", form.priceType);
+  }, [form.priceType]);
 
   return (
     <>
@@ -1054,24 +1157,29 @@ export const DocumentForm: FC<DocumentFormProps> = ({
             <div className="space-y-2 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {/* รูปแบบราคา */}
               <div className="space-y-2">
-                <Label>รูปแบบราคา</Label>
+                <Label htmlFor="priceType">รูปแบบราคา</Label>
                 <Select
-                  value={form.items[0]?.priceType || "exclusive"}
-                  onValueChange={(value) =>
-                    handleItemChange(
-                      form.items[0]?.id || "",
-                      "priceType",
-                      value
-                    )
-                  }
+                  value={form.priceType || "EXCLUDE_VAT"}
+                  onValueChange={(val) => handleFormChange("priceType", val)}
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="เลือกรูปแบบราคา" />
+                  <SelectTrigger className="w-full border-yellow-400 focus:ring-yellow-400 bg-blue-100">
+                    <SelectValue>
+                      {/* debug log */}
+                      {(() => {
+                        console.log("[DEBUG] SelectValue:", form.priceType);
+                        return null;
+                      })()}
+                      {form.priceType === "INCLUDE_VAT"
+                        ? "รวมภาษี"
+                        : form.priceType === "NO_VAT"
+                          ? "ไม่มีภาษี"
+                          : "ไม่รวมภาษี"}
+                    </SelectValue>
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="exclusive">ไม่รวมภาษี</SelectItem>
-                    <SelectItem value="inclusive">รวมภาษี</SelectItem>
-                    <SelectItem value="none">ไม่มีภาษี</SelectItem>
+                  <SelectContent className="bg-blue-100">
+                    <SelectItem value="EXCLUDE_VAT">ไม่รวมภาษี</SelectItem>
+                    <SelectItem value="INCLUDE_VAT">รวมภาษี</SelectItem>
+                    <SelectItem value="NO_VAT">ไม่มีภาษี</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -1725,7 +1833,23 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                                         : undefined,
                                     isNew: false,
                                   };
-                                  return updateItemWithCalculations(newItem);
+                                  const calculated = updateItemWithCalculations(
+                                    {
+                                      ...newItem,
+                                      priceType: mapPriceTypeToBaseItem(
+                                        newItem.priceType
+                                      ),
+                                    }
+                                  );
+                                  return {
+                                    ...calculated,
+                                    priceType: mapPriceTypeToDocumentItem(
+                                      calculated.priceType
+                                    ) as
+                                      | "EXCLUDE_VAT"
+                                      | "INCLUDE_VAT"
+                                      | "NO_VAT",
+                                  };
                                 }
                                 return item;
                               });

@@ -11,7 +11,7 @@ const EditDocumentPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!id) return; // ป้องกันกรณี id ยังไม่พร้อม
+    if (!id) return; 
     console.log("[EditDocument] id:", id);
     apiService
       .getDocumentById(id)

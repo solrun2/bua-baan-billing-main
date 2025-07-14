@@ -776,8 +776,8 @@ app.post("/api/documents", async (req: Request, res: Response) => {
       `INSERT INTO documents (
         customer_id, customer_name, document_number, document_type, status, issue_date,
         subtotal, tax_amount, total_amount, notes,
-        customer_address, customer_phone, customer_email
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        customer_address, customer_phone, customer_email, price_type
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         customer.id,
         customer.name,
@@ -792,6 +792,7 @@ app.post("/api/documents", async (req: Request, res: Response) => {
         customer.address || "",
         customer.phone || "",
         customer.email || "",
+        req.body.price_type || "EXCLUDE_VAT",
       ]
     );
 
@@ -1154,7 +1155,7 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
       `UPDATE documents SET
         customer_id = ?, customer_name = ?, document_type = ?, status = ?, issue_date = ?,
         subtotal = ?, tax_amount = ?, total_amount = ?, notes = ?,
-        customer_address = ?, customer_phone = ?, customer_email = ?
+        customer_address = ?, customer_phone = ?, customer_email = ?, price_type = ?
       WHERE id = ?`,
       [
         customer.id,
@@ -1169,6 +1170,7 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
         customer.address || "",
         customer.phone || "",
         customer.email || "",
+        req.body.price_type || "EXCLUDE_VAT",
         id,
       ]
     );

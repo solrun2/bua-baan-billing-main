@@ -16,6 +16,7 @@ CREATE TABLE `documents` (
   `customer_address` text DEFAULT NULL,
   `customer_phone` varchar(50) DEFAULT NULL,
   `customer_email` varchar(255) DEFAULT NULL,
+  `price_type` ENUM('EXCLUDE_VAT', 'INCLUDE_VAT', 'NO_VAT') NOT NULL DEFAULT 'EXCLUDE_VAT',
   PRIMARY KEY (`id`),
   UNIQUE KEY `document_number` (`document_number`)
 ) ENGINE=InnoDB AUTO_INCREMENT=138 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci
