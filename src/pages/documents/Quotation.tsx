@@ -147,7 +147,7 @@ const Quotation = () => {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "รอตอบรับ":
-        return "bg-yellow-100 text-gray-700";
+        return "bg-yellow-100 text-yellow-700";
       case "ตอบรับแล้ว":
         return "bg-green-100 text-green-700";
       case "พ้นกำหนด":
