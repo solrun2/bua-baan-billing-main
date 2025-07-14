@@ -1,11 +1,17 @@
 import { Customer } from "@/types/customer";
 import axios from "axios";
-import { Document, DocumentData } from "@/types/document";
-import { DocumentItem } from "@/types/document";
+import {
+  Document,
+  DocumentData,
+  DocumentItem,
+  DocumentPayload,
+} from "@/types/document"; // แก้ไข: เพิ่ม DocumentPayload
 import { Product } from "@/types/product";
 import { updateItemWithCalculations } from "@/calculate/documentCalculations";
 
 const API_BASE_URL = "http://localhost:3001/api";
+
+// ... (โค้ดส่วนอื่นๆ ของไฟล์ apiService.ts ยังคงเหมือนเดิม)
 
 const getDocuments = async (): Promise<Document[]> => {
   try {
@@ -25,158 +31,49 @@ const getDocuments = async (): Promise<Document[]> => {
   }
 };
 
-const prepareDocumentData = (document: DocumentData): any => {
-  // เตรียมข้อมูล customer object ให้ครบ id, name
-  const customer =
-    document.customer && document.customer.id && document.customer.name
-      ? {
-          id: document.customer.id,
-          name: document.customer.name,
-          tax_id: document.customer.tax_id || "",
-          phone: document.customer.phone || "",
-          address: document.customer.address || "",
-          email: document.customer.email || "",
-        }
-      : undefined;
-
-  // เตรียม items array ให้ตรงกับ backend
-  const items = (document.items || []).map((item) => ({
-    product_id: item.productId ?? (item as any).product_id ?? "",
-    product_name: item.productTitle ?? (item as any).product_name ?? "",
-    unit: item.unit ?? "",
-    quantity: Number(item.quantity ?? 1),
-    unit_price: Number(item.unitPrice ?? (item as any).unit_price ?? 0),
-    original_unit_price: Number(
-      item.originalUnitPrice ??
-        (item as any).original_unit_price ??
-        (item as any).unit_price ??
-        0
-    ), // ส่ง original_unit_price เสมอ
-    amount: Number(item.amount ?? 0),
-    description: item.description ?? "",
-    withholding_tax_amount: Number(
-      item.withholdingTaxAmount ?? (item as any).withholding_tax_amount ?? 0
-    ),
-    withholding_tax_option:
-      item.withholdingTax ?? (item as any).withholding_tax_option ?? -1,
-    amount_before_tax: Number(
-      item.amountBeforeTax ?? (item as any).amount_before_tax ?? 0
-    ),
-    discount: Number(item.discount ?? 0),
-    discount_type: item.discountType ?? (item as any).discount_type ?? "thb",
-    tax: Number(item.tax ?? 0),
-    tax_amount: Number(item.taxAmount ?? (item as any).tax_amount ?? 0),
-  }));
-
-  // Log discount_type and discount for each item before sending to backend
-  if (items.length > 0) {
-    console.log(
-      "[prepareDocumentData] items to backend:",
-      items.map((i) => ({
-        discount_type: i.discount_type,
-        discount: i.discount,
-        product_name: i.product_name,
-      }))
-    );
-  }
-
-  // Ensure summary fields are always present
-  const summary: any = document.summary || {};
-  const safeSummary = {
-    subtotal: typeof summary.subtotal === "number" ? summary.subtotal : 0,
-    discount: typeof summary.discount === "number" ? summary.discount : 0,
-    tax: typeof summary.tax === "number" ? summary.tax : 0,
-    total: typeof summary.total === "number" ? summary.total : 0,
-    withholdingTax:
-      typeof summary.withholdingTax === "number" ? summary.withholdingTax : 0,
-  };
-
-  // ลบ withholding_tax ออกจากข้อมูลที่จะส่ง
-  const baseData = {
-    ...document, // ใช้ spread document ตรงๆ
-    customer, // object
-    document_type: document.documentType
-      ? document.documentType.toUpperCase()
-      : "",
-    document_number: document.documentNumber, // Add document number to the data sent to backend
-    status: document.status,
-    issue_date: document.documentDate,
-    notes: document.notes,
-    items,
-    summary: safeSummary,
-  };
-  delete (baseData as any).withholding_tax;
-  if (baseData.summary && "withholding_tax" in baseData.summary) {
-    delete baseData.summary.withholding_tax;
-  }
-
-  if (document.documentType === "quotation") {
-    return {
-      ...baseData,
-      valid_until: document.validUntil,
-    };
-  } else if (document.documentType === "invoice") {
-    return {
-      ...baseData,
-      due_date: document.dueDate,
-    };
-  }
-
-  return baseData;
-};
-
 const createDocument = async (
-  document: DocumentData
+  document: DocumentPayload
 ): Promise<DocumentData> => {
-  const backendData = prepareDocumentData(document);
-
-  console.log("[createDocument] backendData:", backendData);
-
+  // ฟังก์ชัน create ใช้ DocumentPayload ซึ่งถูกต้องอยู่แล้ว
   try {
     const response = await fetch(`${API_BASE_URL}/documents`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(backendData),
+      body: JSON.stringify(document),
     });
 
     if (!response.ok) {
       const errorData = await response.json();
       throw new Error(errorData.error || "Failed to create document");
     }
-
-    const createdDocFromBackend = await response.json();
-
-    // Reconstruct the full DocumentData object to ensure consistency
-    const finalDocumentData: DocumentData = {
-      ...document, // all properties from the original form data
-      id: createdDocFromBackend.id.toString(), // override with the new ID from the backend
-      documentNumber: createdDocFromBackend.document_number, // and the new document number
-      // The 'customer' object is preserved from the original 'document'
-    };
-
-    return finalDocumentData;
+    const createdDoc = await response.json();
+    return mapDocumentFromBackend(createdDoc);
   } catch (error) {
     console.error("Error creating document:", error);
     throw error;
   }
 };
 
+// --- จุดที่แก้ไข ---
+// เปลี่ยนประเภทของพารามิเตอร์ document จาก DocumentData เป็น DocumentPayload
 const updateDocument = async (
   id: string,
-  document: DocumentData
+  document: DocumentPayload
 ): Promise<DocumentData> => {
   try {
-    const backendData = prepareDocumentData(document);
+    // ข้อมูลที่มาจากฟอร์ม (payload) อยู่ในรูปแบบที่พร้อมส่งไป backend แล้ว
+    // จึงไม่จำเป็นต้องเรียก prepareDocumentData อีก
     const response = await fetch(`${API_BASE_URL}/documents/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(backendData),
+      body: JSON.stringify(document), // ส่ง document ที่เป็น DocumentPayload ไปได้เลย
     });
     if (!response.ok) {
       const errorData = await response.json();
       throw new Error(errorData.message || "Failed to update document");
     }
-    return await response.json();
+    const updatedDoc = await response.json();
+    return mapDocumentFromBackend(updatedDoc);
   } catch (error) {
     console.error("Error updating document:", error);
     throw error;
@@ -250,72 +147,29 @@ export const uploadImage = async (file: File): Promise<string> => {
   }
 };
 
-// Sync database documents to localStorage
-const syncDocumentsToLocalStorage = async (): Promise<void> => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/documents`);
-    if (!response.ok) {
-      throw new Error("Failed to fetch documents for sync");
-    }
-    const documents = await response.json();
-
-    if (Array.isArray(documents)) {
-      // Only store document numbers to keep localStorage small
-      const documentNumbers = documents.map((doc) => ({
-        id: doc.id,
-        documentNumber: doc.document_number,
-        documentType: doc.document_type,
-        documentDate: doc.issue_date,
-      }));
-
-      localStorage.setItem("documents", JSON.stringify(documentNumbers));
-      console.log("Synced documents to localStorage:", documentNumbers);
-    }
-  } catch (error) {
-    console.error("Error syncing documents to localStorage:", error);
-  }
-};
-
-// Get document numbers directly from the database, filtered by document type
 const getDocumentNumbers = async (
   type: "quotation" | "invoice" | "receipt" | "tax_invoice"
 ): Promise<string[]> => {
   try {
-    console.log(`Fetching documents of type: ${type}`);
-    const response = await fetch(`${API_BASE_URL}/documents?type=${type}`);
+    const response = await fetch(
+      `${API_BASE_URL}/documents/next-number?type=${type}`
+    );
     if (!response.ok) {
-      throw new Error("Failed to fetch documents");
+      throw new Error("Failed to fetch next document number");
     }
-    const documents = await response.json();
-
-    if (Array.isArray(documents)) {
-      // Extract only the document numbers and filter out any invalid entries
-      const numbers = documents
-        .map((doc) => doc.document_number)
-        .filter((num): num is string => Boolean(num));
-
-      console.log(
-        `Found ${numbers.length} documents of type ${type}:`,
-        numbers
-      );
-      return numbers;
-    }
-    return [];
+    const data = await response.json();
+    return data.documentNumber;
   } catch (error) {
     console.error("Error fetching document numbers:", error);
     return [];
   }
 };
 
-// Map backend document (snake_case) to frontend DocumentData (camelCase)
 function mapDocumentFromBackend(doc: any): DocumentData {
-  // Helper function to format date as yyyy-MM-dd
   const formatDate = (dateStr: string | undefined) => {
     if (!dateStr || typeof dateStr !== "string") {
       return "";
     }
-    // Safely take the first 10 characters, which represents YYYY-MM-DD
-    // This avoids any timezone conversion issues from new Date()
     return dateStr.substring(0, 10);
   };
   return {
@@ -338,52 +192,44 @@ function mapDocumentFromBackend(doc: any): DocumentData {
       address: doc.customer_address || "",
       email: doc.customer_email || "",
     },
-    related_document_id: doc.related_document_id, // เดิม
-    items: (doc.items || []).map((item: any) => {
-      return {
-        id: item.id?.toString() ?? `item-${Date.now()}`,
-        productId:
-          item.product_id?.toString() ?? item.productId?.toString() ?? "",
-        productTitle: item.product_name ?? item.productTitle ?? "",
-        description: item.description ?? "",
-        unit: item.unit ?? "",
-        quantity: Number(item.quantity ?? 1),
-        unitPrice: Number(item.unit_price ?? item.unitPrice ?? 0),
-        priceType: doc.price_type || "exclusive",
-        discount: Number(item.discount ?? 0),
-        discountType: item.discount_type ?? item.discountType ?? "thb",
-        tax: Number(item.tax ?? 0),
-        amountBeforeTax: Number(
-          item.amount_before_tax ?? item.amountBeforeTax ?? 0
-        ),
-        withholdingTax:
-          typeof item.withholdingTax === "number"
-            ? item.withholdingTax
-            : typeof item.withholding_tax_option === "string" &&
-                item.withholding_tax_option.endsWith("%")
-              ? parseFloat(item.withholding_tax_option)
-              : Number(item.withholding_tax_option ?? -1),
-        customWithholdingTaxAmount: Number(
-          item.custom_withholding_tax_amount ??
-            item.customWithholdingTaxAmount ??
-            0
-        ),
-        amount: Number(item.amount ?? 0),
-        isEditing: false,
-        taxAmount: Number(item.tax_amount ?? item.taxAmount ?? 0),
-        withholdingTaxAmount: Number(
-          item.withholding_tax_amount ?? item.withholdingTaxAmount ?? 0
-        ),
-        withholding_tax_option: item.withholding_tax_option ?? "ไม่ระบุ",
-      };
-    }),
-    items_recursive: doc.items_recursive || [], // <-- เพิ่มบรรทัดนี้
-    summary: {
-      subtotal: Number(doc.subtotal ?? 0),
-      discount: Number(doc.discount ?? 0),
-      tax: Number(doc.tax_amount ?? 0),
-      total: Number(doc.total_amount ?? 0),
-      withholdingTax: Number(doc.withholding_tax ?? 0),
+    related_document_id: doc.related_document_id,
+    items: (doc.items || []).map((item: any) => ({
+      id: item.id?.toString() ?? `item-${Date.now()}`,
+      productId: item.product_id?.toString() ?? "",
+      productTitle: item.product_name ?? "",
+      description: item.description ?? "",
+      unit: item.unit ?? "",
+      quantity: Number(item.quantity ?? 1),
+      unitPrice: Number(item.unit_price ?? 0),
+      originalUnitPrice: Number(
+        item.original_unit_price ?? item.unit_price ?? 0
+      ),
+      priceType: doc.price_type || "exclusive",
+      discount: Number(item.discount ?? 0),
+      discountType: item.discount_type ?? "thb",
+      tax: Number(item.tax ?? 0),
+      amountBeforeTax: Number(item.amount_before_tax ?? 0),
+      withholdingTax:
+        typeof item.withholding_tax_option === "string" &&
+        item.withholding_tax_option.endsWith("%")
+          ? parseFloat(item.withholding_tax_option)
+          : Number(item.withholding_tax_option) || -1,
+      customWithholdingTaxAmount: Number(
+        item.custom_withholding_tax_amount ?? 0
+      ),
+      amount: Number(item.amount ?? 0),
+      isEditing: false,
+      taxAmount: Number(item.tax_amount ?? 0),
+      withholdingTaxAmount: Number(item.withholding_tax_amount ?? 0),
+      withholding_tax_option: item.withholding_tax_option ?? "ไม่ระบุ",
+    })),
+    items_recursive: doc.items_recursive || [],
+    summary: doc.summary || {
+      subtotal: 0,
+      discount: 0,
+      tax: 0,
+      total: 0,
+      withholdingTax: 0,
     },
     attachments: doc.attachments || [],
     issueTaxInvoice: doc.issue_tax_invoice ?? false,
@@ -393,100 +239,16 @@ function mapDocumentFromBackend(doc: any): DocumentData {
 
 const getDocumentById = async (id: string): Promise<DocumentData> => {
   try {
-    console.log(`Fetching document with ID: ${id}`);
-
-    // เพิ่ม timeout เพื่อป้องกันการรอนานเกินไป
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 วินาที
-
-    const response = await fetch(`${API_BASE_URL}/documents/${id}`, {
-      signal: controller.signal,
-    });
-
-    clearTimeout(timeoutId);
+    const response = await fetch(`${API_BASE_URL}/documents/${id}`);
 
     if (!response.ok) {
       throw new Error("Failed to fetch document by ID");
     }
     const doc = await response.json();
-    console.log(`Document fetched successfully:`, doc);
     return mapDocumentFromBackend(doc);
   } catch (error) {
     console.error("Error fetching document by ID:", error);
-    if (error.name === "AbortError") {
-      throw new Error("Request timeout - โหลดข้อมูลนานเกินไป");
-    }
     throw error;
-  }
-};
-
-const createDefaultItem = (): DocumentItem => ({
-  id: `item-${Date.now()}`,
-  productTitle: "",
-  description: "",
-  unit: "",
-  quantity: 1,
-  unitPrice: 0,
-  priceType: "EXCLUDE_VAT", // แก้ให้ตรง type
-  discount: 0,
-  discountType: "thb",
-  tax: 7,
-  amountBeforeTax: 0,
-  withholdingTax: -1,
-  amount: 0,
-  isEditing: true,
-});
-
-const handleProductSelect = (
-  product: Product | null,
-  itemId: string,
-  items: DocumentItem[],
-  setItems: (items: DocumentItem[]) => void
-) => {
-  if (product) {
-    const updatedItems = items.map((item) => {
-      if (item.id === itemId) {
-        // อัปเดตค่าต่างๆ จากสินค้าใหม่
-        // map priceType ให้ตรงกับ type ที่ updateItemWithCalculations ต้องการ
-        let mappedPriceType: "exclusive" | "inclusive" | "none" = "exclusive";
-        if (item.priceType === "INCLUDE_VAT") mappedPriceType = "inclusive";
-        else if (item.priceType === "NO_VAT") mappedPriceType = "none";
-        else mappedPriceType = "exclusive";
-        const newItem = {
-          ...item,
-          productId: String(product.id),
-          productTitle: product.name,
-          description: product.description || "",
-          unitPrice: product.price || 0,
-          unit: product.unit || "ชิ้น",
-          tax: product.vat_rate ?? 7, // หรือ field ที่ถูกต้อง
-          isEditing: false,
-          priceType: mappedPriceType,
-        };
-        // updateItemWithCalculations อาจคืน BaseItem & CalculatedItem ต้องแปลงกลับเป็น DocumentItem
-        const calculated = updateItemWithCalculations(newItem);
-        // map priceType กลับเป็น DocumentItem type
-        let mappedBackPriceType: "EXCLUDE_VAT" | "INCLUDE_VAT" | "NO_VAT" =
-          "EXCLUDE_VAT";
-        if (calculated.priceType === "inclusive")
-          mappedBackPriceType = "INCLUDE_VAT";
-        else if (calculated.priceType === "none")
-          mappedBackPriceType = "NO_VAT";
-        else mappedBackPriceType = "EXCLUDE_VAT";
-        return {
-          ...item,
-          ...calculated,
-          id: item.id,
-          productTitle: product.name,
-          description: product.description || "",
-          unit: product.unit || "ชิ้น",
-          isEditing: false,
-          priceType: mappedBackPriceType,
-        };
-      }
-      return item;
-    });
-    setItems(updatedItems);
   }
 };
 
@@ -495,7 +257,6 @@ export const apiService = {
   createDocument,
   updateDocument,
   deleteDocument,
-  syncDocumentsToLocalStorage,
   getDocumentNumbers,
   createCustomer,
   uploadImage,

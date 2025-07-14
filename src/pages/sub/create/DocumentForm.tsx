@@ -53,10 +53,7 @@ import {
   updateItemWithCalculations,
 } from "@/calculate/documentCalculations";
 import { ProductForm } from "./ProductForm";
-import { getCustomerById } from "@/pages/services/customerService";
-import { getProductById } from "@/pages/services/productService";
 import { documentService } from "@/pages/services/documentService";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
   Accordion,
   AccordionItem,
@@ -68,7 +65,7 @@ export interface DocumentFormProps {
   onCancel: () => void;
   onSave: (data: DocumentPayload) => Promise<void>;
   initialData: DocumentData;
-  documentType: "quotation" | "invoice" | "receipt";
+  documentType: "quotation" | "invoice" | "receipt" | "tax_invoice";
   isLoading: boolean;
   editMode?: boolean;
   pageTitle?: string;
