@@ -92,9 +92,8 @@ const prepareDocumentData = (document: DocumentData): any => {
   };
 
   // ลบ withholding_tax ออกจากข้อมูลที่จะส่ง
-  const { withholding_tax, ...rest } = document;
   const baseData = {
-    ...rest,
+    ...document, // ใช้ spread document ตรงๆ
     customer, // object
     document_type: document.documentType
       ? document.documentType.toUpperCase()
@@ -427,7 +426,7 @@ const createDefaultItem = (): DocumentItem => ({
   unit: "",
   quantity: 1,
   unitPrice: 0,
-  priceType: "exclusive",
+  priceType: "EXCLUDE_VAT", // แก้ให้ตรง type
   discount: 0,
   discountType: "thb",
   tax: 7,
@@ -447,6 +446,11 @@ const handleProductSelect = (
     const updatedItems = items.map((item) => {
       if (item.id === itemId) {
         // อัปเดตค่าต่างๆ จากสินค้าใหม่
+        // map priceType ให้ตรงกับ type ที่ updateItemWithCalculations ต้องการ
+        let mappedPriceType: "exclusive" | "inclusive" | "none" = "exclusive";
+        if (item.priceType === "INCLUDE_VAT") mappedPriceType = "inclusive";
+        else if (item.priceType === "NO_VAT") mappedPriceType = "none";
+        else mappedPriceType = "exclusive";
         const newItem = {
           ...item,
           productId: String(product.id),
@@ -456,8 +460,28 @@ const handleProductSelect = (
           unit: product.unit || "ชิ้น",
           tax: product.vat_rate ?? 7, // หรือ field ที่ถูกต้อง
           isEditing: false,
+          priceType: mappedPriceType,
         };
-        return updateItemWithCalculations(newItem);
+        // updateItemWithCalculations อาจคืน BaseItem & CalculatedItem ต้องแปลงกลับเป็น DocumentItem
+        const calculated = updateItemWithCalculations(newItem);
+        // map priceType กลับเป็น DocumentItem type
+        let mappedBackPriceType: "EXCLUDE_VAT" | "INCLUDE_VAT" | "NO_VAT" =
+          "EXCLUDE_VAT";
+        if (calculated.priceType === "inclusive")
+          mappedBackPriceType = "INCLUDE_VAT";
+        else if (calculated.priceType === "none")
+          mappedBackPriceType = "NO_VAT";
+        else mappedBackPriceType = "EXCLUDE_VAT";
+        return {
+          ...item,
+          ...calculated,
+          id: item.id,
+          productTitle: product.name,
+          description: product.description || "",
+          unit: product.unit || "ชิ้น",
+          isEditing: false,
+          priceType: mappedBackPriceType,
+        };
       }
       return item;
     });
