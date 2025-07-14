@@ -3,7 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
-  ClipboardList, // Icon for Billing
+  ClipboardList as BillingIcon,
   Plus,
   Search,
   AlertTriangle,
@@ -17,7 +17,7 @@ import { formatCurrency } from "../../lib/utils";
 import DocumentFilter from "../../components/DocumentFilter";
 import { sortData } from "@/utils/sortUtils";
 import { searchData } from "@/utils/searchUtils";
-import { format } from "date-fns";
+import { format, subDays } from "date-fns";
 import { th } from "date-fns/locale";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -29,7 +29,7 @@ interface BillingItem {
   dateValue: number;
   netTotal: number;
   status: string;
-  documentDate: string; // 'YYYY-MM-DD' string
+  documentDate: string;
 }
 
 const Billing = () => {
@@ -55,7 +55,7 @@ const Billing = () => {
         setError(null);
         const data = await apiService.getDocuments();
         const billingData = data
-          .filter((doc: any) => doc.document_type === "BILLING")
+          .filter((doc : any) => doc.document_type === "BILLING")
           .map((doc: any): BillingItem => {
             const issueDate = new Date(doc.issue_date);
             return {
@@ -98,7 +98,7 @@ const Billing = () => {
       toast.promise(apiService.deleteDocument(id), {
         loading: "กำลังลบ...",
         success: () => {
-          setBillings((prev) => prev.filter((bill) => bill.id !== id));
+          setBillings((prev) => prev.filter((item) => item.id !== id));
           return "ลบใบวางบิลเรียบร้อยแล้ว";
         },
         error: "เกิดข้อผิดพลาดในการลบ",
@@ -125,15 +125,24 @@ const Billing = () => {
   const filteredAndSortedBillings = useMemo(() => {
     let result = searchData(billings, searchText, ["number", "customer"]);
 
-    result = result.filter((bill) => {
+    result = result.filter((item) => {
       const isStatusMatch =
         !filters.status ||
         filters.status === "all" ||
-        bill.status === filters.status;
+        item.status === filters.status;
       if (!isStatusMatch) return false;
-      const docDate = bill.documentDate;
+
+      const docDate = item.documentDate;
+
+      let adjustedDateFrom = filters.dateFrom;
+      if (filters.dateFrom) {
+        const fromDate = new Date(filters.dateFrom);
+        const prevDay = subDays(fromDate, 1);
+        adjustedDateFrom = format(prevDay, "yyyy-MM-dd");
+      }
+
       const isAfterFrom =
-        !filters.dateFrom || !docDate || docDate >= filters.dateFrom;
+        !adjustedDateFrom || !docDate || docDate > adjustedDateFrom;
       const isBeforeTo =
         !filters.dateTo || !docDate || docDate <= filters.dateTo;
       return isAfterFrom && isBeforeTo;
@@ -160,7 +169,7 @@ const Billing = () => {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 rounded-xl bg-cyan-100 flex items-center justify-center">
-            <ClipboardList className="w-6 h-6 text-cyan-600" />
+            <BillingIcon className="w-6 h-6 text-cyan-600" />
           </div>
           <div>
             <h1 className="text-2xl font-bold text-foreground">ใบวางบิล</h1>
@@ -257,28 +266,28 @@ const Billing = () => {
                       </td>
                     </tr>
                   ) : (
-                    filteredAndSortedBillings.map((bill) => (
+                    filteredAndSortedBillings.map((item) => (
                       <tr
-                        key={bill.id}
+                        key={item.id}
                         className="border-b border-border/40 hover:bg-muted/30 transition-colors"
                       >
                         <td className="py-3 px-4 font-medium text-foreground">
-                          {bill.number}
+                          {item.number}
                         </td>
                         <td className="py-3 px-4 text-foreground">
-                          {bill.customer}
+                          {item.customer}
                         </td>
                         <td className="py-3 px-4 text-muted-foreground">
-                          {bill.date}
+                          {item.date}
                         </td>
                         <td className="py-3 px-4 font-medium text-foreground">
-                          {formatCurrency(bill.netTotal)}
+                          {formatCurrency(item.netTotal)}
                         </td>
                         <td className="py-3 px-4">
                           <span
-                            className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(bill.status)}`}
+                            className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(item.status)}`}
                           >
-                            {bill.status}
+                            {item.status}
                           </span>
                         </td>
                         <td className="py-3 px-4 no-print">
@@ -286,21 +295,21 @@ const Billing = () => {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleViewClick(bill)}
+                              onClick={() => handleViewClick(item)}
                             >
                               ดู
                             </Button>
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleEditClick(bill.id)}
+                              onClick={() => handleEditClick(item.id)}
                             >
                               แก้ไข
                             </Button>
                             <Button
                               variant="destructive"
                               size="sm"
-                              onClick={() => handleDeleteClick(bill.id)}
+                              onClick={() => handleDeleteClick(item.id)}
                             >
                               ลบ
                             </Button>

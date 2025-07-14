@@ -3,7 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
-  Receipt, // Icon for Invoice
+  Receipt as InvoiceIcon,
   Plus,
   Search,
   AlertTriangle,
@@ -17,7 +17,7 @@ import { formatCurrency } from "../../lib/utils";
 import DocumentFilter from "../../components/DocumentFilter";
 import { sortData } from "@/utils/sortUtils";
 import { searchData } from "@/utils/searchUtils";
-import { format } from "date-fns";
+import { format, subDays } from "date-fns"; // ✨ import subDays
 import { th } from "date-fns/locale";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -105,7 +105,7 @@ const Invoice = () => {
       toast.promise(apiService.deleteDocument(id), {
         loading: "กำลังลบ...",
         success: () => {
-          setInvoices((prev) => prev.filter((inv) => inv.id !== id));
+          setInvoices((prev) => prev.filter((item) => item.id !== id));
           return "ลบใบแจ้งหนี้เรียบร้อยแล้ว";
         },
         error: "เกิดข้อผิดพลาดในการลบ",
@@ -132,19 +132,30 @@ const Invoice = () => {
   const filteredAndSortedInvoices = useMemo(() => {
     let result = searchData(invoices, searchText, ["number", "customer"]);
 
-    result = result.filter((inv) => {
+    result = result.filter((item) => {
       const isStatusMatch =
         !filters.status ||
         filters.status === "all" ||
-        inv.status === filters.status;
+        item.status === filters.status;
       if (!isStatusMatch) return false;
-      const docDate = inv.documentDate;
+
+      const docDate = item.documentDate;
+
+      // ✨✨✨ แก้ไขตามคำขอ: ลบวันที่เริ่มต้นออก 1 วัน ✨✨✨
+      let adjustedDateFrom = filters.dateFrom;
+      if (filters.dateFrom) {
+        const fromDate = new Date(filters.dateFrom);
+        const prevDay = subDays(fromDate, 1);
+        adjustedDateFrom = format(prevDay, "yyyy-MM-dd");
+      }
+
       const isAfterFrom =
-        !filters.dateFrom || !docDate || docDate >= filters.dateFrom;
+        !adjustedDateFrom || !docDate || docDate > adjustedDateFrom;
       const isBeforeTo =
         !filters.dateTo || !docDate || docDate <= filters.dateTo;
       return isAfterFrom && isBeforeTo;
     });
+
     return sortData(result, sortColumn as keyof InvoiceItem, sortDirection);
   }, [invoices, searchText, filters, sortColumn, sortDirection]);
 
@@ -163,11 +174,10 @@ const Invoice = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 rounded-xl bg-orange-100 flex items-center justify-center">
-            <Receipt className="w-6 h-6 text-orange-600" />
+            <InvoiceIcon className="w-6 h-6 text-orange-600" />
           </div>
           <div>
             <h1 className="text-2xl font-bold text-foreground">ใบแจ้งหนี้</h1>
@@ -182,7 +192,6 @@ const Invoice = () => {
         </Link>
       </div>
 
-      {/* Actions */}
       <div className="flex items-center gap-4">
         <div className="flex-1 max-w-md">
           <div className="relative">
@@ -209,7 +218,6 @@ const Invoice = () => {
         />
       </div>
 
-      {/* Content */}
       <Card className="border border-border/40">
         <CardHeader>
           <CardTitle>รายการใบแจ้งหนี้</CardTitle>
@@ -268,31 +276,31 @@ const Invoice = () => {
                       </td>
                     </tr>
                   ) : (
-                    filteredAndSortedInvoices.map((inv) => (
+                    filteredAndSortedInvoices.map((item) => (
                       <tr
-                        key={inv.id}
+                        key={item.id}
                         className="border-b border-border/40 hover:bg-muted/30 transition-colors"
                       >
                         <td className="py-3 px-4 font-medium text-foreground">
-                          {inv.number}
+                          {item.number}
                         </td>
                         <td className="py-3 px-4 text-foreground">
-                          {inv.customer}
+                          {item.customer}
                         </td>
                         <td className="py-3 px-4 text-muted-foreground">
-                          {inv.date}
+                          {item.date}
                         </td>
                         <td className="py-3 px-4 text-muted-foreground">
-                          {inv.dueDate}
+                          {item.dueDate}
                         </td>
                         <td className="py-3 px-4 font-medium text-foreground">
-                          {formatCurrency(inv.netTotal)}
+                          {formatCurrency(item.netTotal)}
                         </td>
                         <td className="py-3 px-4">
                           <span
-                            className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(inv.status)}`}
+                            className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(item.status)}`}
                           >
-                            {inv.status}
+                            {item.status}
                           </span>
                         </td>
                         <td className="py-3 px-4 no-print">
@@ -300,21 +308,21 @@ const Invoice = () => {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleViewClick(inv)}
+                              onClick={() => handleViewClick(item)}
                             >
                               ดู
                             </Button>
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleEditClick(inv.id)}
+                              onClick={() => handleEditClick(item.id)}
                             >
                               แก้ไข
                             </Button>
                             <Button
                               variant="destructive"
                               size="sm"
-                              onClick={() => handleDeleteClick(inv.id)}
+                              onClick={() => handleDeleteClick(item.id)}
                             >
                               ลบ
                             </Button>

@@ -3,7 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
-  Landmark, // Icon for TaxInvoice
+  Landmark as TaxInvoiceIcon,
   Plus,
   Search,
   AlertTriangle,
@@ -17,7 +17,7 @@ import { formatCurrency } from "../../lib/utils";
 import DocumentFilter from "../../components/DocumentFilter";
 import { sortData } from "@/utils/sortUtils";
 import { searchData } from "@/utils/searchUtils";
-import { format } from "date-fns";
+import { format, subDays } from "date-fns";
 import { th } from "date-fns/locale";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -29,7 +29,7 @@ interface TaxInvoiceItem {
   dateValue: number;
   netTotal: number;
   status: string;
-  documentDate: string; // 'YYYY-MM-DD' string
+  documentDate: string;
 }
 
 const TaxInvoice = () => {
@@ -57,7 +57,7 @@ const TaxInvoice = () => {
         setError(null);
         const data = await apiService.getDocuments();
         const taxInvoicesData = data
-          .filter((doc: any) => doc.document_type === "TAX_INVOICE")
+          .filter((doc : any) => doc.document_type === "TAX_INVOICE")
           .map((doc: any): TaxInvoiceItem => {
             const issueDate = new Date(doc.issue_date);
             return {
@@ -100,7 +100,7 @@ const TaxInvoice = () => {
       toast.promise(apiService.deleteDocument(id), {
         loading: "กำลังลบ...",
         success: () => {
-          setTaxInvoices((prev) => prev.filter((tax) => tax.id !== id));
+          setTaxInvoices((prev) => prev.filter((item) => item.id !== id));
           return "ลบใบกำกับภาษีเรียบร้อยแล้ว";
         },
         error: "เกิดข้อผิดพลาดในการลบ",
@@ -127,15 +127,24 @@ const TaxInvoice = () => {
   const filteredAndSortedTaxInvoices = useMemo(() => {
     let result = searchData(taxInvoices, searchText, ["number", "customer"]);
 
-    result = result.filter((tax) => {
+    result = result.filter((item) => {
       const isStatusMatch =
         !filters.status ||
         filters.status === "all" ||
-        tax.status === filters.status;
+        item.status === filters.status;
       if (!isStatusMatch) return false;
-      const docDate = tax.documentDate;
+
+      const docDate = item.documentDate;
+
+      let adjustedDateFrom = filters.dateFrom;
+      if (filters.dateFrom) {
+        const fromDate = new Date(filters.dateFrom);
+        const prevDay = subDays(fromDate, 1);
+        adjustedDateFrom = format(prevDay, "yyyy-MM-dd");
+      }
+
       const isAfterFrom =
-        !filters.dateFrom || !docDate || docDate >= filters.dateFrom;
+        !adjustedDateFrom || !docDate || docDate > adjustedDateFrom;
       const isBeforeTo =
         !filters.dateTo || !docDate || docDate <= filters.dateTo;
       return isAfterFrom && isBeforeTo;
@@ -160,7 +169,7 @@ const TaxInvoice = () => {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 rounded-xl bg-indigo-100 flex items-center justify-center">
-            <Landmark className="w-6 h-6 text-indigo-600" />
+            <TaxInvoiceIcon className="w-6 h-6 text-indigo-600" />
           </div>
           <div>
             <h1 className="text-2xl font-bold text-foreground">ใบกำกับภาษี</h1>
@@ -256,28 +265,28 @@ const TaxInvoice = () => {
                       </td>
                     </tr>
                   ) : (
-                    filteredAndSortedTaxInvoices.map((tax) => (
+                    filteredAndSortedTaxInvoices.map((item) => (
                       <tr
-                        key={tax.id}
+                        key={item.id}
                         className="border-b border-border/40 hover:bg-muted/30 transition-colors"
                       >
                         <td className="py-3 px-4 font-medium text-foreground">
-                          {tax.number}
+                          {item.number}
                         </td>
                         <td className="py-3 px-4 text-foreground">
-                          {tax.customer}
+                          {item.customer}
                         </td>
                         <td className="py-3 px-4 text-muted-foreground">
-                          {tax.date}
+                          {item.date}
                         </td>
                         <td className="py-3 px-4 font-medium text-foreground">
-                          {formatCurrency(tax.netTotal)}
+                          {formatCurrency(item.netTotal)}
                         </td>
                         <td className="py-3 px-4">
                           <span
-                            className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(tax.status)}`}
+                            className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(item.status)}`}
                           >
-                            {tax.status}
+                            {item.status}
                           </span>
                         </td>
                         <td className="py-3 px-4 no-print">
@@ -285,21 +294,21 @@ const TaxInvoice = () => {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleViewClick(tax)}
+                              onClick={() => handleViewClick(item)}
                             >
                               ดู
                             </Button>
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleEditClick(tax.id)}
+                              onClick={() => handleEditClick(item.id)}
                             >
                               แก้ไข
                             </Button>
                             <Button
                               variant="destructive"
                               size="sm"
-                              onClick={() => handleDeleteClick(tax.id)}
+                              onClick={() => handleDeleteClick(item.id)}
                             >
                               ลบ
                             </Button>

@@ -3,7 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
-  CircleDollarSign, // Icon for Credit Note
+  CircleDollarSign as CreditNoteIcon,
   Plus,
   Search,
   AlertTriangle,
@@ -17,7 +17,7 @@ import { formatCurrency } from "../../lib/utils";
 import DocumentFilter from "../../components/DocumentFilter";
 import { sortData } from "@/utils/sortUtils";
 import { searchData } from "@/utils/searchUtils";
-import { format } from "date-fns";
+import { format, subDays } from "date-fns"; // ✨ import subDays
 import { th } from "date-fns/locale";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -57,7 +57,7 @@ const CreditNote = () => {
         setError(null);
         const data = await apiService.getDocuments();
         const creditNotesData = data
-          .filter((doc: any) => doc.document_type === "CREDIT_NOTE")
+          .filter((doc : any) => doc.document_type === "CREDIT_NOTE")
           .map((doc: any): CreditNoteItem => {
             const issueDate = new Date(doc.issue_date);
             return {
@@ -100,7 +100,7 @@ const CreditNote = () => {
       toast.promise(apiService.deleteDocument(id), {
         loading: "กำลังลบ...",
         success: () => {
-          setCreditNotes((prev) => prev.filter((cn) => cn.id !== id));
+          setCreditNotes((prev) => prev.filter((item) => item.id !== id));
           return "ลบใบลดหนี้เรียบร้อยแล้ว";
         },
         error: "เกิดข้อผิดพลาดในการลบ",
@@ -127,15 +127,25 @@ const CreditNote = () => {
   const filteredAndSortedCreditNotes = useMemo(() => {
     let result = searchData(creditNotes, searchText, ["number", "customer"]);
 
-    result = result.filter((cn) => {
+    result = result.filter((item) => {
       const isStatusMatch =
         !filters.status ||
         filters.status === "all" ||
-        cn.status === filters.status;
+        item.status === filters.status;
       if (!isStatusMatch) return false;
-      const docDate = cn.documentDate;
+
+      const docDate = item.documentDate;
+
+      // ✨✨✨ แก้ไขตามคำขอ: ลบวันที่เริ่มต้นออก 1 วัน ✨✨✨
+      let adjustedDateFrom = filters.dateFrom;
+      if (filters.dateFrom) {
+        const fromDate = new Date(filters.dateFrom);
+        const prevDay = subDays(fromDate, 1);
+        adjustedDateFrom = format(prevDay, "yyyy-MM-dd");
+      }
+
       const isAfterFrom =
-        !filters.dateFrom || !docDate || docDate >= filters.dateFrom;
+        !adjustedDateFrom || !docDate || docDate > adjustedDateFrom;
       const isBeforeTo =
         !filters.dateTo || !docDate || docDate <= filters.dateTo;
       return isAfterFrom && isBeforeTo;
@@ -159,11 +169,10 @@ const CreditNote = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 rounded-xl bg-purple-100 flex items-center justify-center">
-            <CircleDollarSign className="w-6 h-6 text-purple-600" />
+            <CreditNoteIcon className="w-6 h-6 text-purple-600" />
           </div>
           <div>
             <h1 className="text-2xl font-bold text-foreground">ใบลดหนี้</h1>
@@ -178,7 +187,6 @@ const CreditNote = () => {
         </Link>
       </div>
 
-      {/* Actions */}
       <div className="flex items-center gap-4">
         <div className="flex-1 max-w-md">
           <div className="relative">
@@ -204,7 +212,6 @@ const CreditNote = () => {
         />
       </div>
 
-      {/* Content */}
       <Card className="border border-border/40">
         <CardHeader>
           <CardTitle>รายการใบลดหนี้</CardTitle>
@@ -229,7 +236,7 @@ const CreditNote = () => {
                       { key: "number", label: "เลขที่" },
                       { key: "customer", label: "ลูกค้า" },
                       { key: "dateValue", label: "วันที่" },
-                      { key: "netTotal", label: "ยอดเงิน" },
+                      { key: "netTotal", label: "จำนวนเงิน" },
                       { key: "status", label: "สถานะ" },
                     ].map(({ key, label }) => (
                       <th
@@ -262,28 +269,28 @@ const CreditNote = () => {
                       </td>
                     </tr>
                   ) : (
-                    filteredAndSortedCreditNotes.map((cn) => (
+                    filteredAndSortedCreditNotes.map((item) => (
                       <tr
-                        key={cn.id}
+                        key={item.id}
                         className="border-b border-border/40 hover:bg-muted/30 transition-colors"
                       >
                         <td className="py-3 px-4 font-medium text-foreground">
-                          {cn.number}
+                          {item.number}
                         </td>
                         <td className="py-3 px-4 text-foreground">
-                          {cn.customer}
+                          {item.customer}
                         </td>
                         <td className="py-3 px-4 text-muted-foreground">
-                          {cn.date}
+                          {item.date}
                         </td>
                         <td className="py-3 px-4 font-medium text-foreground">
-                          {formatCurrency(cn.netTotal)}
+                          {formatCurrency(item.netTotal)}
                         </td>
                         <td className="py-3 px-4">
                           <span
-                            className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(cn.status)}`}
+                            className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(item.status)}`}
                           >
-                            {cn.status}
+                            {item.status}
                           </span>
                         </td>
                         <td className="py-3 px-4 no-print">
@@ -291,21 +298,21 @@ const CreditNote = () => {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleViewClick(cn)}
+                              onClick={() => handleViewClick(item)}
                             >
                               ดู
                             </Button>
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleEditClick(cn.id)}
+                              onClick={() => handleEditClick(item.id)}
                             >
                               แก้ไข
                             </Button>
                             <Button
                               variant="destructive"
                               size="sm"
-                              onClick={() => handleDeleteClick(cn.id)}
+                              onClick={() => handleDeleteClick(item.id)}
                             >
                               ลบ
                             </Button>

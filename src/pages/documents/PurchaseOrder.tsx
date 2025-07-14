@@ -3,7 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
-  ShoppingCart, // Icon for PurchaseOrder
+  ShoppingCart as PurchaseOrderIcon,
   Plus,
   Search,
   AlertTriangle,
@@ -17,19 +17,19 @@ import { formatCurrency } from "../../lib/utils";
 import DocumentFilter from "../../components/DocumentFilter";
 import { sortData } from "@/utils/sortUtils";
 import { searchData } from "@/utils/searchUtils";
-import { format } from "date-fns";
+import { format, subDays } from "date-fns";
 import { th } from "date-fns/locale";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface PurchaseOrderItem {
   id: string;
   number: string;
-  vendor: string; // Changed from customer
+  vendor: string;
   date: string;
   dateValue: number;
   netTotal: number;
   status: string;
-  documentDate: string; // 'YYYY-MM-DD' string
+  documentDate: string;
 }
 
 const PurchaseOrder = () => {
@@ -55,13 +55,13 @@ const PurchaseOrder = () => {
         setError(null);
         const data = await apiService.getDocuments();
         const poData = data
-          .filter((doc: any) => doc.document_type === "PURCHASE_ORDER")
+          .filter((doc : any) => doc.document_type === "PURCHASE_ORDER")
           .map((doc: any): PurchaseOrderItem => {
             const issueDate = new Date(doc.issue_date);
             return {
               id: doc.id,
               number: doc.document_number,
-              vendor: doc.vendor_name, // Changed from customer_name
+              vendor: doc.vendor_name, // Changed property
               date: format(issueDate, "d MMM yy", { locale: th }),
               dateValue: issueDate.getTime(),
               netTotal:
@@ -98,7 +98,7 @@ const PurchaseOrder = () => {
       toast.promise(apiService.deleteDocument(id), {
         loading: "กำลังลบ...",
         success: () => {
-          setPurchaseOrders((prev) => prev.filter((po) => po.id !== id));
+          setPurchaseOrders((prev) => prev.filter((item) => item.id !== id));
           return "ลบใบสั่งซื้อเรียบร้อยแล้ว";
         },
         error: "เกิดข้อผิดพลาดในการลบ",
@@ -125,15 +125,24 @@ const PurchaseOrder = () => {
   const filteredAndSortedPOs = useMemo(() => {
     let result = searchData(purchaseOrders, searchText, ["number", "vendor"]);
 
-    result = result.filter((po) => {
+    result = result.filter((item) => {
       const isStatusMatch =
         !filters.status ||
         filters.status === "all" ||
-        po.status === filters.status;
+        item.status === filters.status;
       if (!isStatusMatch) return false;
-      const docDate = po.documentDate;
+
+      const docDate = item.documentDate;
+
+      let adjustedDateFrom = filters.dateFrom;
+      if (filters.dateFrom) {
+        const fromDate = new Date(filters.dateFrom);
+        const prevDay = subDays(fromDate, 1);
+        adjustedDateFrom = format(prevDay, "yyyy-MM-dd");
+      }
+
       const isAfterFrom =
-        !filters.dateFrom || !docDate || docDate >= filters.dateFrom;
+        !adjustedDateFrom || !docDate || docDate > adjustedDateFrom;
       const isBeforeTo =
         !filters.dateTo || !docDate || docDate <= filters.dateTo;
       return isAfterFrom && isBeforeTo;
@@ -164,7 +173,7 @@ const PurchaseOrder = () => {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 rounded-xl bg-pink-100 flex items-center justify-center">
-            <ShoppingCart className="w-6 h-6 text-pink-600" />
+            <PurchaseOrderIcon className="w-6 h-6 text-pink-600" />
           </div>
           <div>
             <h1 className="text-2xl font-bold text-foreground">ใบสั่งซื้อ</h1>
@@ -261,28 +270,28 @@ const PurchaseOrder = () => {
                       </td>
                     </tr>
                   ) : (
-                    filteredAndSortedPOs.map((po) => (
+                    filteredAndSortedPOs.map((item) => (
                       <tr
-                        key={po.id}
+                        key={item.id}
                         className="border-b border-border/40 hover:bg-muted/30 transition-colors"
                       >
                         <td className="py-3 px-4 font-medium text-foreground">
-                          {po.number}
+                          {item.number}
                         </td>
                         <td className="py-3 px-4 text-foreground">
-                          {po.vendor}
+                          {item.vendor}
                         </td>
                         <td className="py-3 px-4 text-muted-foreground">
-                          {po.date}
+                          {item.date}
                         </td>
                         <td className="py-3 px-4 font-medium text-foreground">
-                          {formatCurrency(po.netTotal)}
+                          {formatCurrency(item.netTotal)}
                         </td>
                         <td className="py-3 px-4">
                           <span
-                            className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(po.status)}`}
+                            className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(item.status)}`}
                           >
-                            {po.status}
+                            {item.status}
                           </span>
                         </td>
                         <td className="py-3 px-4 no-print">
@@ -290,21 +299,21 @@ const PurchaseOrder = () => {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleViewClick(po)}
+                              onClick={() => handleViewClick(item)}
                             >
                               ดู
                             </Button>
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleEditClick(po.id)}
+                              onClick={() => handleEditClick(item.id)}
                             >
                               แก้ไข
                             </Button>
                             <Button
                               variant="destructive"
                               size="sm"
-                              onClick={() => handleDeleteClick(po.id)}
+                              onClick={() => handleDeleteClick(item.id)}
                             >
                               ลบ
                             </Button>

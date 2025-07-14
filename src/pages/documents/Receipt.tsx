@@ -3,7 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
-  HeartHandshake, // Icon for Receipt
+  HeartHandshake as ReceiptIcon,
   Plus,
   Search,
   AlertTriangle,
@@ -17,7 +17,7 @@ import { formatCurrency } from "../../lib/utils";
 import DocumentFilter from "../../components/DocumentFilter";
 import { sortData } from "@/utils/sortUtils";
 import { searchData } from "@/utils/searchUtils";
-import { format } from "date-fns";
+import { format, subDays } from "date-fns";
 import { th } from "date-fns/locale";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -29,7 +29,7 @@ interface ReceiptItem {
   dateValue: number;
   netTotal: number;
   status: string;
-  documentDate: string; // 'YYYY-MM-DD' string
+  documentDate: string;
 }
 
 const Receipt = () => {
@@ -98,7 +98,7 @@ const Receipt = () => {
       toast.promise(apiService.deleteDocument(id), {
         loading: "กำลังลบ...",
         success: () => {
-          setReceipts((prev) => prev.filter((rec) => rec.id !== id));
+          setReceipts((prev) => prev.filter((item) => item.id !== id));
           return "ลบใบเสร็จรับเงินเรียบร้อยแล้ว";
         },
         error: "เกิดข้อผิดพลาดในการลบ",
@@ -125,15 +125,24 @@ const Receipt = () => {
   const filteredAndSortedReceipts = useMemo(() => {
     let result = searchData(receipts, searchText, ["number", "customer"]);
 
-    result = result.filter((rec) => {
+    result = result.filter((item) => {
       const isStatusMatch =
         !filters.status ||
         filters.status === "all" ||
-        rec.status === filters.status;
+        item.status === filters.status;
       if (!isStatusMatch) return false;
-      const docDate = rec.documentDate;
+
+      const docDate = item.documentDate;
+
+      let adjustedDateFrom = filters.dateFrom;
+      if (filters.dateFrom) {
+        const fromDate = new Date(filters.dateFrom);
+        const prevDay = subDays(fromDate, 1);
+        adjustedDateFrom = format(prevDay, "yyyy-MM-dd");
+      }
+
       const isAfterFrom =
-        !filters.dateFrom || !docDate || docDate >= filters.dateFrom;
+        !adjustedDateFrom || !docDate || docDate > adjustedDateFrom;
       const isBeforeTo =
         !filters.dateTo || !docDate || docDate <= filters.dateTo;
       return isAfterFrom && isBeforeTo;
@@ -144,7 +153,7 @@ const Receipt = () => {
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case "ชำระแล้ว":
+      case "สมบูรณ์":
         return "bg-green-100 text-green-700";
       case "ยกเลิก":
         return "bg-red-100 text-red-700";
@@ -158,7 +167,7 @@ const Receipt = () => {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 rounded-xl bg-teal-100 flex items-center justify-center">
-            <HeartHandshake className="w-6 h-6 text-teal-600" />
+            <ReceiptIcon className="w-6 h-6 text-teal-600" />
           </div>
           <div>
             <h1 className="text-2xl font-bold text-foreground">
@@ -256,28 +265,28 @@ const Receipt = () => {
                       </td>
                     </tr>
                   ) : (
-                    filteredAndSortedReceipts.map((rec) => (
+                    filteredAndSortedReceipts.map((item) => (
                       <tr
-                        key={rec.id}
+                        key={item.id}
                         className="border-b border-border/40 hover:bg-muted/30 transition-colors"
                       >
                         <td className="py-3 px-4 font-medium text-foreground">
-                          {rec.number}
+                          {item.number}
                         </td>
                         <td className="py-3 px-4 text-foreground">
-                          {rec.customer}
+                          {item.customer}
                         </td>
                         <td className="py-3 px-4 text-muted-foreground">
-                          {rec.date}
+                          {item.date}
                         </td>
                         <td className="py-3 px-4 font-medium text-foreground">
-                          {formatCurrency(rec.netTotal)}
+                          {formatCurrency(item.netTotal)}
                         </td>
                         <td className="py-3 px-4">
                           <span
-                            className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(rec.status)}`}
+                            className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(item.status)}`}
                           >
-                            {rec.status}
+                            {item.status}
                           </span>
                         </td>
                         <td className="py-3 px-4 no-print">
@@ -285,21 +294,21 @@ const Receipt = () => {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleViewClick(rec)}
+                              onClick={() => handleViewClick(item)}
                             >
                               ดู
                             </Button>
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleEditClick(rec.id)}
+                              onClick={() => handleEditClick(item.id)}
                             >
                               แก้ไข
                             </Button>
                             <Button
                               variant="destructive"
                               size="sm"
-                              onClick={() => handleDeleteClick(rec.id)}
+                              onClick={() => handleDeleteClick(item.id)}
                             >
                               ลบ
                             </Button>
