@@ -147,13 +147,13 @@ const Quotation = () => {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "รอตอบรับ":
-        return "bg-gray-100 text-gray-700";
+        return "bg-yellow-100 text-gray-700";
       case "ตอบรับแล้ว":
         return "bg-green-100 text-green-700";
       case "พ้นกำหนด":
-        return "bg-yellow-100 text-yellow-700";
+        return "bg-red-100 text-yellow-700";
       case "ยกเลิก":
-        return "bg-red-100 text-red-700";
+        return "bg-gray-100 text-red-700";
       default:
         return "bg-gray-200 text-gray-800";
     }
@@ -233,7 +233,7 @@ const Quotation = () => {
                       { key: "customer", label: "ลูกค้า" },
                       { key: "dateValue", label: "วันที่" },
                       { key: "validUntilValue", label: "วันหมดอายุ" },
-                      { key: "netTotal", label: "ยอดเงิน" },
+                      { key: "netTotal", label: "จำนวนเงิน" },
                       { key: "status", label: "สถานะ" },
                     ].map(({ key, label }) => (
                       <th

@@ -1,55 +1,180 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { useNavigate, Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileText, Plus, Search, AlertTriangle } from "lucide-react";
+import {
+  ClipboardList, // Icon for Billing
+  Plus,
+  Search,
+  AlertTriangle,
+  Loader2,
+  FileText,
+} from "lucide-react";
+import { apiService } from "@/pages/services/apiService";
+import { toast } from "sonner";
+import BillingModal from "@/pages/sub/billing/BillingModal";
 import { formatCurrency } from "../../lib/utils";
 import DocumentFilter from "../../components/DocumentFilter";
+import { sortData } from "@/utils/sortUtils";
+import { searchData } from "@/utils/searchUtils";
+import { format } from "date-fns";
+import { th } from "date-fns/locale";
 import { Skeleton } from "@/components/ui/skeleton";
 
+interface BillingItem {
+  id: string;
+  number: string;
+  customer: string;
+  date: string;
+  dateValue: number;
+  netTotal: number;
+  status: string;
+  documentDate: string; // 'YYYY-MM-DD' string
+}
+
 const Billing = () => {
-  const [filters, setFilters] = useState({});
-  const [isLoading, setIsLoading] = useState(false);
+  const navigate = useNavigate();
+  const [billings, setBillings] = useState<BillingItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [documents, setDocuments] = useState<any[]>([]);
+  const [selectedBilling, setSelectedBilling] = useState<any | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [filters, setFilters] = useState<{
+    status?: string;
+    dateFrom?: string | null;
+    dateTo?: string | null;
+  }>({ status: "all", dateFrom: null, dateTo: null });
+  const [searchText, setSearchText] = useState("");
+  const [sortColumn, setSortColumn] = useState<string>("dateValue");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
 
   useEffect(() => {
-    setIsLoading(true);
-    setError(null);
-    // TODO: โหลดข้อมูลใบวางบิลจาก API
-    setTimeout(() => {
-      setDocuments([]); // mock ว่าง
-      setIsLoading(false);
-    }, 800);
+    const loadBillings = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const data = await apiService.getDocuments();
+        const billingData = data
+          .filter((doc: any) => doc.document_type === "BILLING")
+          .map((doc: any): BillingItem => {
+            const issueDate = new Date(doc.issue_date);
+            return {
+              id: doc.id,
+              number: doc.document_number,
+              customer: doc.customer_name,
+              date: format(issueDate, "d MMM yy", { locale: th }),
+              dateValue: issueDate.getTime(),
+              netTotal:
+                doc.summary?.netTotalAmount ?? Number(doc.total_amount ?? 0),
+              status: doc.status,
+              documentDate: format(issueDate, "yyyy-MM-dd"),
+            };
+          });
+        setBillings(billingData);
+      } catch (err) {
+        console.error("[Billing] Load error:", err);
+        setError("ไม่สามารถโหลดข้อมูลได้");
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadBillings();
   }, []);
 
-  const handleFilterChange = (newFilters: any) => {
-    setFilters(newFilters);
-    // TODO: filter ข้อมูลจริง
+  const handleSort = (column: string) => {
+    if (sortColumn === column)
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+    else {
+      setSortColumn(column);
+      setSortDirection("desc");
+    }
+  };
+  const handleFilterChange = (newFilters: any) => setFilters(newFilters);
+  const handleEditClick = (id: string) =>
+    navigate(`/documents/billing/edit/${id}`);
+
+  const handleDeleteClick = async (id: string) => {
+    if (window.confirm("คุณต้องการลบใบวางบิลนี้ใช่หรือไม่?")) {
+      toast.promise(apiService.deleteDocument(id), {
+        loading: "กำลังลบ...",
+        success: () => {
+          setBillings((prev) => prev.filter((bill) => bill.id !== id));
+          return "ลบใบวางบิลเรียบร้อยแล้ว";
+        },
+        error: "เกิดข้อผิดพลาดในการลบ",
+      });
+    }
   };
 
-  const handleCreateNew = () => {
-    // TODO: ไปหน้าสร้างใบวางบิลใหม่
+  const handleViewClick = useCallback(async (billing: BillingItem) => {
+    toast.promise(apiService.getDocumentById(billing.id), {
+      loading: "กำลังโหลดข้อมูล...",
+      success: (fullDoc) => {
+        if (fullDoc) {
+          setSelectedBilling(fullDoc);
+          setIsModalOpen(true);
+        } else {
+          toast.error("ไม่พบข้อมูลเอกสาร");
+        }
+        return "โหลดข้อมูลสำเร็จ";
+      },
+      error: "ไม่สามารถดูรายละเอียดได้",
+    });
+  }, []);
+
+  const filteredAndSortedBillings = useMemo(() => {
+    let result = searchData(billings, searchText, ["number", "customer"]);
+
+    result = result.filter((bill) => {
+      const isStatusMatch =
+        !filters.status ||
+        filters.status === "all" ||
+        bill.status === filters.status;
+      if (!isStatusMatch) return false;
+      const docDate = bill.documentDate;
+      const isAfterFrom =
+        !filters.dateFrom || !docDate || docDate >= filters.dateFrom;
+      const isBeforeTo =
+        !filters.dateTo || !docDate || docDate <= filters.dateTo;
+      return isAfterFrom && isBeforeTo;
+    });
+
+    return sortData(result, sortColumn as keyof BillingItem, sortDirection);
+  }, [billings, searchText, filters, sortColumn, sortDirection]);
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "วางบิลแล้ว":
+        return "bg-green-100 text-green-700";
+      case "รอวางบิล":
+        return "bg-yellow-100 text-yellow-700";
+      case "ยกเลิก":
+        return "bg-red-100 text-red-700";
+      default:
+        return "bg-gray-100 text-gray-700";
+    }
   };
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-teal-100 flex items-center justify-center">
-            <FileText className="w-6 h-6 text-teal-600" />
+          <div className="w-12 h-12 rounded-xl bg-cyan-100 flex items-center justify-center">
+            <ClipboardList className="w-6 h-6 text-cyan-600" />
           </div>
           <div>
             <h1 className="text-2xl font-bold text-foreground">ใบวางบิล</h1>
             <p className="text-gray-400">จัดการใบวางบิลทั้งหมด</p>
           </div>
         </div>
-        <Button className="flex items-center gap-2" onClick={handleCreateNew}>
-          <Plus className="w-4 h-4" />
-          สร้างใบวางบิลใหม่
-        </Button>
+        <Link to="/documents/billing/new">
+          <Button className="flex items-center gap-2">
+            <Plus className="w-4 h-4" />
+            สร้างใบวางบิลใหม่
+          </Button>
+        </Link>
       </div>
-      {/* Actions */}
+
       <div className="flex items-center gap-4">
         <div className="flex-1 max-w-md">
           <div className="relative">
@@ -58,22 +183,31 @@ const Billing = () => {
               type="text"
               placeholder="ค้นหาใบวางบิล..."
               className="w-full pl-10 pr-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
             />
           </div>
         </div>
         <DocumentFilter
           onFilterChange={handleFilterChange}
           initialFilters={filters}
+          statusOptions={[
+            { value: "all", label: "สถานะทั้งหมด" },
+            { value: "รอวางบิล", label: "รอวางบิล" },
+            { value: "วางบิลแล้ว", label: "วางบิลแล้ว" },
+            { value: "ยกเลิก", label: "ยกเลิก" },
+          ]}
         />
       </div>
+
       <Card className="border border-border/40">
         <CardHeader>
           <CardTitle>รายการใบวางบิล</CardTitle>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
+          {loading ? (
             <div className="space-y-4">
-              <Skeleton className="h-8 w-48" />
+              <Skeleton className="h-8 w-full" />
               <Skeleton className="h-64 w-full" />
             </div>
           ) : error ? (
@@ -81,43 +215,114 @@ const Billing = () => {
               <AlertTriangle className="w-8 h-8 mx-auto mb-2" />
               <p>เกิดข้อผิดพลาด: {error}</p>
             </div>
-          ) : documents.length === 0 ? (
-            <div className="text-center py-10 text-muted-foreground">
-              <FileText className="w-12 h-12 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold">ยังไม่มีใบวางบิล</h3>
-              <p>เริ่มสร้างใบวางบิลแรกของคุณ</p>
-            </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-border">
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">
-                      เลขที่
-                    </th>
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">
-                      ลูกค้า
-                    </th>
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">
-                      วันที่
-                    </th>
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">
-                      จำนวนเงิน
-                    </th>
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">
-                      สถานะ
-                    </th>
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">
+                    {[
+                      { key: "number", label: "เลขที่" },
+                      { key: "customer", label: "ลูกค้า" },
+                      { key: "dateValue", label: "วันที่" },
+                      { key: "netTotal", label: "จำนวนเงิน" },
+                      { key: "status", label: "สถานะ" },
+                    ].map(({ key, label }) => (
+                      <th
+                        key={key}
+                        className="text-left py-3 px-4 font-medium text-muted-foreground cursor-pointer select-none"
+                        onClick={() => handleSort(key)}
+                      >
+                        {label}{" "}
+                        {sortColumn === key &&
+                          (sortDirection === "asc" ? "▲" : "▼")}
+                      </th>
+                    ))}
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground no-print">
                       การดำเนินการ
                     </th>
                   </tr>
                 </thead>
-                <tbody>{/* TODO: map ข้อมูลจริง */}</tbody>
+                <tbody>
+                  {filteredAndSortedBillings.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={6}
+                        className="text-center py-10 text-muted-foreground"
+                      >
+                        <FileText className="w-12 h-12 mx-auto mb-4" />
+                        <h3 className="text-lg font-semibold">
+                          ยังไม่มีใบวางบิล
+                        </h3>
+                        <p>เริ่มต้นสร้างใบวางบิลใหม่ได้เลย</p>
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredAndSortedBillings.map((bill) => (
+                      <tr
+                        key={bill.id}
+                        className="border-b border-border/40 hover:bg-muted/30 transition-colors"
+                      >
+                        <td className="py-3 px-4 font-medium text-foreground">
+                          {bill.number}
+                        </td>
+                        <td className="py-3 px-4 text-foreground">
+                          {bill.customer}
+                        </td>
+                        <td className="py-3 px-4 text-muted-foreground">
+                          {bill.date}
+                        </td>
+                        <td className="py-3 px-4 font-medium text-foreground">
+                          {formatCurrency(bill.netTotal)}
+                        </td>
+                        <td className="py-3 px-4">
+                          <span
+                            className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(bill.status)}`}
+                          >
+                            {bill.status}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 no-print">
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleViewClick(bill)}
+                            >
+                              ดู
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleEditClick(bill.id)}
+                            >
+                              แก้ไข
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => handleDeleteClick(bill.id)}
+                            >
+                              ลบ
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
               </table>
             </div>
           )}
         </CardContent>
       </Card>
+
+      {isModalOpen && selectedBilling && (
+        <BillingModal
+          open={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          billing={selectedBilling}
+        />
+      )}
     </div>
   );
 };

@@ -1,281 +1,164 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { useNavigate, Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
-  CreditCard,
+  HeartHandshake, // Icon for Receipt
+  Plus,
   Search,
-  Filter,
   AlertTriangle,
   Loader2,
-  Plus,
+  FileText,
 } from "lucide-react";
 import { apiService } from "@/pages/services/apiService";
-import type { Document } from "@/types/document";
-import ReceiptModal from "../sub/receipt/ReceiptModal";
 import { toast } from "sonner";
+import ReceiptModal from "@/pages/sub/receipt/ReceiptModal";
+import { formatCurrency } from "../../lib/utils";
 import DocumentFilter from "../../components/DocumentFilter";
-import { Link, Routes, Route } from "react-router-dom";
-import ReceiptForm from "../sub/receipt/ReceiptForm";
-import { Skeleton } from "@/components/ui/skeleton";
 import { sortData } from "@/utils/sortUtils";
 import { searchData } from "@/utils/searchUtils";
+import { format } from "date-fns";
+import { th } from "date-fns/locale";
+import { Skeleton } from "@/components/ui/skeleton";
+
+interface ReceiptItem {
+  id: string;
+  number: string;
+  customer: string;
+  date: string;
+  dateValue: number;
+  netTotal: number;
+  status: string;
+  documentDate: string; // 'YYYY-MM-DD' string
+}
 
 const Receipt = () => {
-  const [receipts, setReceipts] = useState<Document[]>([]);
+  const navigate = useNavigate();
+  const [receipts, setReceipts] = useState<ReceiptItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  const [selectedReceipt, setSelectedReceipt] = useState<Document | null>(null);
+  const [selectedReceipt, setSelectedReceipt] = useState<any | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [filters, setFilters] = useState<{
     status?: string;
-    dateFrom?: Date;
-    dateTo?: Date;
-  }>({});
+    dateFrom?: string | null;
+    dateTo?: string | null;
+  }>({ status: "all", dateFrom: null, dateTo: null });
   const [searchText, setSearchText] = useState("");
-
-  // state สำหรับการเรียงลำดับ
-  const [sortColumn, setSortColumn] = useState<string>("created_at");
+  const [sortColumn, setSortColumn] = useState<string>("dateValue");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
-
-  // ฟังก์ชันเปลี่ยนคอลัมน์และทิศทางการเรียง
-  const handleSort = (column: string) => {
-    if (sortColumn === column) {
-      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
-    } else {
-      setSortColumn(column);
-      setSortDirection("asc");
-    }
-  };
 
   useEffect(() => {
     const loadReceipts = async () => {
       try {
-        console.log("[Receipt] เริ่มโหลดข้อมูลใบเสร็จ");
         setLoading(true);
+        setError(null);
         const data = await apiService.getDocuments();
-        console.log("[Receipt] โหลดเอกสารทั้งหมด:", data.length);
-
-        // กรองใบเสร็จที่ไม่มีเลขที่เอกสารจริง (mock) ออก
         const receiptsData = data
           .filter((doc) => doc.document_type === "RECEIPT")
-          .filter(
-            (doc) =>
-              doc.document_number &&
-              /^RE-\d{4}-\d{4}$/.test(doc.document_number)
-          )
-          .map((doc) => ({
-            ...doc,
-            total_amount: Number(doc.total_amount),
-          }));
-
-        console.log("[Receipt] กรองใบเสร็จสำเร็จ:", {
-          total: data.length,
-          receipts: receiptsData.length,
-        });
+          .map((doc: any): ReceiptItem => {
+            const issueDate = new Date(doc.issue_date);
+            return {
+              id: doc.id,
+              number: doc.document_number,
+              customer: doc.customer_name,
+              date: format(issueDate, "d MMM yy", { locale: th }),
+              dateValue: issueDate.getTime(),
+              netTotal:
+                doc.summary?.netTotalAmount ?? Number(doc.total_amount ?? 0),
+              status: doc.status,
+              documentDate: format(issueDate, "yyyy-MM-dd"),
+            };
+          });
         setReceipts(receiptsData);
       } catch (err) {
-        console.error("[Receipt] เกิดข้อผิดพลาดในการโหลดข้อมูล:", err);
-        setError((err as Error).message);
+        console.error("[Receipt] Load error:", err);
+        setError("ไม่สามารถโหลดข้อมูลได้");
       } finally {
         setLoading(false);
       }
     };
-
     loadReceipts();
   }, []);
 
-  const handleViewClick = (receipt: Document) => {
-    console.log("[Receipt] ดูรายละเอียดใบเสร็จ:", receipt.document_number);
-    setSelectedReceipt(receipt);
-    setIsModalOpen(true);
+  const handleSort = (column: string) => {
+    if (sortColumn === column)
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+    else {
+      setSortColumn(column);
+      setSortDirection("desc");
+    }
   };
+  const handleFilterChange = (newFilters: any) => setFilters(newFilters);
+  const handleEditClick = (id: string) =>
+    navigate(`/documents/receipt/edit/${id}`);
 
-  const handleDeleteClick = async (id: number) => {
-    if (window.confirm("Are you sure you want to delete this receipt?")) {
-      try {
-        console.log("[Receipt] ลบใบเสร็จ ID:", id);
-        await apiService.deleteDocument(id.toString());
-        setReceipts((prevReceipts) =>
-          prevReceipts.filter((receipt) => receipt.id !== id)
-        );
-        toast.success("ลบใบเสร็จรับเงินเรียบร้อยแล้ว");
-      } catch (error) {
-        console.error("[Receipt] เกิดข้อผิดพลาดในการลบ:", error);
-        toast.error("เกิดข้อผิดพลาดในการลบใบเสร็จรับเงิน");
-        setError((error as Error).message);
-      }
+  const handleDeleteClick = async (id: string) => {
+    if (window.confirm("คุณต้องการลบใบเสร็จรับเงินนี้ใช่หรือไม่?")) {
+      toast.promise(apiService.deleteDocument(id), {
+        loading: "กำลังลบ...",
+        success: () => {
+          setReceipts((prev) => prev.filter((rec) => rec.id !== id));
+          return "ลบใบเสร็จรับเงินเรียบร้อยแล้ว";
+        },
+        error: "เกิดข้อผิดพลาดในการลบ",
+      });
     }
   };
 
-  const handleEditClick = (receipt: Document) => {
-    console.log("[Receipt] แก้ไขใบเสร็จ:", receipt.document_number);
-    // ถ้าไม่มีเลขที่เอกสารจริง (mock) ให้แจ้งเตือนและไม่ให้แก้ไข
-    if (
-      !receipt.document_number ||
-      !/^RE-\d{4}-\d{4}$/.test(receipt.document_number)
-    ) {
-      toast.warning(
-        "ใบเสร็จนี้ยังไม่ได้บันทึกลงระบบ เลขที่เอกสารจะถูกกำหนดหลังบันทึก"
-      );
-      return;
-    }
-    window.location.href = `/documents/receipt/edit/${receipt.id}`;
-  };
+  const handleViewClick = useCallback(async (receipt: ReceiptItem) => {
+    toast.promise(apiService.getDocumentById(receipt.id), {
+      loading: "กำลังโหลดข้อมูล...",
+      success: (fullDoc) => {
+        if (fullDoc) {
+          setSelectedReceipt(fullDoc);
+          setIsModalOpen(true);
+        } else {
+          toast.error("ไม่พบข้อมูลเอกสาร");
+        }
+        return "โหลดข้อมูลสำเร็จ";
+      },
+      error: "ไม่สามารถดูรายละเอียดได้",
+    });
+  }, []);
 
-  const handleCreateNew = () => {
-    console.log("[Receipt] สร้างใบเสร็จใหม่");
-    window.location.href = "/documents/receipt/new";
-  };
+  const filteredAndSortedReceipts = useMemo(() => {
+    let result = searchData(receipts, searchText, ["number", "customer"]);
 
-  const mapApiStatusToModalStatus = (
-    status: string
-  ): "รอชำระเงิน" | "ชำระเงินแล้ว" | "ยกเลิก" | "คืนเงิน" | "รอตรวจสอบ" => {
-    switch (status) {
-      case "ชำระเงินแล้ว":
-      case "PAID":
-        return "ชำระเงินแล้ว";
-      case "ยกเลิก":
-      case "CANCELLED":
-        return "ยกเลิก";
-      case "คืนเงิน":
-      case "REFUNDED":
-        return "คืนเงิน";
-      default:
-        return "รอตรวจสอบ";
-    }
-  };
+    result = result.filter((rec) => {
+      const isStatusMatch =
+        !filters.status ||
+        filters.status === "all" ||
+        rec.status === filters.status;
+      if (!isStatusMatch) return false;
+      const docDate = rec.documentDate;
+      const isAfterFrom =
+        !filters.dateFrom || !docDate || docDate >= filters.dateFrom;
+      const isBeforeTo =
+        !filters.dateTo || !docDate || docDate <= filters.dateTo;
+      return isAfterFrom && isBeforeTo;
+    });
 
-  const mapReceiptForModal = (receipt: Document | null) => {
-    if (!receipt) return null;
-    return {
-      id: receipt.document_number,
-      client: receipt.customer_name,
-      created_at: new Date(receipt.issue_date).toLocaleDateString("th-TH"),
-      order_date: new Date(receipt.issue_date).toLocaleDateString("th-TH"),
-      amount: new Intl.NumberFormat("th-TH", {
-        style: "currency",
-        currency: "THB",
-      }).format(receipt.total_amount),
-      status: mapApiStatusToModalStatus(receipt.status),
-      items: (receipt.items || []).map((item) => ({
-        title: item.productTitle,
-        qty: item.quantity,
-        price: item.unitPrice,
-        total: item.amount,
-      })),
-      address: receipt.customer_address,
-      tel: receipt.customer_phone,
-      paymentMethod: receipt.payment_method,
-      shippingCost: receipt.shipping_cost,
-    };
-  };
+    return sortData(result, sortColumn as keyof ReceiptItem, sortDirection);
+  }, [receipts, searchText, filters, sortColumn, sortDirection]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "ชำระแล้ว":
-      case "PAID":
         return "bg-green-100 text-green-700";
       case "ยกเลิก":
-      case "CANCELLED":
         return "bg-red-100 text-red-700";
-      case "คืนเงิน":
-      case "REFUNDED":
-        return "bg-orange-100 text-orange-700";
       default:
         return "bg-gray-100 text-gray-700";
     }
   };
 
-  // Helper แปลง yyyy-MM-dd หรือ yyyy-MM-ddTHH:mm:ss.sssZ string เป็น Date แบบ local (robust)
-  function parseLocalDate(str: string): Date | null {
-    if (!str) return null;
-    // ตัดเวลาออกถ้ามี
-    const datePart = str.split("T")[0];
-    const [y, m, d] = datePart.split("-").map(Number);
-    if (!y || !m || !d) return null;
-    // สร้างวันที่แบบ UTC เพื่อหลีกเลี่ยงปัญหา timezone
-    const date = new Date(Date.UTC(y, m - 1, d));
-    return isNaN(date.getTime()) ? null : date;
-  }
-
-  // Helper เปรียบเทียบวันที่แบบไม่สนใจเวลา (ปลอดภัยกับ invalid date)
-  const toDateOnly = (d: string | Date | undefined) => {
-    if (!d) return "";
-    let dateObj = typeof d === "string" ? new Date(d) : d;
-    if (
-      typeof d === "string" &&
-      d.length === 10 &&
-      d.match(/^\d{4}-\d{2}-\d{2}$/)
-    ) {
-      const [y, m, day] = d.split("-");
-      dateObj = new Date(Date.UTC(Number(y), Number(m) - 1, Number(day)));
-    }
-    if (!dateObj || isNaN(dateObj.getTime())) return "";
-    return dateObj.toISOString().slice(0, 10);
-  };
-
-  const handleFilterChange = (newFilters: any) => {
-    console.log("[Receipt] เปลี่ยน filter:", newFilters);
-    setFilters(newFilters);
-  };
-
-  const filteredReceipts = receipts.filter((r) => {
-    if (
-      filters.status &&
-      filters.status !== "all" &&
-      r.status !== filters.status
-    ) {
-      return false;
-    }
-    // เปรียบเทียบวันที่แบบเป๊ะ 100%
-    const docDateStr = r.issue_date
-      ? new Date(r.issue_date).toISOString().slice(0, 10)
-      : null;
-    const fromStr = filters.dateFrom
-      ? new Date(filters.dateFrom).toISOString().slice(0, 10)
-      : null;
-    const toStr = filters.dateTo
-      ? new Date(filters.dateTo).toISOString().slice(0, 10)
-      : null;
-    if (fromStr && docDateStr && docDateStr < fromStr) return false;
-    if (toStr && docDateStr && docDateStr > toStr) return false;
-    return true;
-  });
-
-  // กรองข้อมูลด้วย search ก่อน filter/sort
-  const searchedReceipts = searchData(receipts, searchText, [
-    "document_number",
-    "customer_name",
-  ]);
-  // เพิ่ม key สำหรับ sort วันที่และครบทุกคอลัมน์ที่จำเป็น
-  const receiptsWithSortKeys = searchedReceipts.map((doc) => ({
-    ...doc,
-    date: doc.issue_date
-      ? new Date(doc.issue_date).toLocaleDateString("th-TH")
-      : "-",
-    dateValue: doc.issue_date ? new Date(doc.issue_date).getTime() : 0,
-    totalAmount: Number(doc.total_amount),
-  }));
-
-  // เรียงลำดับข้อมูล
-  const sortedReceipts = sortData(
-    receiptsWithSortKeys,
-    sortColumn as keyof (typeof receiptsWithSortKeys)[0],
-    sortDirection
-  );
-
-  // หลัง filter
-  console.log("[Receipt] Filter:", filters.dateFrom, typeof filters.dateFrom);
-  console.log("[Receipt] หลัง filter:", filteredReceipts.length);
-
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-green-100 flex items-center justify-center">
-            <CreditCard className="w-6 h-6 text-green-600" />
+          <div className="w-12 h-12 rounded-xl bg-teal-100 flex items-center justify-center">
+            <HeartHandshake className="w-6 h-6 text-teal-600" />
           </div>
           <div>
             <h1 className="text-2xl font-bold text-foreground">
@@ -284,13 +167,14 @@ const Receipt = () => {
             <p className="text-gray-400">จัดการใบเสร็จรับเงินทั้งหมด</p>
           </div>
         </div>
-        <Button className="flex items-center gap-2" onClick={handleCreateNew}>
-          <Plus className="w-4 h-4" />
-          สร้างใบเสร็จใหม่
-        </Button>
+        <Link to="/documents/receipt/new">
+          <Button className="flex items-center gap-2">
+            <Plus className="w-4 h-4" />
+            สร้างใบเสร็จใหม่
+          </Button>
+        </Link>
       </div>
 
-      {/* Actions */}
       <div className="flex items-center gap-4">
         <div className="flex-1 max-w-md">
           <div className="relative">
@@ -308,15 +192,13 @@ const Receipt = () => {
           onFilterChange={handleFilterChange}
           initialFilters={filters}
           statusOptions={[
-            { value: "all", label: "ทั้งหมด" },
-            { value: "ชำระแล้ว", label: "ชำระแล้ว" },
+            { value: "all", label: "สถานะทั้งหมด" },
+            { value: "สมบูรณ์", label: "สมบูรณ์" },
             { value: "ยกเลิก", label: "ยกเลิก" },
-            { value: "คืนเงิน", label: "คืนเงิน" },
           ]}
         />
       </div>
 
-      {/* Content */}
       <Card className="border border-border/40">
         <CardHeader>
           <CardTitle>รายการใบเสร็จรับเงิน</CardTitle>
@@ -324,7 +206,7 @@ const Receipt = () => {
         <CardContent>
           {loading ? (
             <div className="space-y-4">
-              <Skeleton className="h-8 w-48" />
+              <Skeleton className="h-8 w-full" />
               <Skeleton className="h-64 w-full" />
             </div>
           ) : error ? (
@@ -332,149 +214,100 @@ const Receipt = () => {
               <AlertTriangle className="w-8 h-8 mx-auto mb-2" />
               <p>เกิดข้อผิดพลาด: {error}</p>
             </div>
-          ) : filteredReceipts.length === 0 ? (
-            <div className="text-center py-10 text-muted-foreground">
-              <CreditCard className="w-12 h-12 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold">ยังไม่มีใบเสร็จรับเงิน</h3>
-              <p>เริ่มต้นสร้างใบเสร็จรับเงินใหม่ได้เลย</p>
-            </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-border">
-                    <th
-                      className="text-left py-3 px-4 font-medium text-muted-foreground cursor-pointer select-none"
-                      onClick={() => handleSort("document_number")}
-                    >
-                      เลขที่{" "}
-                      {sortColumn === "document_number" ? (
-                        sortDirection === "asc" ? (
-                          <b>▲</b>
-                        ) : (
-                          <b>▼</b>
-                        )
-                      ) : (
-                        <span style={{ color: "#bbb" }}>⇅</span>
-                      )}
-                    </th>
-                    <th
-                      className="text-left py-3 px-4 font-medium text-muted-foreground cursor-pointer select-none"
-                      onClick={() => handleSort("customer_name")}
-                    >
-                      ลูกค้า{" "}
-                      {sortColumn === "customer_name" ? (
-                        sortDirection === "asc" ? (
-                          <b>▲</b>
-                        ) : (
-                          <b>▼</b>
-                        )
-                      ) : (
-                        <span style={{ color: "#bbb" }}>⇅</span>
-                      )}
-                    </th>
-                    <th
-                      className="text-left py-3 px-4 font-medium text-muted-foreground cursor-pointer select-none"
-                      onClick={() => handleSort("dateValue")}
-                    >
-                      วันที่{" "}
-                      {sortColumn === "dateValue" ? (
-                        sortDirection === "asc" ? (
-                          <b>▲</b>
-                        ) : (
-                          <b>▼</b>
-                        )
-                      ) : (
-                        <span style={{ color: "#bbb" }}>⇅</span>
-                      )}
-                    </th>
-                    <th
-                      className="text-left py-3 px-4 font-medium text-muted-foreground cursor-pointer select-none"
-                      onClick={() => handleSort("totalAmount")}
-                    >
-                      จำนวนเงิน{" "}
-                      {sortColumn === "totalAmount" ? (
-                        sortDirection === "asc" ? (
-                          <b>▲</b>
-                        ) : (
-                          <b>▼</b>
-                        )
-                      ) : (
-                        <span style={{ color: "#bbb" }}>⇅</span>
-                      )}
-                    </th>
-                    <th
-                      className="text-left py-3 px-4 font-medium text-muted-foreground cursor-pointer select-none"
-                      onClick={() => handleSort("status")}
-                    >
-                      สถานะ{" "}
-                      {sortColumn === "status" ? (
-                        sortDirection === "asc" ? (
-                          <b>▲</b>
-                        ) : (
-                          <b>▼</b>
-                        )
-                      ) : (
-                        <span style={{ color: "#bbb" }}>⇅</span>
-                      )}
-                    </th>
+                    {[
+                      { key: "number", label: "เลขที่" },
+                      { key: "customer", label: "ลูกค้า" },
+                      { key: "dateValue", label: "วันที่" },
+                      { key: "netTotal", label: "จำนวนเงิน" },
+                      { key: "status", label: "สถานะ" },
+                    ].map(({ key, label }) => (
+                      <th
+                        key={key}
+                        className="text-left py-3 px-4 font-medium text-muted-foreground cursor-pointer select-none"
+                        onClick={() => handleSort(key)}
+                      >
+                        {label}{" "}
+                        {sortColumn === key &&
+                          (sortDirection === "asc" ? "▲" : "▼")}
+                      </th>
+                    ))}
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground no-print">
                       การดำเนินการ
                     </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {sortedReceipts.map((receipt) => (
-                    <tr
-                      key={receipt.id}
-                      className="border-b border-border/40 hover:bg-muted/30 transition-colors"
-                    >
-                      <td className="py-3 px-4 font-medium text-foreground">
-                        {receipt.document_number}
-                      </td>
-                      <td className="py-3 px-4 text-foreground">
-                        {receipt.customer_name}
-                      </td>
-                      <td className="py-3 px-4 text-muted-foreground">
-                        {receipt.date}
-                      </td>
-                      <td className="py-3 px-4 font-medium text-foreground">
-                        {receipt.totalAmount.toLocaleString()}
-                      </td>
-                      <td className="py-3 px-4">
-                        <span
-                          className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(receipt.status)}`}
-                        >
-                          {receipt.status}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 no-print">
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleViewClick(receipt)}
-                          >
-                            ดู
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleEditClick(receipt)}
-                          >
-                            แก้ไข
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleDeleteClick(receipt.id)}
-                          >
-                            ลบ
-                          </Button>
-                        </div>
+                  {filteredAndSortedReceipts.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={6}
+                        className="text-center py-10 text-muted-foreground"
+                      >
+                        <FileText className="w-12 h-12 mx-auto mb-4" />
+                        <h3 className="text-lg font-semibold">
+                          ยังไม่มีใบเสร็จรับเงิน
+                        </h3>
+                        <p>เริ่มต้นสร้างใบเสร็จใหม่ได้เลย</p>
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    filteredAndSortedReceipts.map((rec) => (
+                      <tr
+                        key={rec.id}
+                        className="border-b border-border/40 hover:bg-muted/30 transition-colors"
+                      >
+                        <td className="py-3 px-4 font-medium text-foreground">
+                          {rec.number}
+                        </td>
+                        <td className="py-3 px-4 text-foreground">
+                          {rec.customer}
+                        </td>
+                        <td className="py-3 px-4 text-muted-foreground">
+                          {rec.date}
+                        </td>
+                        <td className="py-3 px-4 font-medium text-foreground">
+                          {formatCurrency(rec.netTotal)}
+                        </td>
+                        <td className="py-3 px-4">
+                          <span
+                            className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(rec.status)}`}
+                          >
+                            {rec.status}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 no-print">
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleViewClick(rec)}
+                            >
+                              ดู
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleEditClick(rec.id)}
+                            >
+                              แก้ไข
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => handleDeleteClick(rec.id)}
+                            >
+                              ลบ
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -482,15 +315,11 @@ const Receipt = () => {
         </CardContent>
       </Card>
 
-      {/* Modal */}
-      {selectedReceipt && (
+      {isModalOpen && selectedReceipt && (
         <ReceiptModal
           open={isModalOpen}
-          onClose={() => {
-            setIsModalOpen(false);
-            setSelectedReceipt(null);
-          }}
-          receipt={selectedReceipt as any}
+          onClose={() => setIsModalOpen(false)}
+          receipt={selectedReceipt}
         />
       )}
     </div>
