@@ -43,7 +43,9 @@ app.post(
     if (!req.file) {
       return res.status(400).send({ message: "Please upload a file." });
     }
-    const imageUrl = `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
+    const imageUrl = `${req.protocol}://${req.get("host")}/uploads/${
+      req.file.filename
+    }`;
     res.status(200).send({
       message: "File uploaded successfully.",
       imageUrl: imageUrl,
@@ -324,7 +326,6 @@ app.get("/api/documents", async (req: Request, res: Response) => {
       ORDER BY d.issue_date DESC, d.id DESC
     `;
     const rows = await pool.query(query);
-    // ดึง items ของแต่ละ document
     const docIds = Array.isArray(rows) ? rows.map((doc: any) => doc.id) : [];
     let itemsByDoc: Record<number, any[]> = {};
     if (docIds.length > 0) {
@@ -332,64 +333,20 @@ app.get("/api/documents", async (req: Request, res: Response) => {
         `SELECT * FROM document_items WHERE document_id IN (${docIds.map(() => "?").join(",")})`,
         docIds
       );
-      // group by document_id
       itemsByDoc = itemsRows.reduce((acc: Record<number, any[]>, item: any) => {
         if (!acc[item.document_id]) acc[item.document_id] = [];
         acc[item.document_id].push(item);
         return acc;
       }, {});
     }
-    // แนบ items และ summary ให้แต่ละ document
+
     const docsWithItems = rows.map((doc: any) => {
       const items = itemsByDoc[doc.id] || [];
-      // คำนวณ withholdingTax แบบ dynamic
-      const withholdingTax = items.reduce((sum: number, item: any) => {
-        // คำนวณ amount ก่อนหัก ณ ที่จ่าย
-        const quantity = Number(item.quantity ?? 1);
-        const unitPrice = Number(item.unit_price ?? 0);
-        const discount = Number(item.discount ?? 0);
-        const discountType = item.discount_type ?? "thb";
-        let amountBeforeTax = 0;
-        if (discountType === "percentage") {
-          amountBeforeTax = quantity * unitPrice * (1 - discount / 100);
-        } else {
-          amountBeforeTax = quantity * (unitPrice - discount);
-        }
-        let whtRate = 0;
-        if (typeof item.withholding_tax_option === "number") {
-          whtRate = item.withholding_tax_option / 100;
-        } else if (
-          typeof item.withholding_tax_option === "string" &&
-          item.withholding_tax_option.endsWith("%")
-        ) {
-          whtRate = parseFloat(item.withholding_tax_option) / 100;
-        } else if (
-          item.withholding_tax_option === "ไม่มี" ||
-          item.withholding_tax_option === "ไม่ระบุ"
-        ) {
-          whtRate = 0;
-        }
-        // รองรับ custom amount
-        let whtAmount = 0;
-        if (
-          item.withholding_tax_option === "กำหนดเอง" &&
-          item.customWithholdingTaxAmount
-        ) {
-          whtAmount = Number(item.customWithholdingTaxAmount);
-        } else {
-          whtAmount = amountBeforeTax * whtRate;
-        }
-        return sum + whtAmount;
-      }, 0);
+      const summary = calculateDocumentSummary(items, doc.price_type);
       return {
         ...doc,
         items,
-        summary: {
-          subtotal: doc.subtotal,
-          tax: doc.tax_amount,
-          total: doc.total_amount,
-          withholdingTax,
-        },
+        summary,
       };
     });
     res.json(docsWithItems);
@@ -433,10 +390,10 @@ const generateDocumentNumber = async (
     const lastNumber = rows[0].document_number;
     const parts = lastNumber.split("-");
     if (parts.length >= 3) {
-      const lastRunningPart = parts[2]; // Get the last part after splitting by '-'
-      const lastNumber = parseInt(lastRunningPart, 10);
-      if (!isNaN(lastNumber)) {
-        nextNumber = lastNumber + 1;
+      const lastRunningPart = parts[2];
+      const lastNumberInt = parseInt(lastRunningPart, 10);
+      if (!isNaN(lastNumberInt)) {
+        nextNumber = lastNumberInt + 1;
       }
     }
   }
@@ -466,31 +423,38 @@ app.get("/api/documents/next-number", async (req, res) => {
   }
 });
 
-// === ฟังก์ชันกลางสำหรับคำนวณ summary ของเอกสาร (quotation/invoice/receipt) ===
-function calculateDocumentSummary(items: any[]) {
+function calculateDocumentSummary(
+  items: any[],
+  priceType: "inclusive" | "exclusive" | "none" = "exclusive"
+) {
   let subtotal = 0;
   let discountTotal = 0;
-  let tax = 0;
-  let withholdingTax = 0;
+  let taxTotal = 0;
+  let withholdingTaxTotal = 0;
+
   for (const item of items) {
     const quantity = Number(item.quantity ?? 1);
     const unitPrice = Number(item.unit_price ?? item.unitPrice ?? 0);
+    const taxRate = Number(item.tax ?? 0) / 100;
+
+    const priceBeforeTaxPerUnit =
+      priceType === "inclusive" && taxRate > 0
+        ? unitPrice / (1 + taxRate)
+        : unitPrice;
+
+    const itemTotalBeforeDiscount = priceBeforeTaxPerUnit * quantity;
+
     const discount = Number(item.discount ?? 0);
     const discountType = item.discount_type ?? item.discountType ?? "thb";
-    let amountBeforeTax = 0;
-    if (discountType === "percentage") {
-      amountBeforeTax = quantity * unitPrice * (1 - discount / 100);
-      discountTotal += quantity * unitPrice * (discount / 100);
-    } else {
-      amountBeforeTax = quantity * (unitPrice - discount);
-      discountTotal += quantity * discount;
-    }
-    subtotal += amountBeforeTax;
-    // VAT
-    const taxRate = Number(item.tax ?? 0);
-    const taxAmount = amountBeforeTax * (taxRate / 100);
-    tax += taxAmount;
-    // หัก ณ ที่จ่าย
+    const discountAmount =
+      discountType === "percentage"
+        ? itemTotalBeforeDiscount * (discount / 100)
+        : discount * quantity;
+
+    const amountBeforeTax = itemTotalBeforeDiscount - discountAmount;
+
+    const taxAmount = priceType !== "none" ? amountBeforeTax * taxRate : 0;
+
     let whtRate = 0;
     if (typeof item.withholding_tax_option === "number") {
       whtRate = item.withholding_tax_option / 100;
@@ -499,12 +463,8 @@ function calculateDocumentSummary(items: any[]) {
       item.withholding_tax_option.endsWith("%")
     ) {
       whtRate = parseFloat(item.withholding_tax_option) / 100;
-    } else if (
-      item.withholding_tax_option === "ไม่มี" ||
-      item.withholding_tax_option === "ไม่ระบุ"
-    ) {
-      whtRate = 0;
     }
+
     let whtAmount = 0;
     if (
       item.withholding_tax_option === "กำหนดเอง" &&
@@ -514,16 +474,22 @@ function calculateDocumentSummary(items: any[]) {
     } else {
       whtAmount = amountBeforeTax * whtRate;
     }
-    withholdingTax += whtAmount;
+
+    subtotal += amountBeforeTax;
+    discountTotal += discountAmount;
+    taxTotal += taxAmount;
+    withholdingTaxTotal += whtAmount;
   }
-  const total = subtotal + tax;
-  const netTotalAmount = total - withholdingTax;
+
+  const total = subtotal + taxTotal;
+  const netTotalAmount = total - withholdingTaxTotal;
+
   return {
     subtotal,
     discount: discountTotal,
-    tax,
+    tax: taxTotal,
     total,
-    withholdingTax,
+    withholdingTax: withholdingTaxTotal,
     netTotalAmount,
   };
 }
@@ -536,10 +502,10 @@ async function createDocumentFromServer(data: any, pool: any) {
       customer,
       document_type,
       status,
+      priceType,
       issue_date,
       notes,
       items,
-      summary,
       payment_date,
       payment_method,
       payment_reference,
@@ -547,20 +513,12 @@ async function createDocumentFromServer(data: any, pool: any) {
       valid_until,
       related_document_id,
     } = data;
-    if (
-      !summary ||
-      summary.subtotal === undefined ||
-      summary.tax === undefined ||
-      summary.total === undefined
-    ) {
-      throw new Error("Missing or invalid summary object.");
-    }
-    const summaryCalc = calculateDocumentSummary(items);
+
+    const summaryCalc = calculateDocumentSummary(items, priceType);
     const subtotal = summaryCalc.subtotal;
     const tax_amount = summaryCalc.tax;
-    const total_amount = summaryCalc.netTotalAmount; // ใช้ยอดสุทธิหลังหัก ณ ที่จ่าย
-    const withholdingTax = summaryCalc.withholdingTax;
-    const netTotalAmount = summaryCalc.netTotalAmount;
+    const total_amount = summaryCalc.total;
+
     if (
       !customer ||
       !customer.id ||
@@ -576,30 +534,29 @@ async function createDocumentFromServer(data: any, pool: any) {
     }
     conn = await pool.getConnection();
     await conn.beginTransaction();
-    // Generate Document Number
     const document_number = await generateDocumentNumber(
       conn,
       document_type,
       issue_date
     );
-    // Insert into main 'documents' table
     const docResult = await conn.query(
       `INSERT INTO documents (
-        customer_id, customer_name, document_number, document_type, status, issue_date,
+        customer_id, customer_name, document_number, document_type, status, price_type, issue_date,
         subtotal, tax_amount, total_amount, notes,
         customer_address, customer_phone, customer_email,
         related_document_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         customer.id,
         customer.name,
         document_number,
         document_type,
         status,
+        priceType,
         issue_date,
         subtotal,
         tax_amount,
-        total_amount, // ใช้ยอดสุทธิหลังหัก ณ ที่จ่าย
+        total_amount,
         notes,
         customer.address || "",
         customer.phone || "",
@@ -612,7 +569,6 @@ async function createDocumentFromServer(data: any, pool: any) {
       await conn.rollback();
       throw new Error("Failed to create document and get ID.");
     }
-    // Insert into document-specific details table
     if (document_type.toLowerCase() === "quotation" && valid_until) {
       await conn.query(
         "INSERT INTO quotation_details (document_id, valid_until) VALUES (?, ?)",
@@ -633,25 +589,15 @@ async function createDocumentFromServer(data: any, pool: any) {
         [documentId, payment_date, payment_method, payment_reference]
       );
     }
-    // ถ้าเป็นเอกสารลูก (มี related_document_id และไม่ใช่ QUOTATION) จะไม่ insert document_items ใหม่
     if (!related_document_id || document_type.toLowerCase() === "quotation") {
       for (const item of items as any[]) {
-        // ถ้า priceType เป็น INCLUDE_VAT ให้แปลง unit_price เป็น Net จาก original_unit_price
-        let originalUnitPrice = item.original_unit_price ?? 0; // ห้าม fallback เป็น unit_price เด็ดขาด
-        let unitPrice = originalUnitPrice;
-        const priceType = data.priceType || data.price_type || "EXCLUDE_VAT";
-        if (priceType === "INCLUDE_VAT") {
-          const taxRate = (item.tax ?? 7) / 100;
-          unitPrice = originalUnitPrice / (1 + taxRate);
-        }
         const params = [
           documentId,
           item.product_id ?? null,
           item.productTitle ?? item.product_name ?? "",
           item.unit ?? "",
           item.quantity ?? 1,
-          unitPrice, // unit_price (Net ถ้า INCLUDE_VAT)
-          originalUnitPrice, // original_unit_price
+          item.unit_price ?? 0,
           item.amount ?? 0,
           item.description ?? "",
           item.withholding_tax_amount ?? 0,
@@ -664,8 +610,8 @@ async function createDocumentFromServer(data: any, pool: any) {
         ];
         await conn.query(
           `INSERT INTO document_items (
-            document_id, product_id, product_name, unit, quantity, unit_price, original_unit_price, amount, description, withholding_tax_amount, withholding_tax_option, amount_before_tax, discount, discount_type, tax, tax_amount
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            document_id, product_id, product_name, unit, quantity, unit_price, amount, description, withholding_tax_amount, withholding_tax_option, amount_before_tax, discount, discount_type, tax, tax_amount
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           params
         );
       }
@@ -681,49 +627,31 @@ async function createDocumentFromServer(data: any, pool: any) {
   }
 }
 
-// API route to create a new document
 app.post("/api/documents", async (req: Request, res: Response) => {
   console.log("Received document data:", req.body);
   let conn;
   try {
     const {
-      customer, // { id, name, ... }
+      customer,
       document_type,
       status,
+      priceType,
       issue_date,
       notes,
-      items, // [{ product_id, product_name, ... }]
-      summary,
-      payment_date, // For receipts
-      payment_method, // For receipts
-      payment_reference, // For receipts
-      related_document_id, // <-- เพิ่มบรรทัดนี้
+      items,
+      payment_date,
+      payment_method,
+      payment_reference,
+      related_document_id,
     } = req.body;
 
-    // Log items from frontend
-    console.log("[POST /api/documents] items from frontend:", items);
-
-    // Handle camelCase from frontend for document-specific dates
     const due_date = req.body.due_date || req.body.dueDate;
     const valid_until = req.body.valid_until || req.body.validUntil;
 
-    // 1. Validation
-    if (
-      !summary ||
-      summary.subtotal === undefined ||
-      summary.tax === undefined ||
-      summary.total === undefined
-    ) {
-      return res
-        .status(400)
-        .json({ error: "Missing or invalid summary object." });
-    }
-    const summaryCalc = calculateDocumentSummary(items);
+    const summaryCalc = calculateDocumentSummary(items, priceType);
     const subtotal = summaryCalc.subtotal;
     const tax_amount = summaryCalc.tax;
-    const total_amount = summaryCalc.netTotalAmount; // ใช้ยอดสุทธิหลังหัก ณ ที่จ่าย
-    const withholdingTax = summaryCalc.withholdingTax;
-    const netTotalAmount = summaryCalc.netTotalAmount;
+    const total_amount = summaryCalc.total;
 
     if (
       !customer ||
@@ -744,13 +672,6 @@ app.post("/api/documents", async (req: Request, res: Response) => {
     conn = await pool.getConnection();
     await conn.beginTransaction();
 
-    // --- LOG ก่อนเช็คซ้ำ ---
-    console.log(
-      "DEBUG: related_document_id =",
-      related_document_id,
-      "document_type =",
-      document_type
-    );
     if (
       related_document_id &&
       document_type &&
@@ -760,32 +681,25 @@ app.post("/api/documents", async (req: Request, res: Response) => {
         `SELECT id FROM documents WHERE related_document_id = ? AND document_type = 'INVOICE'`,
         [related_document_id]
       );
-      console.log("DEBUG: existing invoices found =", existing);
       if (Array.isArray(existing) && existing.length > 0) {
         await conn.rollback();
-        console.error(
-          "BLOCKED: Duplicate invoice for related_document_id =",
-          related_document_id
-        );
         return res
           .status(400)
           .json({ error: "มี Invoice ที่อ้างอิง Quotation นี้อยู่แล้ว" });
       }
     }
 
-    // 2. Generate Document Number
     const document_number = await generateDocumentNumber(
       conn,
       document_type,
       issue_date
     );
 
-    // 3. Insert into main 'documents' table
     const docResult = await conn.query(
       `INSERT INTO documents (
-        customer_id, customer_name, document_number, document_type, status, issue_date,
+        customer_id, customer_name, document_number, document_type, status, price_type, issue_date,
         subtotal, tax_amount, total_amount, notes,
-        customer_address, customer_phone, customer_email, price_type
+        customer_address, customer_phone, customer_email
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         customer.id,
@@ -793,20 +707,19 @@ app.post("/api/documents", async (req: Request, res: Response) => {
         document_number,
         document_type,
         status,
+        priceType,
         issue_date,
         subtotal,
         tax_amount,
-        total_amount, // ใช้ยอดสุทธิหลังหัก ณ ที่จ่าย
+        total_amount,
         notes,
         customer.address || "",
         customer.phone || "",
         customer.email || "",
-        req.body.priceType || "EXCLUDE_VAT",
       ]
     );
 
     const documentId = Number((docResult as any).insertId);
-    console.log("DEBUG: Created documentId =", documentId);
     if (!documentId) {
       await conn.rollback();
       return res
@@ -814,7 +727,6 @@ app.post("/api/documents", async (req: Request, res: Response) => {
         .json({ error: "Failed to create document and get ID." });
     }
 
-    // 4. Insert into document-specific details table
     if (document_type.toLowerCase() === "quotation" && valid_until) {
       await conn.query(
         "INSERT INTO quotation_details (document_id, valid_until) VALUES (?, ?)",
@@ -846,44 +758,23 @@ app.post("/api/documents", async (req: Request, res: Response) => {
       );
     }
 
-    console.log(
-      "items to save:",
-      items.map((item) => ({
-        ...item,
-        withholding_tax_amount:
-          item.withholding_tax_amount ?? item.withholdingTaxAmount ?? 0,
-      }))
-    );
-
-    // ถ้าเป็นเอกสารลูก (มี related_document_id และ document_type เป็น INVOICE หรือ RECEIPT) ไม่ต้อง insert document_items ใหม่
     if (
       !related_document_id ||
       (document_type.toLowerCase() !== "invoice" &&
         document_type.toLowerCase() !== "receipt")
     ) {
       for (const item of items) {
-        // ถ้า priceType เป็น INCLUDE_VAT ให้แปลง unit_price เป็น Net จาก original_unit_price
-        let originalUnitPrice =
-          item.original_unit_price ?? item.unit_price ?? 0;
-        let unitPrice = originalUnitPrice;
-        const priceType =
-          req.body.priceType || req.body.price_type || "EXCLUDE_VAT";
-        if (priceType === "INCLUDE_VAT") {
-          const taxRate = (item.tax ?? 7) / 100;
-          unitPrice = originalUnitPrice / (1 + taxRate);
-        }
         const params = [
-          documentId, // document_id
-          item.product_id ?? null, // product_id
-          item.productTitle ?? item.product_name ?? "", // product_name
-          item.unit ?? "", // unit
-          item.quantity ?? 1, // quantity
-          unitPrice, // unit_price (Net ถ้า INCLUDE_VAT)
-          originalUnitPrice, // original_unit_price
-          item.amount ?? 0, // amount
-          item.description ?? "", // description
+          documentId,
+          item.product_id ?? null,
+          item.productTitle ?? item.product_name ?? "",
+          item.unit ?? "",
+          item.quantity ?? 1,
+          item.unit_price ?? 0,
+          item.amount ?? 0,
+          item.description ?? "",
           item.withholding_tax_amount ?? 0,
-          item.withholding_tax_option ?? "ไม่ระบุ",
+          item.withholding_tax_option ?? -1,
           item.amount_before_tax ?? 0,
           item.discount ?? 0,
           item.discount_type ?? item.discountType ?? "thb",
@@ -892,8 +783,8 @@ app.post("/api/documents", async (req: Request, res: Response) => {
         ];
         await conn.query(
           `INSERT INTO document_items (
-            document_id, product_id, product_name, unit, quantity, unit_price, original_unit_price, amount, description, withholding_tax_amount, withholding_tax_option, amount_before_tax, discount, discount_type, tax, tax_amount
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            document_id, product_id, product_name, unit, quantity, unit_price, amount, description, withholding_tax_amount, withholding_tax_option, amount_before_tax, discount, discount_type, tax, tax_amount
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           params
         );
       }
@@ -933,8 +824,6 @@ app.delete("/api/documents/:id", async (req: Request, res: Response) => {
     conn = await pool.getConnection();
     await conn.beginTransaction();
 
-    // The database schema is set up with ON DELETE CASCADE,
-    // so this single delete is sufficient.
     const deleteResult = await conn.query(
       "DELETE FROM documents WHERE id = ?",
       [id]
@@ -956,71 +845,42 @@ app.delete("/api/documents/:id", async (req: Request, res: Response) => {
   }
 });
 
-// === Helper: ดึง document_items แบบ recursive ===
 async function getDocumentItemsRecursive(documentId: string) {
-  console.log("[getDocumentItemsRecursive] START documentId =", documentId);
   const [docRows] = await pool.query("SELECT * FROM documents WHERE id = ?", [
     documentId,
   ]);
-  console.log("[getDocumentItemsRecursive] docRows =", docRows);
   const doc = Array.isArray(docRows) ? docRows[0] : docRows;
-  console.log("[getDocumentItemsRecursive] doc =", doc);
+
   if (!doc) {
-    console.log(
-      "[getDocumentItemsRecursive] Document not found for id",
-      documentId
-    );
-    console.log("[getDocumentItemsRecursive] RETURN []");
     return [];
   }
   if (doc.related_document_id) {
-    console.log(
-      "[getDocumentItemsRecursive] documentId",
-      documentId,
-      "has related_document_id =",
-      doc.related_document_id,
-      "→ go recursive"
-    );
     return getDocumentItemsRecursive(String(doc.related_document_id));
   }
   const items = await pool.query(
     "SELECT * FROM document_items WHERE document_id = ?",
     [documentId]
   );
-  console.log(
-    "[getDocumentItemsRecursive] Items found for documentId",
-    documentId,
-    ":",
-    items
-  );
   if (Array.isArray(items)) {
-    const mapped = items.map((item) => ({
+    return items.map((item) => ({
       ...item,
       withholding_tax_option: item.withholding_tax_option ?? "-1",
     }));
-    console.log("[getDocumentItemsRecursive] RETURN mapped items =", mapped);
-    return mapped;
   }
-  console.log("[getDocumentItemsRecursive] RETURN items =", items);
   return items;
 }
 
-// เพิ่ม route สำหรับดึงเอกสารตาม id
 app.get("/api/documents/:id", async (req, res) => {
   const { id } = req.params;
   try {
-    console.log("[GET /api/documents/:id] id param:", id);
-    // ดึงข้อมูลเอกสารหลัก
     const docRows = await pool.query("SELECT * FROM documents WHERE id = ?", [
       id,
     ]);
-    console.log("[GET /api/documents/:id] docRows:", docRows);
     const doc = Array.isArray(docRows) ? docRows[0] : null;
     if (!doc || (Array.isArray(doc) && doc.length === 0)) {
-      console.log("[GET /api/documents/:id] Document not found for id:", id);
       return res.status(404).json({ error: "Document not found" });
     }
-    // ดึง invoice_details ถ้าเป็น INVOICE
+
     let invoice_details = null;
     if (doc.document_type && doc.document_type.toLowerCase() === "invoice") {
       const invoiceRows = await pool.query(
@@ -1031,7 +891,7 @@ app.get("/api/documents/:id", async (req, res) => {
         invoice_details = invoiceRows[0];
       }
     }
-    // ดึง receipt_details ถ้าเป็น RECEIPT
+
     let receipt_details = null;
     if (doc.document_type && doc.document_type.toLowerCase() === "receipt") {
       const receiptRows = await pool.query(
@@ -1040,7 +900,6 @@ app.get("/api/documents/:id", async (req, res) => {
       );
       if (Array.isArray(receiptRows) && receiptRows.length > 0) {
         receipt_details = receiptRows[0];
-        // แปลง JSON field กลับเป็น object
         if (receipt_details.payment_channels) {
           try {
             receipt_details.payment_channels = JSON.parse(
@@ -1062,34 +921,30 @@ app.get("/api/documents/:id", async (req, res) => {
         }
       }
     }
-    // ดึง items ของเอกสารนี้
+
     let items = await pool.query(
       "SELECT * FROM document_items WHERE document_id = ?",
       [id]
     );
-    console.log("[GET /api/documents/:id] items =", items);
-    // map withholding_tax_option ให้เป็น -1 ถ้า null
     if (Array.isArray(items)) {
       items = items.map((item) => ({
         ...item,
         withholding_tax_option: item.withholding_tax_option ?? "-1",
       }));
     }
-    // === ดึง items ของต้นทางสุดท้ายแบบ recursive ===
+
     const items_recursive = await getDocumentItemsRecursive(id);
-    console.log("[GET /api/documents/:id] items_recursive =", items_recursive);
-    // ใช้ items_recursive ในการคำนวณ summary เสมอ
-    const summary = calculateDocumentSummary(items_recursive);
-    // แนบ items (ที่เลือกแล้ว), items_recursive และ summary เข้าไปใน doc
+    const summary = calculateDocumentSummary(items_recursive, doc.price_type);
+
     const documentWithItems = {
       ...(Array.isArray(doc) ? doc[0] : doc),
       items: Array.isArray(items) && items.length > 0 ? items : items_recursive,
       items_recursive,
-      summary, // summary สดจาก items_recursive
+      summary,
       ...(invoice_details ? { invoice_details } : {}),
       ...(receipt_details ? { receipt_details } : {}),
     };
-    // แนบ due_date ใน root object ด้วย ถ้ามี invoice_details
+
     if (invoice_details && invoice_details.due_date) {
       documentWithItems.due_date = invoice_details.due_date;
     }
@@ -1108,10 +963,10 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
       customer,
       document_type,
       status,
+      priceType,
       issue_date,
       notes,
       items,
-      summary,
       due_date,
       valid_until,
       payment_date,
@@ -1128,8 +983,7 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
       !issue_date ||
       !items ||
       !Array.isArray(items) ||
-      items.length === 0 ||
-      !summary
+      items.length === 0
     ) {
       return res
         .status(400)
@@ -1139,8 +993,6 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
     conn = await pool.getConnection();
     await conn.beginTransaction();
 
-    // --- เพิ่ม logic ตรวจสอบก่อนอัปเดตเอกสารต้นทาง (PUT) ---
-    // ดึงข้อมูลเอกสารต้นทาง
     const [docRows] = await conn.query("SELECT * FROM documents WHERE id = ?", [
       id,
     ]);
@@ -1150,7 +1002,6 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
       docData.document_type &&
       docData.document_type.toLowerCase() === "quotation"
     ) {
-      // เช็คว่ามี Invoice ที่อ้างอิง Quotation นี้อยู่แล้วหรือไม่
       const [existing] = await conn.query(
         `SELECT id FROM documents WHERE related_document_id = ? AND document_type = 'INVOICE'`,
         [id]
@@ -1164,38 +1015,35 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
       }
     }
 
-    // 1. Update main document
-    const summaryCalc = calculateDocumentSummary(items);
+    const summaryCalc = calculateDocumentSummary(items, priceType);
     const subtotal = summaryCalc.subtotal;
     const tax_amount = summaryCalc.tax;
-    const total_amount = summaryCalc.netTotalAmount; // จะเป็นยอดสุทธิหลังหัก ณ ที่จ่าย
-    const withholdingTax = summaryCalc.withholdingTax;
-    const netTotalAmount = summaryCalc.netTotalAmount;
+    const total_amount = summaryCalc.total;
+
     await conn.query(
       `UPDATE documents SET
-        customer_id = ?, customer_name = ?, document_type = ?, status = ?, issue_date = ?,
+        customer_id = ?, customer_name = ?, document_type = ?, status = ?, price_type = ?, issue_date = ?,
         subtotal = ?, tax_amount = ?, total_amount = ?, notes = ?,
-        customer_address = ?, customer_phone = ?, customer_email = ?, price_type = ?
+        customer_address = ?, customer_phone = ?, customer_email = ?
       WHERE id = ?`,
       [
         customer.id,
         customer.name,
         document_type,
         status,
+        priceType,
         issue_date,
         subtotal,
         tax_amount,
-        total_amount, // จะเป็น summary.total - summary.withholdingTax
+        total_amount,
         notes,
         customer.address || "",
         customer.phone || "",
         customer.email || "",
-        req.body.priceType || "EXCLUDE_VAT",
         id,
       ]
     );
 
-    // 2. Update document-specific details
     if (document_type.toLowerCase() === "quotation" && valid_until) {
       await conn.query(
         "UPDATE quotation_details SET valid_until = ? WHERE document_id = ?",
@@ -1232,30 +1080,19 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
       );
     }
 
-    // 3. ลบ items เดิม แล้ว insert ใหม่
     await conn.query("DELETE FROM document_items WHERE document_id = ?", [id]);
     for (const item of items) {
-      // ถ้า priceType เป็น INCLUDE_VAT ให้แปลง unit_price เป็น Net จาก original_unit_price
-      let originalUnitPrice = item.original_unit_price ?? 0; // ห้าม fallback เป็น unit_price เด็ดขาด
-      let unitPrice = originalUnitPrice;
-      const priceType =
-        req.body.priceType || req.body.price_type || "EXCLUDE_VAT";
-      if (priceType === "INCLUDE_VAT") {
-        const taxRate = (item.tax ?? 7) / 100;
-        unitPrice = originalUnitPrice / (1 + taxRate);
-      }
       const params = [
         id,
         item.product_id ?? null,
         item.product_name ?? "",
         item.unit ?? "",
         item.quantity ?? 1,
-        unitPrice, // unit_price (Net ถ้า INCLUDE_VAT)
-        originalUnitPrice, // original_unit_price
+        item.unit_price ?? 0,
         item.amount ?? 0,
         item.description ?? "",
         item.withholding_tax_amount ?? 0,
-        item.withholding_tax_option ?? "ไม่ระบุ",
+        item.withholding_tax_option ?? -1,
         item.amount_before_tax ?? 0,
         item.discount ?? 0,
         item.discount_type ?? "thb",
@@ -1264,27 +1101,18 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
       ];
       await conn.query(
         `INSERT INTO document_items (
-          document_id, product_id, product_name, unit, quantity, unit_price, original_unit_price, amount, description, withholding_tax_amount, withholding_tax_option, amount_before_tax, discount, discount_type, tax, tax_amount
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          document_id, product_id, product_name, unit, quantity, unit_price, amount, description, withholding_tax_amount, withholding_tax_option, amount_before_tax, discount, discount_type, tax, tax_amount
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         params
       );
     }
 
     await conn.commit();
 
-    // === Auto-create Invoice or Receipt ===
-    console.log(
-      "[Auto-create] document_type:",
-      document_type,
-      "status:",
-      status
-    );
-    // 1. ถ้าเป็นใบเสนอราคาและสถานะใหม่คือ "ตอบรับแล้ว" ให้สร้างใบแจ้งหนี้
     if (
       document_type.toLowerCase() === "quotation" &&
       (status === "ตอบรับแล้ว" || status === "accepted")
     ) {
-      // ดึงข้อมูลใบเสนอราคานี้ใหม่ (พร้อม items)
       const [quotationDoc] = await pool.query(
         "SELECT * FROM documents WHERE id = ?",
         [id]
@@ -1293,7 +1121,6 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
         "SELECT * FROM document_items WHERE document_id = ?",
         [id]
       );
-      // เตรียมข้อมูลสำหรับสร้างใบแจ้งหนี้ (ใช้ยอด subtotal, tax_amount, total_amount เดิม)
       const invoiceData = {
         customer: {
           id: quotationDoc.customer_id,
@@ -1304,6 +1131,7 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
         },
         document_type: "INVOICE",
         status: "รอชำระ",
+        priceType: quotationDoc.price_type,
         issue_date: new Date().toISOString().slice(0, 10),
         notes: quotationDoc.notes || "",
         items: quotationItems.map((item: any) => ({
@@ -1323,32 +1151,21 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
           tax: item.tax,
           tax_amount: item.tax_amount,
         })),
-        summary: {
-          subtotal: quotationDoc.subtotal,
-          tax: quotationDoc.tax_amount,
-          total: quotationDoc.total_amount,
-        },
         related_document_id: quotationDoc.id,
         due_date: null,
-        forceTotalAmount: quotationDoc.total_amount, // ส่งยอดสุทธิเดิมไปด้วย
       };
-      console.log(
-        "[Auto-create] Creating INVOICE from QUOTATION:",
-        invoiceData
-      );
+
       try {
         await createDocumentFromServer(invoiceData, pool);
-        console.log("[Auto-create] INVOICE created successfully");
       } catch (err) {
         console.error("[Auto-create] Failed to create INVOICE:", err);
       }
     }
-    // 2. ถ้าเป็นใบแจ้งหนี้และสถานะใหม่คือ "ชำระแล้ว" ให้สร้างใบเสร็จ
+
     if (
       document_type.toLowerCase() === "invoice" &&
       (status === "ชำระแล้ว" || status === "paid")
     ) {
-      // ดึงข้อมูลใบแจ้งหนี้นี้ใหม่ (พร้อม items)
       const [invoiceDoc] = await pool.query(
         "SELECT * FROM documents WHERE id = ?",
         [id]
@@ -1357,12 +1174,7 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
         "SELECT * FROM document_items WHERE document_id = ?",
         [id]
       );
-      // เตรียมข้อมูลสำหรับสร้างใบเสร็จ
-      // คำนวณยอดสุทธิหลังหัก ณ ที่จ่าย (ถ้ามี)
-      let netTotal = Number(invoiceDoc.total_amount ?? 0);
-      if (typeof invoiceDoc.withholdingTax !== "undefined") {
-        netTotal = netTotal - Number(invoiceDoc.withholdingTax ?? 0);
-      }
+
       const receiptData = {
         customer: {
           id: invoiceDoc.customer_id,
@@ -1373,6 +1185,7 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
         },
         document_type: "RECEIPT",
         status: "ชำระแล้ว",
+        priceType: invoiceDoc.price_type,
         issue_date: new Date().toISOString().slice(0, 10),
         notes: invoiceDoc.notes || "",
         items: invoiceItems.map((item: any) => ({
@@ -1392,20 +1205,14 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
           tax: item.tax,
           tax_amount: item.tax_amount,
         })),
-        summary: {
-          subtotal: invoiceDoc.subtotal,
-          tax: invoiceDoc.tax_amount,
-          total: netTotal,
-        },
         related_document_id: invoiceDoc.id,
         payment_date: new Date().toISOString().slice(0, 10),
         payment_method: null,
         payment_reference: null,
       };
-      console.log("[Auto-create] Creating RECEIPT from INVOICE:", receiptData);
+
       try {
         await createDocumentFromServer(receiptData, pool);
-        console.log("[Auto-create] RECEIPT created successfully");
       } catch (err) {
         console.error("[Auto-create] Failed to create RECEIPT:", err);
       }
