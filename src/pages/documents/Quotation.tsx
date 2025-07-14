@@ -2,24 +2,16 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import {
-  FileText,
-  Plus,
-  Search,
-  Filter,
-  AlertTriangle,
-  Loader2,
-} from "lucide-react";
+import { FileText, Plus, Search, AlertTriangle, Loader2 } from "lucide-react";
 import { apiService } from "@/pages/services/apiService";
 import { toast } from "sonner";
 import QuotationModal from "@/pages/sub/quotation/QuotationModal";
 import { formatCurrency } from "../../lib/utils";
-import DocumentFilter from "../../components/DocumentFilter"; // ✅ Import DocumentFilter อย่างเดียว
-import { Skeleton } from "@/components/ui/skeleton";
+import DocumentFilter from "../../components/DocumentFilter";
 import { sortData } from "@/utils/sortUtils";
 import { searchData } from "@/utils/searchUtils";
+import { format } from "date-fns";
 
-// สร้าง Type เพื่อความชัดเจนของข้อมูล
 interface QuotationItem {
   id: string;
   number: string;
@@ -30,29 +22,11 @@ interface QuotationItem {
   validUntilValue: number;
   netTotal: number;
   status: string;
-  documentDate: string; // รับค่าเป็น 'YYYY-MM-DD' จาก API
+  documentDate: string; // 'YYYY-MM-DD' string
 }
-
-// ✅ ย้ายฟังก์ชัน parseLocalDate มาไว้นอก Component เพื่อประสิทธิภาพที่ดีกว่า
-// และแก้ปัญหาเรื่อง Timezone โดยแปลงวันที่ให้เป็น UTC เสมอ
-const parseLocalDate = (str: string): Date | null => {
-  if (!str) return null;
-  const datePart = str.split("T")[0];
-  const [y, m, d] = datePart.split("-").map(Number);
-  if (!y || !m || !d) return null;
-  // สร้าง Date object ในรูปแบบ UTC เพื่อให้การเปรียบเทียบไม่ผิดเพี้ยน
-  const date = new Date(Date.UTC(y, m - 1, d));
-  return isNaN(date.getTime()) ? null : date;
-};
 
 const Quotation = () => {
   const navigate = useNavigate();
-
-  const handleCreateNew = () => {
-    console.log("[Quotation] สร้างใบเสนอราคาใหม่");
-    navigate("/documents/quotation/new");
-  };
-
   const [quotations, setQuotations] = useState<QuotationItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -60,22 +34,12 @@ const Quotation = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [filters, setFilters] = useState<{
     status?: string;
-    dateFrom?: Date | null;
-    dateTo?: Date | null;
-  }>({});
+    dateFrom?: string | null; // <-- รับค่าเป็น string
+    dateTo?: string | null; // <-- รับค่าเป็น string
+  }>({ status: "all", dateFrom: null, dateTo: null });
   const [searchText, setSearchText] = useState("");
-
   const [sortColumn, setSortColumn] = useState<string>("dateValue");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
-
-  const handleSort = (column: string) => {
-    if (sortColumn === column) {
-      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
-    } else {
-      setSortColumn(column);
-      setSortDirection("desc");
-    }
-  };
 
   useEffect(() => {
     const loadQuotations = async () => {
@@ -86,45 +50,102 @@ const Quotation = () => {
         const quotationsData = data
           .filter((doc) => doc.document_type === "QUOTATION")
           .map((doc: any): QuotationItem => {
-            const netTotal =
-              doc.summary?.netTotalAmount ?? Number(doc.total_amount ?? 0);
+            const issueDate = new Date(doc.issue_date);
+            const validUntilDate = doc.valid_until
+              ? new Date(doc.valid_until)
+              : null;
             return {
               id: doc.id,
               number: doc.document_number,
               customer: doc.customer_name,
-              date: new Date(doc.issue_date).toLocaleDateString("th-TH", {
-                year: "numeric",
-                month: "short",
-                day: "numeric",
-              }),
-              dateValue: new Date(doc.issue_date).getTime(),
-              validUntil: doc.valid_until
-                ? new Date(doc.valid_until).toLocaleDateString("th-TH", {
-                    year: "numeric",
-                    month: "short",
-                    day: "numeric",
-                  })
+              date: format(issueDate, "d MMM yyyy"),
+              dateValue: issueDate.getTime(),
+              validUntil: validUntilDate
+                ? format(validUntilDate, "d MMM yyyy")
                 : "-",
-              validUntilValue: doc.valid_until
-                ? new Date(doc.valid_until).getTime()
-                : 0,
-              netTotal: netTotal,
+              validUntilValue: validUntilDate?.getTime() || 0,
+              netTotal:
+                doc.summary?.netTotalAmount ?? Number(doc.total_amount ?? 0),
               status: doc.status,
-              documentDate: doc.issue_date,
+              documentDate: format(issueDate, "yyyy-MM-dd"), // <-- เก็บเป็น YYYY-MM-DD เสมอ
             };
           });
         setQuotations(quotationsData);
       } catch (err) {
-        console.error("[Quotation] เกิดข้อผิดพลาดในการโหลดข้อมูล:", err);
-        setError("ไม่สามารถโหลดข้อมูลใบเสนอราคาได้");
-        toast.error("เกิดข้อผิดพลาดในการโหลดข้อมูล");
+        console.error("[Quotation] Load error:", err);
+        setError("ไม่สามารถโหลดข้อมูลได้");
       } finally {
         setLoading(false);
       }
     };
-
     loadQuotations();
   }, []);
+
+  const handleCreateNew = () => navigate("/documents/quotation/new");
+  const handleSort = (column: string) => {
+    if (sortColumn === column)
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+    else {
+      setSortColumn(column);
+      setSortDirection("desc");
+    }
+  };
+  const handleFilterChange = (newFilters: any) => setFilters(newFilters);
+  const handleEditClick = (id: string) =>
+    navigate(`/documents/quotation/edit/${id}`);
+
+  const handleDeleteClick = async (id: string) => {
+    if (window.confirm("คุณต้องการลบใบเสนอราคานี้ใช่หรือไม่?")) {
+      toast.promise(apiService.deleteDocument(id), {
+        loading: "กำลังลบ...",
+        success: () => {
+          setQuotations((prev) => prev.filter((q) => q.id !== id));
+          return "ลบใบเสนอราคาเรียบร้อยแล้ว";
+        },
+        error: "เกิดข้อผิดพลาดในการลบ",
+      });
+    }
+  };
+
+  const handleViewClick = useCallback(async (quotation: QuotationItem) => {
+    toast.promise(apiService.getDocumentById(quotation.id), {
+      loading: "กำลังโหลดข้อมูล...",
+      success: (fullDoc) => {
+        if (fullDoc) {
+          setSelectedQuotation(fullDoc);
+          setIsModalOpen(true);
+        } else {
+          toast.error("ไม่พบข้อมูลเอกสาร");
+        }
+        return "โหลดข้อมูลสำเร็จ";
+      },
+      error: "ไม่สามารถดูรายละเอียดได้",
+    });
+  }, []);
+
+  const filteredAndSortedQuotations = useMemo(() => {
+    let result = searchData(quotations, searchText, ["number", "customer"]);
+
+    // ✨✨✨ การกรองโดยใช้ String Comparison โดยตรง ✨✨✨
+    result = result.filter((q) => {
+      const isStatusMatch =
+        !filters.status ||
+        filters.status === "all" ||
+        q.status === filters.status;
+      if (!isStatusMatch) return false;
+
+      const docDate = q.documentDate; // 'YYYY-MM-DD'
+
+      const isAfterFrom =
+        !filters.dateFrom || !docDate || docDate >= filters.dateFrom;
+      const isBeforeTo =
+        !filters.dateTo || !docDate || docDate <= filters.dateTo;
+
+      return isAfterFrom && isBeforeTo;
+    });
+
+    return sortData(result, sortColumn as keyof QuotationItem, sortDirection);
+  }, [quotations, searchText, filters, sortColumn, sortDirection]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -140,72 +161,6 @@ const Quotation = () => {
         return "bg-gray-200 text-gray-800";
     }
   };
-
-  const handleViewClick = useCallback(async (quotation: QuotationItem) => {
-    try {
-      toast.loading("กำลังโหลดข้อมูล...");
-      const allDocs = await apiService.getDocuments();
-      toast.dismiss();
-      const fullDoc = allDocs.find((doc: any) => doc.id === quotation.id);
-
-      if (fullDoc) {
-        setSelectedQuotation(fullDoc);
-        setIsModalOpen(true);
-      } else {
-        toast.error("ไม่พบข้อมูลเอกสาร");
-      }
-    } catch (err) {
-      toast.dismiss();
-      console.error("[Quotation] เกิดข้อผิดพลาดในการดูรายละเอียด:", err);
-      toast.error("ไม่สามารถดูรายละเอียดได้");
-    }
-  }, []);
-
-  const handleEditClick = (id: string) => {
-    navigate(`/documents/quotation/edit/${id}`);
-  };
-
-  const handleDeleteClick = async (id: string) => {
-    if (window.confirm("คุณแน่ใจหรือไม่ว่าต้องการลบใบเสนอราคานี้?")) {
-      try {
-        toast.loading("กำลังลบ...");
-        await apiService.deleteDocument(id);
-        setQuotations((prev) => prev.filter((q) => q.id !== id));
-        toast.success("ลบใบเสนอราคาเรียบร้อยแล้ว");
-      } catch (error) {
-        toast.dismiss();
-        console.error("[Quotation] เกิดข้อผิดพลาดในการลบ:", error);
-        toast.error("เกิดข้อผิดพลาดในการลบใบเสนอราคา");
-      }
-    }
-  };
-
-  const handleFilterChange = (newFilters: any) => {
-    setFilters(newFilters);
-  };
-
-  const filteredAndSortedQuotations = useMemo(() => {
-    let result = searchData(quotations, searchText, ["number", "customer"]);
-
-    result = result.filter((q) => {
-      const isStatusMatch =
-        !filters.status ||
-        filters.status === "all" ||
-        q.status === filters.status;
-      if (!isStatusMatch) return false;
-
-      // ✨✨ ใช้ฟังก์ชัน parseLocalDate ที่ประกาศไว้ด้านบน ✨✨
-      const docDate = parseLocalDate(q.documentDate);
-      const isAfterFrom =
-        !filters.dateFrom || !docDate || docDate >= filters.dateFrom;
-      const isBeforeTo =
-        !filters.dateTo || !docDate || docDate <= filters.dateTo;
-
-      return isAfterFrom && isBeforeTo;
-    });
-
-    return sortData(result, sortColumn as keyof QuotationItem, sortDirection);
-  }, [quotations, searchText, filters, sortColumn, sortDirection]);
 
   return (
     <div className="space-y-6">
@@ -225,13 +180,13 @@ const Quotation = () => {
         </Button>
       </div>
 
-      <div className="flex flex-col md:flex-row items-center gap-4 no-print">
+      <div className="flex flex-col md:flex-row items-center justify-between gap-4 no-print">
         <div className="relative flex-1 w-full md:max-w-md">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <input
             type="text"
             placeholder="ค้นหาเลขที่เอกสาร, ชื่อลูกค้า..."
-            className="w-full pl-10 pr-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
+            className="w-full pl-10 pr-4 py-2 border rounded-lg"
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
           />
@@ -255,29 +210,25 @@ const Quotation = () => {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="flex justify-center items-center py-10">
+            <div className="flex justify-center p-10">
               <Loader2 className="w-8 h-8 animate-spin text-primary" />
             </div>
           ) : error ? (
-            <div className="text-center py-10 text-red-500">
-              <AlertTriangle className="w-8 h-8 mx-auto mb-2" />
+            <div className="text-center p-10 text-red-500">
+              <AlertTriangle className="mx-auto w-8 h-8 mb-2" />
               <p>{error}</p>
             </div>
           ) : filteredAndSortedQuotations.length === 0 ? (
-            <div className="text-center py-10 text-muted-foreground">
-              <FileText className="w-12 h-12 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold">ไม่พบใบเสนอราคา</h3>
-              <p>
-                {searchText || filters.status || filters.dateFrom
-                  ? "ลองเปลี่ยนเงื่อนไขการค้นหาหรือตัวกรอง"
-                  : "เริ่มต้นสร้างใบเสนอราคาใหม่ได้เลย"}
-              </p>
+            <div className="text-center p-10 text-muted-foreground">
+              <FileText className="mx-auto w-12 h-12 mb-4" />
+              <h3 className="text-lg font-semibold">ไม่พบข้อมูล</h3>
+              <p>ลองเปลี่ยนเงื่อนไขการค้นหาหรือตัวกรอง</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-border">
+                  <tr className="border-b">
                     {[
                       { key: "number", label: "เลขที่" },
                       { key: "customer", label: "ลูกค้า" },
@@ -288,70 +239,65 @@ const Quotation = () => {
                     ].map(({ key, label }) => (
                       <th
                         key={key}
-                        className="text-left py-3 px-4 font-medium text-muted-foreground cursor-pointer select-none"
+                        className="text-left p-3 font-medium text-muted-foreground cursor-pointer"
                         onClick={() => handleSort(key)}
                       >
                         {label}{" "}
                         {sortColumn === key ? (
-                          <span>{sortDirection === "asc" ? "▲" : "▼"}</span>
+                          sortDirection === "asc" ? (
+                            "▲"
+                          ) : (
+                            "▼"
+                          )
                         ) : (
                           <span className="text-gray-300">⇅</span>
                         )}
                       </th>
                     ))}
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground no-print">
+                    <th className="text-left p-3 font-medium text-muted-foreground">
                       การดำเนินการ
                     </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredAndSortedQuotations.map((quotation) => (
-                    <tr
-                      key={quotation.id}
-                      className="border-b border-border/40 hover:bg-muted/30 transition-colors"
-                    >
-                      <td className="py-3 px-4 font-medium text-foreground">
-                        {quotation.number}
+                  {filteredAndSortedQuotations.map((q) => (
+                    <tr key={q.id} className="border-b hover:bg-muted/40">
+                      <td className="p-3 font-medium">{q.number}</td>
+                      <td className="p-3">{q.customer}</td>
+                      <td className="p-3 text-muted-foreground">{q.date}</td>
+                      <td className="p-3 text-muted-foreground">
+                        {q.validUntil}
                       </td>
-                      <td className="py-3 px-4 text-foreground">
-                        {quotation.customer}
+                      <td className="p-3 font-medium text-right">
+                        {formatCurrency(q.netTotal)}
                       </td>
-                      <td className="py-3 px-4 text-muted-foreground">
-                        {quotation.date}
-                      </td>
-                      <td className="py-3 px-4 text-muted-foreground">
-                        {quotation.validUntil}
-                      </td>
-                      <td className="py-3 px-4 font-medium text-foreground text-right">
-                        {formatCurrency(quotation.netTotal)}
-                      </td>
-                      <td className="py-3 px-4">
+                      <td className="p-3">
                         <span
-                          className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(quotation.status)}`}
+                          className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusBadge(q.status)}`}
                         >
-                          {quotation.status}
+                          {q.status}
                         </span>
                       </td>
-                      <td className="py-3 px-4 no-print">
+                      <td className="p-3">
                         <div className="flex items-center gap-2">
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => handleViewClick(quotation)}
+                            onClick={() => handleViewClick(q)}
                           >
                             ดู
                           </Button>
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => handleEditClick(quotation.id)}
+                            onClick={() => handleEditClick(q.id)}
                           >
                             แก้ไข
                           </Button>
                           <Button
                             variant="destructive"
                             size="sm"
-                            onClick={() => handleDeleteClick(quotation.id)}
+                            onClick={() => handleDeleteClick(q.id)}
                           >
                             ลบ
                           </Button>
@@ -369,10 +315,7 @@ const Quotation = () => {
       {isModalOpen && selectedQuotation && (
         <QuotationModal
           open={isModalOpen}
-          onClose={() => {
-            setIsModalOpen(false);
-            setSelectedQuotation(null);
-          }}
+          onClose={() => setIsModalOpen(false)}
           quotation={selectedQuotation}
         />
       )}
