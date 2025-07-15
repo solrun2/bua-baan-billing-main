@@ -785,18 +785,28 @@ app.post("/api/documents", async (req: Request, res: Response) => {
         document_type.toLowerCase() !== "receipt")
     ) {
       for (const item of items) {
+        const qty = Number(item.quantity ?? 1);
+        const unitPrice = Number(item.unit_price ?? 0);
+        const taxRate = Number(item.tax ?? 0) / 100;
+        let amount = unitPrice * qty;
+        let amount_before_tax = amount;
+        if (priceType === "INCLUDE_VAT" && taxRate > 0) {
+          amount_before_tax = amount / (1 + taxRate);
+        } else if (priceType === "EXCLUDE_VAT" || priceType === "NO_VAT") {
+          amount_before_tax = amount;
+        }
         const params = [
           documentId,
           item.product_id ?? null,
           item.productTitle ?? item.product_name ?? "",
           item.unit ?? "",
-          item.quantity ?? 1,
-          item.unit_price ?? 0,
-          item.amount ?? 0,
+          qty,
+          unitPrice,
+          amount,
           item.description ?? "",
           item.withholding_tax_amount ?? 0,
           item.withholding_tax_option ?? -1,
-          item.amount_before_tax ?? 0,
+          amount_before_tax,
           item.discount ?? 0,
           item.discount_type ?? item.discountType ?? "thb",
           item.tax ?? 0,

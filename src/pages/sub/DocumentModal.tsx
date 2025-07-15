@@ -25,6 +25,7 @@ interface DocumentItem {
   withholding_tax_amount?: number;
   originalUnitPrice?: number;
   original_unit_price?: number;
+  amount_after_discount?: number;
 }
 
 interface DocumentSummary {
@@ -65,6 +66,8 @@ interface DocumentBase {
     address?: string;
     email?: string;
   };
+  priceType?: "EXCLUDE_VAT" | "INCLUDE_VAT" | "NO_VAT";
+  price_type?: "EXCLUDE_VAT" | "INCLUDE_VAT" | "NO_VAT";
 }
 
 interface Quotation extends DocumentBase {
@@ -412,24 +415,23 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
           ) : (
             items.map((item, idx) => {
               const prod = productMap[item.product_id];
-              const qty = (item as any).quantity ?? (item as any).qty ?? 1;
-              const unitPrice =
-                item.originalUnitPrice ??
-                item.original_unit_price ??
-                item.unitPrice ??
-                item.unit_price ??
-                0;
-              const discount = item.discount ?? 0;
+              const qty = Number(item.quantity ?? 1);
+              // ใช้ field จาก backend โดยตรง
+              const displayUnitPrice = item.unit_price ?? 0;
+              // ส่วนลด (คำนวณเองถ้าไม่มีใน db)
+              const discount = Number(item.discount ?? 0);
               const discountType =
                 item.discount_type ?? item.discountType ?? "thb";
               let discountAmount = 0;
               if (discountType === "percentage") {
-                discountAmount = unitPrice * qty * (discount / 100);
+                discountAmount = displayUnitPrice * qty * (discount / 100);
               } else {
                 discountAmount = discount * qty;
               }
+              // VAT (แสดง % ตาม field tax)
               const vat = (item.tax ?? item.tax_amount) || 0;
-              const totalAmount = unitPrice * qty - discountAmount;
+              // ราคารวม: ใช้ amount จาก backend ตรงๆ ถ้ามี ถ้าไม่มี fallback เป็น 0
+              const displayTotal = item.amount ?? 0;
               return (
                 <tr key={idx}>
                   <td className="border border-gray-300 p-2 text-center">
@@ -446,7 +448,7 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
                     {qty}
                   </td>
                   <td className="border border-gray-300 p-2 text-right bg-yellow-100 font-bold text-yellow-700">
-                    {formatCurrency(unitPrice)}
+                    {formatCurrency(displayUnitPrice)}
                   </td>
                   <td className="border border-gray-300 p-2 text-right">
                     {discountAmount > 0 ? formatCurrency(discountAmount) : "-"}
@@ -455,7 +457,7 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
                     {vat ? `${vat}%` : "-"}
                   </td>
                   <td className="border border-gray-300 p-2 text-right">
-                    {formatCurrency(totalAmount)}
+                    {formatCurrency(displayTotal)}
                   </td>
                 </tr>
               );
