@@ -629,7 +629,7 @@ async function createDocumentFromServer(data: any, pool: any) {
 
 app.post("/api/documents", async (req: Request, res: Response) => {
   console.log("Received document data:", req.body);
-  let conn;
+  let conn: any; // ประกาศก่อน validation
   try {
     const {
       customer,
@@ -653,24 +653,34 @@ app.post("/api/documents", async (req: Request, res: Response) => {
     const tax_amount = summaryCalc.tax;
     const total_amount = summaryCalc.total;
 
-    if (
-      !customer ||
-      !customer.id ||
-      !customer.name ||
-      !document_type ||
-      !status ||
-      !issue_date ||
-      !items ||
-      !Array.isArray(items) ||
-      items.length === 0
-    ) {
+    // Validation เฉพาะ field ที่บังคับ (NOT NULL) ตาม schema
+    const missingFields = [];
+    if (!customer || !customer.id) missingFields.push("customer.id");
+    if (!customer || !customer.name) missingFields.push("customer.name");
+    if (!document_type) missingFields.push("document_type");
+    if (!status) missingFields.push("status");
+    if (!priceType) missingFields.push("priceType");
+    if (!issue_date) missingFields.push("issue_date");
+    if (!items || !Array.isArray(items) || items.length === 0)
+      missingFields.push("items");
+    // ตรวจสอบ field ที่บังคับในแต่ละ item
+    if (Array.isArray(items)) {
+      items.forEach((item, idx) => {
+        if (!item.product_name)
+          missingFields.push(`items[${idx}].product_name`);
+        if (item.quantity === undefined || item.quantity === null)
+          missingFields.push(`items[${idx}].quantity`);
+        if (item.unit_price === undefined || item.unit_price === null)
+          missingFields.push(`items[${idx}].unit_price`);
+      });
+    }
+    if (missingFields.length > 0) {
       return res
         .status(400)
-        .json({ error: "Missing required document fields." });
+        .json({ error: "Missing required fields", missing: missingFields });
     }
 
     conn = await pool.getConnection();
-    await conn.beginTransaction();
 
     if (
       related_document_id &&

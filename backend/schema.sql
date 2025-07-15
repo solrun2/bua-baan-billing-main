@@ -19,21 +19,21 @@ CREATE TABLE `documents` (
   `price_type` ENUM('EXCLUDE_VAT', 'INCLUDE_VAT', 'NO_VAT') NOT NULL DEFAULT 'EXCLUDE_VAT',
   PRIMARY KEY (`id`),
   UNIQUE KEY `document_number` (`document_number`)
-) ENGINE=InnoDB AUTO_INCREMENT=138 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci
+) ENGINE=InnoDB AUTO_INCREMENT=138 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
 
 CREATE TABLE `quotation_details` (
   `document_id` int(11) NOT NULL,
   `valid_until` date NOT NULL,
   PRIMARY KEY (`document_id`),
   CONSTRAINT `fk_quotation_document` FOREIGN KEY (`document_id`) REFERENCES `documents` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
 
 CREATE TABLE `invoice_details` (
   `document_id` int(11) NOT NULL,
   `due_date` date NOT NULL,
   PRIMARY KEY (`document_id`),
   CONSTRAINT `fk_invoice_document` FOREIGN KEY (`document_id`) REFERENCES `documents` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
 
 CREATE TABLE `receipt_details` (
   `document_id` int(11) NOT NULL,
@@ -46,7 +46,7 @@ CREATE TABLE `receipt_details` (
   `net_total_receipt` decimal(15,2) DEFAULT 0.00,
   PRIMARY KEY (`document_id`),
   CONSTRAINT `fk_receipt_document` FOREIGN KEY (`document_id`) REFERENCES `documents` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
 
 CREATE TABLE `document_items` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -69,4 +69,4 @@ CREATE TABLE `document_items` (
   PRIMARY KEY (`id`),
   KEY `document_id` (`document_id`),
   CONSTRAINT `document_items_ibfk_1` FOREIGN KEY (`document_id`) REFERENCES `documents` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=224 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci
+) ENGINE=InnoDB AUTO_INCREMENT=224 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;

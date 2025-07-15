@@ -391,13 +391,14 @@ export const DocumentForm: FC<DocumentFormProps> = ({
         | "INCLUDE_VAT"
         | "NO_VAT",
     };
-    setForm(
-      (prev) =>
-        ({
-          ...prev,
-          items: [...prev.items, fixedItem],
-        }) as typeof form
-    );
+    setForm((prev) => {
+      const newItems = [...prev.items, fixedItem];
+      console.log("[addNewItem] form.items:", newItems);
+      return {
+        ...prev,
+        items: newItems,
+      };
+    });
   };
   const removeItem = (id: string) => {
     setForm(
@@ -433,9 +434,8 @@ export const DocumentForm: FC<DocumentFormProps> = ({
   // handle เลือกสินค้า
   const handleProductSelect = (product: Product | null, itemId: string) => {
     if (product) {
-      setForm((prev) => ({
-        ...prev,
-        items: prev.items.map((item) => {
+      setForm((prev) => {
+        const newItems = prev.items.map((item) => {
           if (item.id === itemId) {
             // normalize discountType ให้ถูกต้อง
             let normalizedDiscountType: "thb" | "percentage" = "thb";
@@ -446,13 +446,24 @@ export const DocumentForm: FC<DocumentFormProps> = ({
             const mergedItem: DocumentItem = {
               ...item,
               id: item.id ?? `item-${Date.now()}`,
-              productId: product.id ? product.id.toString() : (item.productId ?? ""),
+              productId: product.id
+                ? product.id.toString()
+                : (item.productId ?? ""),
               productTitle: product.title ?? item.productTitle ?? "",
               description: product.description ?? item.description ?? "",
-              originalUnitPrice: typeof product.price === "number" ? product.price : (item.originalUnitPrice ?? 0), // แก้ให้ใช้ราคาสินค้าใหม่
-              unitPrice: typeof product.price === "number" ? product.price : (item.unitPrice ?? 0), // แก้ให้ใช้ราคาสินค้าใหม่
+              originalUnitPrice:
+                typeof product.price === "number"
+                  ? product.price
+                  : (item.originalUnitPrice ?? 0), // แก้ให้ใช้ราคาสินค้าใหม่
+              unitPrice:
+                typeof product.price === "number"
+                  ? product.price
+                  : (item.unitPrice ?? 0), // แก้ให้ใช้ราคาสินค้าใหม่
               unit: product.unit ?? item.unit ?? "",
-              tax: typeof product.vat_rate === "number" ? product.vat_rate : (item.tax ?? 7),
+              tax:
+                typeof product.vat_rate === "number"
+                  ? product.vat_rate
+                  : (item.tax ?? 7),
               discount: item.discount ?? 0,
               discountType: normalizedDiscountType,
               withholding_tax_option: item.withholding_tax_option ?? "ไม่ระบุ",
@@ -499,8 +510,13 @@ export const DocumentForm: FC<DocumentFormProps> = ({
             };
           }
           return item;
-        }),
-      }));
+        });
+        console.log("[handleProductSelect] form.items:", newItems);
+        return {
+          ...prev,
+          items: newItems,
+        };
+      });
     }
   };
 

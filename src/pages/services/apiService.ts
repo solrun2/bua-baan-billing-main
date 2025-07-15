@@ -27,12 +27,13 @@ const getDocuments = async (): Promise<Document[]> => {
 const createDocument = async (
   document: DocumentPayload
 ): Promise<DocumentData> => {
-  // ฟังก์ชัน create ใช้ DocumentPayload ซึ่งถูกต้องอยู่แล้ว
+  // map field ให้ตรง backend
+  const backendData = prepareDocumentData(document);
   try {
     const response = await fetch(`${API_BASE_URL}/documents`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(document),
+      body: JSON.stringify(backendData),
     });
 
     if (!response.ok) {

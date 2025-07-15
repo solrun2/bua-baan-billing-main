@@ -17,45 +17,10 @@ const saveDocuments = (documents: DocumentData[]) => {
   }
 };
 
-// Initialize with some mock data if storage is empty
-if (typeof window !== "undefined" && !localStorage.getItem(STORAGE_KEY)) {
-  const mockInvoices: DocumentData[] = [
-    {
-      id: "inv_001",
-      documentNumber: "QT-2025-0001",
-      documentType: "quotation",
-      customer: { name: "บริษัท ABC จำกัด", tax_id: "", phone: "", address: "" },
-      items: [],
-      summary: { subtotal: 50000, discount: 0, tax: 3500, total: 53500, withholdingTax: 0 },
-      status: "รอตอบรับ",
-      documentDate: new Date().toISOString().split('T')[0],
-      dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      reference: "",
-      notes: "",
-      priceType: 'exclusive',
-    },
-    {
-      id: "inv_002",
-      documentNumber: "INV-2025-0002",
-      documentType: "invoice",
-      customer: { name: "บริษัท XYZ จำกัด", tax_id: "", phone: "", address: "" },
-      items: [],
-      summary: { subtotal: 75000, discount: 0, tax: 5250, total: 80250, withholdingTax: 0 },
-      status: "ชำระแล้ว",
-      documentDate: new Date().toISOString().split('T')[0],
-      dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      reference: "",
-      notes: "",
-      priceType: 'exclusive',
-    },
-  ];
-  saveDocuments(mockInvoices);
-}
-
 // Public service object
 export const documentService = {
   clearAll: () => {
-    localStorage.removeItem('documents');
+    localStorage.removeItem("documents");
     // We might need to reload to reflect the changes in the UI
     window.location.reload();
   },
@@ -84,30 +49,32 @@ export const documentService = {
   },
 
   // Generate a new document number based on type
-  generateNewDocumentNumber(type: 'quotation' | 'invoice' | 'receipt' | 'tax_invoice'): string {
+  generateNewDocumentNumber(
+    type: "quotation" | "invoice" | "receipt" | "tax_invoice"
+  ): string {
     // ใช้ cache เพื่อเพิ่มประสิทธิภาพ
     const cacheKey = `doc_number_${type}`;
     const cached = sessionStorage.getItem(cacheKey);
-    
+
     if (cached) {
       return cached;
     }
-    
+
     const documents = this.getAll();
-    const existingNumbers = documents.map(doc => doc.documentNumber);
+    const existingNumbers = documents.map((doc) => doc.documentNumber);
     const newNumber = generateDocumentNumber(type, existingNumbers);
-    
+
     // cache ไว้ 5 นาที
     sessionStorage.setItem(cacheKey, newNumber);
     setTimeout(() => sessionStorage.removeItem(cacheKey), 5 * 60 * 1000);
-    
+
     return newNumber;
   },
 
   // Delete a document by ID
   deleteById: (id: string): void => {
     const documents = getDocuments();
-    const updatedDocuments = documents.filter(doc => doc.id !== id);
+    const updatedDocuments = documents.filter((doc) => doc.id !== id);
     saveDocuments(updatedDocuments);
-  }
+  },
 };
