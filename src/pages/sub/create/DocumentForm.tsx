@@ -746,7 +746,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
       unit: item.unit ?? "",
       quantity: item.quantity ?? 1,
       unit_price: item.unitPrice ?? 0,
-      original_unit_price: item.originalUnitPrice ?? item.unitPrice ?? 0, // ส่ง original_unit_price
+      original_unit_price: item.originalUnitPrice ?? item.unitPrice ?? 0,
       amount: item.amount ?? 0,
       description: item.description ?? "",
       withholding_tax_amount: item.withholdingTaxAmount ?? 0,

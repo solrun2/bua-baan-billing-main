@@ -1,13 +1,6 @@
 import { Customer } from "@/types/customer";
 import axios from "axios";
-import {
-  Document,
-  DocumentData,
-  DocumentItem,
-  DocumentPayload,
-} from "@/types/document"; // แก้ไข: เพิ่ม DocumentPayload
-import { Product } from "@/types/product";
-import { updateItemWithCalculations } from "@/calculate/documentCalculations";
+import { Document, DocumentData, DocumentPayload } from "@/types/document";
 
 const API_BASE_URL = "http://localhost:3001/api";
 
@@ -54,6 +47,30 @@ const createDocument = async (
   }
 };
 
+// ย้ายฟังก์ชัน prepareDocumentData ให้อยู่เหนือ updateDocument (ถ้ายังไม่ได้อยู่)
+function prepareDocumentData(document: DocumentPayload): any {
+  return {
+    id: document.id,
+    document_type: document.documentType,
+    document_number: document.documentNumber,
+    issue_date: document.documentDate,
+    due_date: document.dueDate,
+    valid_until: document.validUntil,
+    reference: document.reference || "",
+    customer: document.customer,
+    items: Array.isArray(document.items) ? document.items : [],
+    summary: document.summary,
+    notes: document.notes,
+    priceType: document.priceType,
+    status: document.status,
+    attachments: document.attachments,
+    tags: document.tags,
+    updatedAt: document.updatedAt,
+    issueTaxInvoice: document.issueTaxInvoice,
+    // เพิ่ม field อื่น ๆ ที่ backend ต้องการ
+  };
+}
+
 // --- จุดที่แก้ไข ---
 // เปลี่ยนประเภทของพารามิเตอร์ document จาก DocumentData เป็น DocumentPayload
 const updateDocument = async (
@@ -61,19 +78,19 @@ const updateDocument = async (
   document: DocumentPayload
 ): Promise<DocumentData> => {
   try {
-    // ข้อมูลที่มาจากฟอร์ม (payload) อยู่ในรูปแบบที่พร้อมส่งไป backend แล้ว
-    // จึงไม่จำเป็นต้องเรียก prepareDocumentData อีก
+    const backendData = prepareDocumentData(document);
+    console.log("[updateDocument] backendData:", backendData); // <--- log payload ที่จะส่งไป
     const response = await fetch(`${API_BASE_URL}/documents/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(document), // ส่ง document ที่เป็น DocumentPayload ไปได้เลย
+      body: JSON.stringify(backendData),
     });
     if (!response.ok) {
       const errorData = await response.json();
+      console.error("[updateDocument] errorData:", errorData); // <--- log error ที่ได้จาก backend
       throw new Error(errorData.message || "Failed to update document");
     }
-    const updatedDoc = await response.json();
-    return mapDocumentFromBackend(updatedDoc);
+    return await response.json();
   } catch (error) {
     console.error("Error updating document:", error);
     throw error;
