@@ -340,15 +340,17 @@ app.get("/api/documents", async (req: Request, res: Response) => {
       }, {});
     }
 
-    const docsWithItems = rows.map((doc: any) => {
-      const items = itemsByDoc[doc.id] || [];
-      const summary = calculateDocumentSummary(items, doc.price_type);
-      return {
-        ...doc,
-        items,
-        summary,
-      };
-    });
+    const docsWithItems = rows.map((doc: any) => ({
+      ...doc,
+      items: itemsByDoc[doc.id] || [],
+      summary: {
+        subtotal: doc.subtotal,
+        tax: doc.tax_amount,
+        total: doc.total_amount,
+        discount: 0, // ถ้ามี field discount ใน DB ให้ใส่, ถ้าไม่มีใส่ 0
+        withholdingTax: 0, // ถ้ามี field withholdingTax ใน DB ให้ใส่, ถ้าไม่มีใส่ 0
+      },
+    }));
     res.json(docsWithItems);
   } catch (err) {
     console.error("Failed to fetch documents:", err);
@@ -629,6 +631,8 @@ async function createDocumentFromServer(data: any, pool: any) {
 
 app.post("/api/documents", async (req: Request, res: Response) => {
   console.log("Received document data:", req.body);
+  console.log("[DEBUG] summary ที่รับมาจาก frontend:", req.body.summary);
+  console.log("[DEBUG] priceType ที่รับมาจาก frontend:", req.body.priceType);
   let conn: any; // ประกาศก่อน validation
   try {
     const {
@@ -643,6 +647,7 @@ app.post("/api/documents", async (req: Request, res: Response) => {
       payment_method,
       payment_reference,
       related_document_id,
+      summary = {},
     } = req.body;
 
     // เพิ่ม validation สำหรับ priceType
@@ -654,10 +659,10 @@ app.post("/api/documents", async (req: Request, res: Response) => {
     const due_date = req.body.due_date || req.body.dueDate;
     const valid_until = req.body.valid_until || req.body.validUntil;
 
-    const summaryCalc = calculateDocumentSummary(items, priceType);
-    const subtotal = summaryCalc.subtotal;
-    const tax_amount = summaryCalc.tax;
-    const total_amount = summaryCalc.total;
+    // ใช้ค่าจาก frontend โดยตรง
+    const subtotal = summary.subtotal ?? 0;
+    const tax_amount = summary.tax ?? 0;
+    const total_amount = summary.total ?? 0;
 
     // Validation เฉพาะ field ที่บังคับ (NOT NULL) ตาม schema
     const missingFields = [];
@@ -988,6 +993,7 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
       payment_date,
       payment_method,
       payment_reference,
+      summary = {},
     } = req.body;
 
     // เพิ่ม validation สำหรับ priceType
@@ -995,6 +1001,11 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
     if (!allowedPriceTypes.includes(priceType)) {
       return res.status(400).json({ error: "Invalid priceType" });
     }
+
+    // ใช้ค่าจาก frontend โดยตรง
+    const subtotal = summary.subtotal ?? 0;
+    const tax_amount = summary.tax ?? 0;
+    const total_amount = summary.total ?? 0;
 
     if (
       !customer ||
@@ -1036,11 +1047,6 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
         });
       }
     }
-
-    const summaryCalc = calculateDocumentSummary(items, priceType);
-    const subtotal = summaryCalc.subtotal;
-    const tax_amount = summaryCalc.tax;
-    const total_amount = summaryCalc.total;
 
     await conn.query(
       `UPDATE documents SET

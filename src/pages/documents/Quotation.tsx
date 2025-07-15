@@ -66,8 +66,7 @@ const Quotation = () => {
                 ? format(validUntilDate, "d MMM yy", { locale: th })
                 : "-",
               validUntilValue: validUntilDate?.getTime() || 0,
-              netTotal:
-                doc.summary?.netTotalAmount ?? Number(doc.total_amount ?? 0),
+              netTotal: doc.summary?.total ?? doc.total_amount ?? 0,
               status: doc.status,
               documentDate: format(issueDate, "yyyy-MM-dd"),
             };
@@ -284,7 +283,7 @@ const Quotation = () => {
                           {q.validUntil}
                         </td>
                         <td className="py-3 px-4 font-medium text-foreground">
-                          {formatCurrency(q.netTotal)}
+                          {formatCurrency(Number(q.netTotal))}
                         </td>
                         <td className="py-3 px-4">
                           <span

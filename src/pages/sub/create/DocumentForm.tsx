@@ -811,7 +811,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
         email: form.customer.email,
       },
       items: itemsToSave,
-      summary: summary,
+      summary: calculatedSummary, // ใช้ค่าจาก useMemo ที่คำนวณสดเสมอ
       notes: form.notes,
       priceType: mapPriceTypeToEnum(form.priceType),
       status: form.status,
@@ -850,6 +850,9 @@ export const DocumentForm: FC<DocumentFormProps> = ({
     };
     documentService.save(dataForLocal);
 
+    console.log("[DEBUG] summary ที่จะส่งไป backend:", calculatedSummary);
+    console.log("[DEBUG] priceType ที่จะส่งไป backend:", mapPriceTypeToEnum(form.priceType));
+    console.log("[DEBUG] dataToSave:", dataToSave);
     try {
       await onSave(dataToSave);
     } catch (error) {

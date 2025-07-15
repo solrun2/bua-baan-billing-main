@@ -31,19 +31,27 @@ export const calculateItemAmounts = (item: BaseItem): CalculatedItem => {
       ? item.withholdingTax / 100
       : 0;
 
-  // ใช้ originalUnitPrice ถ้ามี (Net)
   let priceBeforeTaxPerUnit = item.unitPrice;
-  if (typeof item.originalUnitPrice === "number") {
-    if (item.priceType === "inclusive" && taxRate > 0) {
-      priceBeforeTaxPerUnit = item.originalUnitPrice / (1 + taxRate);
-    } else {
-      priceBeforeTaxPerUnit = item.originalUnitPrice;
-    }
-  } else if (item.priceType === "inclusive" && taxRate > 0) {
+  let effectiveTaxRate = taxRate;
+  let itemTax = 0;
+
+  // ปรับ logic ตาม priceType
+  if (item.priceType === "inclusive") {
+    // ราคานี้รวม VAT แล้ว ต้องคำนวณ tax ย้อนกลับ
     priceBeforeTaxPerUnit = item.unitPrice / (1 + taxRate);
+    itemTax = item.unitPrice - priceBeforeTaxPerUnit;
+    effectiveTaxRate = taxRate;
+  } else if (item.priceType === "none") {
+    // ไม่มี VAT
+    priceBeforeTaxPerUnit = item.unitPrice;
+    itemTax = 0;
+    effectiveTaxRate = 0;
+  } else {
+    // exclusive
+    priceBeforeTaxPerUnit = item.unitPrice;
+    itemTax = priceBeforeTaxPerUnit * taxRate;
+    effectiveTaxRate = taxRate;
   }
-  // ถ้า priceType === 'none' ให้ tax = 0
-  const effectiveTaxRate = item.priceType === "none" ? 0 : taxRate;
 
   // Calculate subtotal from the (potentially adjusted) unit price
   const subtotal = item.quantity * priceBeforeTaxPerUnit;
@@ -58,8 +66,7 @@ export const calculateItemAmounts = (item: BaseItem): CalculatedItem => {
   const amountBeforeTax = subtotal - discountAmount;
 
   // Calculate tax amount from the amount after discount, but only if priceType is not 'none'
-  const taxAmount =
-    effectiveTaxRate > 0 ? amountBeforeTax * effectiveTaxRate : 0;
+  const taxAmount = item.priceType === "none" ? 0 : amountBeforeTax * taxRate;
 
   // Calculate withholding tax amount for the item
   let withholdingTaxAmount = 0;

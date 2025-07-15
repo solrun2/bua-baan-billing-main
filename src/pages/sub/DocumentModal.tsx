@@ -285,29 +285,13 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
   );
 
   // Use summary from document, or recalculate if missing/zero
-  const summary =
-    document.summary &&
-    typeof document.summary.discount !== "undefined" &&
-    !isNaN(
-      Number((document.summary.discount ?? 0).toString().replace(/,/g, ""))
-    )
-      ? {
-          ...document.summary,
-          subtotal: Number(
-            (document.summary.subtotal ?? 0).toString().replace(/,/g, "")
-          ),
-          discount: Number(
-            (document.summary.discount ?? 0).toString().replace(/,/g, "")
-          ),
-          tax: Number((document.summary.tax ?? 0).toString().replace(/,/g, "")),
-          total: Number(
-            (document.summary.total ?? 0).toString().replace(/,/g, "")
-          ),
-          withholdingTax: Number(
-            (document.summary.withholdingTax ?? 0).toString().replace(/,/g, "")
-          ),
-        }
-      : calculateSummaryFromItems(items);
+  const summary = document.summary || {
+    subtotal: (document as any).subtotal ?? 0,
+    tax: (document as any).tax_amount ?? 0,
+    total: (document as any).total_amount ?? 0,
+    discount: (document as any).discount ?? 0,
+    withholdingTax: (document as any).withholdingTax ?? 0,
+  };
 
   console.log("summary", summary);
   console.log("DocumentModal document:", document);
@@ -445,6 +429,7 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
                 discountAmount = discount * qty;
               }
               const vat = (item.tax ?? item.tax_amount) || 0;
+              const totalAmount = unitPrice * qty - discountAmount;
               return (
                 <tr key={idx}>
                   <td className="border border-gray-300 p-2 text-center">
@@ -470,133 +455,45 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
                     {vat ? `${vat}%` : "-"}
                   </td>
                   <td className="border border-gray-300 p-2 text-right">
-                    {formatCurrency(unitPrice * qty - discountAmount)}
+                    {formatCurrency(totalAmount)}
                   </td>
                 </tr>
               );
             })
           )}
           {/* แถวว่างสำหรับเขียนเพิ่ม */}
-          {[...Array(5 - items.length > 0 ? 5 - items.length : 0)].map(
-            (_, i) => (
-              <tr key={"empty-" + i}>
-                <td className="border border-gray-300 p-2 text-center">
-                  &nbsp;
-                </td>
-                <td className="border border-gray-300 p-2 text-left">&nbsp;</td>
-                <td className="border border-gray-300 p-2 text-center">
-                  &nbsp;
-                </td>
-                <td className="border border-gray-300 p-2 text-right">
-                  &nbsp;
-                </td>
-                <td className="border border-gray-300 p-2 text-right">
-                  &nbsp;
-                </td>
-                <td className="border border-gray-300 p-2 text-center">
-                  &nbsp;
-                </td>
-                <td className="border border-gray-300 p-2 text-right">
-                  &nbsp;
-                </td>
-              </tr>
-            )
-          )}
+          {Array.from({ length: Math.max(0, 5 - items.length) }).map((_, i) => (
+            <tr key={"empty-" + i}>
+              <td className="border border-gray-300 p-2 text-center">&nbsp;</td>
+              <td className="border border-gray-300 p-2 text-left">&nbsp;</td>
+              <td className="border border-gray-300 p-2 text-center">&nbsp;</td>
+              <td className="border border-gray-300 p-2 text-right">&nbsp;</td>
+              <td className="border border-gray-300 p-2 text-right">&nbsp;</td>
+              <td className="border border-gray-300 p-2 text-center">&nbsp;</td>
+              <td className="border border-gray-300 p-2 text-right">&nbsp;</td>
+            </tr>
+          ))}
         </tbody>
       </table>
     );
   };
 
-  // สรุปยอด: เพิ่มส่วนลด, ภาษี, หัก ณ ที่จ่าย
-  // 3. renderSummary: เวลาคำนวณ grossTotal, totalDiscount ให้ใช้ originalUnitPrice เป็นหลัก
+  // สรุปยอด: แก้ไขให้ใช้ค่าจาก summary backend เท่านั้น
   const renderSummary = () => {
-    // แปลง discount เป็น number เสมอ (รองรับ string/number/comma)
-    const discountValue = Number(
-      (summary.discount ?? 0).toString().replace(/,/g, "")
-    );
-    // คำนวณยอดก่อนหักส่วนลด (รวมราคาก่อนลดของทุกแถว)
-    const grossTotal = items.reduce((sum, item) => {
-      const qty = (item as any).quantity ?? (item as any).qty ?? 1;
-      const netUnitPrice = getNetUnitPrice(
-        item,
-        (document as any).price_type ||
-          (document as any).priceType ||
-          "EXCLUDE_VAT"
-      );
-      return sum + netUnitPrice * qty;
-    }, 0);
-    // คำนวณส่วนลดรวม (รวมส่วนลดของทุกแถว)
-    const totalDiscount = items.reduce((sum, item) => {
-      const qty = (item as any).quantity ?? (item as any).qty ?? 1;
-      const unitPrice =
-        item.originalUnitPrice ??
-        item.original_unit_price ??
-        item.unitPrice ??
-        item.unit_price ??
-        0;
-      const discount = item.discount ?? 0;
-      const discountType = item.discount_type ?? item.discountType ?? "thb";
-      let discountAmount = 0;
-      if (discountType === "percentage") {
-        discountAmount = unitPrice * qty * (discount / 100);
-      } else {
-        discountAmount = discount * qty;
-      }
-      return sum + discountAmount;
-    }, 0);
     // รวม withholding tax จาก summary หรือจากทุกแถว
     const summaryWithholdingTax =
       typeof summary.withholdingTax === "number" && summary.withholdingTax > 0
         ? summary.withholdingTax
-        : items.reduce(
-            (sum, item) =>
-              sum +
-              (typeof item.withholdingTaxAmount === "number"
-                ? item.withholdingTaxAmount
-                : typeof item.withholding_tax_amount === "number"
-                  ? item.withholding_tax_amount
-                  : 0),
-            0
-          );
+        : 0;
     return (
       <div className="flex justify-end mb-2">
         <div className="w-full max-w-xs space-y-1 bg-blue-50 rounded-lg p-4 shadow-sm">
-          {totalDiscount > 0 && (
-            <div className="flex justify-between mb-1">
-              <span>ยอดก่อนหักส่วนลด</span>
-              <span className="font-semibold">
-                {formatCurrency(grossTotal)}
-              </span>
-            </div>
-          )}
-          {totalDiscount > 0 && (
-            <div className="flex justify-between mb-1 text-destructive">
-              <span>ส่วนลดรวม</span>
-              <span>-{formatCurrency(totalDiscount)}</span>
-            </div>
-          )}
           <div className="flex justify-between mb-1">
             <span>มูลค่าสินค้าหรือค่าบริการ</span>
             <span className="font-semibold">
               {formatCurrency(summary.subtotal)}
             </span>
           </div>
-          {discountValue > 0 && (
-            <>
-              <div className="flex justify-between mb-1 text-destructive">
-                <span>ส่วนลด</span>
-                <span>-{formatCurrency(discountValue)}</span>
-              </div>
-              <div className="flex justify-between mb-1">
-                <span>มูลค่าหลังหักส่วนลด</span>
-                <span className="font-semibold">
-                  {formatCurrency(
-                    Number(summary.subtotal ?? 0) - discountValue
-                  )}
-                </span>
-              </div>
-            </>
-          )}
           {summary.tax > 0 && (
             <div className="flex justify-between mb-1">
               <span>ภาษีมูลค่าเพิ่ม 7%</span>
@@ -605,11 +502,7 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
           )}
           <div className="flex justify-between mb-1 font-semibold">
             <span>ยอดรวมหลังรวมภาษี</span>
-            <span>
-              {formatCurrency(
-                Number(summary.subtotal ?? 0) + Number(summary.tax ?? 0)
-              )}
-            </span>
+            <span>{formatCurrency(Number(summary.total ?? 0))}</span>
           </div>
           <div className="flex justify-between mb-1 text-yellow-700">
             <span>หัก ณ ที่จ่าย</span>
@@ -619,9 +512,7 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
             <span>จำนวนเงินทั้งสิ้น</span>
             <span className="text-blue-700">
               {formatCurrency(
-                Number(summary.subtotal ?? 0) +
-                  Number(summary.tax ?? 0) -
-                  summaryWithholdingTax
+                Number(summary.total ?? 0) - summaryWithholdingTax
               )}
             </span>
           </div>
