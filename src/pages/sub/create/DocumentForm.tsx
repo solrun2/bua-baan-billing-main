@@ -102,6 +102,13 @@ function getNetUnitPrice(item: DocumentItem, priceType: string) {
   return item.originalUnitPrice ?? 0;
 }
 
+// เพิ่มฟังก์ชัน mapPriceTypeToEnum
+function mapPriceTypeToEnum(pt: string): "EXCLUDE_VAT" | "INCLUDE_VAT" | "NO_VAT" {
+  if (pt === "INCLUDE_VAT" || pt === "inclusive") return "INCLUDE_VAT";
+  if (pt === "NO_VAT" || pt === "none") return "NO_VAT";
+  return "EXCLUDE_VAT";
+}
+
 export const DocumentForm: FC<DocumentFormProps> = ({
   onCancel,
   onSave,
@@ -806,7 +813,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
       items: itemsToSave,
       summary: summary,
       notes: form.notes,
-      priceType: form.priceType || "EXCLUDE_VAT",
+      priceType: mapPriceTypeToEnum(form.priceType),
       status: form.status,
       attachments: attachments,
     };

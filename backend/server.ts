@@ -645,6 +645,12 @@ app.post("/api/documents", async (req: Request, res: Response) => {
       related_document_id,
     } = req.body;
 
+    // เพิ่ม validation สำหรับ priceType
+    const allowedPriceTypes = ["EXCLUDE_VAT", "INCLUDE_VAT", "NO_VAT"];
+    if (!allowedPriceTypes.includes(priceType)) {
+      return res.status(400).json({ error: "Invalid priceType" });
+    }
+
     const due_date = req.body.due_date || req.body.dueDate;
     const valid_until = req.body.valid_until || req.body.validUntil;
 
@@ -983,6 +989,12 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
       payment_method,
       payment_reference,
     } = req.body;
+
+    // เพิ่ม validation สำหรับ priceType
+    const allowedPriceTypes = ["EXCLUDE_VAT", "INCLUDE_VAT", "NO_VAT"];
+    if (!allowedPriceTypes.includes(priceType)) {
+      return res.status(400).json({ error: "Invalid priceType" });
+    }
 
     if (
       !customer ||
