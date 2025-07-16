@@ -301,7 +301,7 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
           </div>
           <div>
             <b>วันที่:</b>{" "}
-            {formatDate(document.issue_date || document.documentDate)}
+            {formatDate(document.documentDate || document.issue_date)}
           </div>
           {type === "invoice" && (
             <div>

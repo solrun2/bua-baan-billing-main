@@ -188,7 +188,14 @@ function mapDocumentFromBackend(doc: any): DocumentData {
     if (!dateStr || typeof dateStr !== "string") {
       return "";
     }
-    return dateStr.substring(0, 10);
+    // แปลงเป็น YYYY-MM-DD (local date)
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr.substring(0, 10);
+    // local date (timezone browser)
+    const year = d.getFullYear();
+    const month = d.getMonth() + 1;
+    const day = d.getDate();
+    return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
   };
   return {
     id: doc.id?.toString(),
