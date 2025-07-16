@@ -617,7 +617,7 @@ async function createDocumentFromServer(data: any, pool: any) {
           item.amount_before_tax ?? 0,
           item.discount ?? 0,
           item.discount_type ?? item.discountType ?? "thb",
-          item.tax ?? 0,
+          Number(item.tax ?? 0),
           item.tax_amount ?? 0,
         ];
         await conn.query(
@@ -819,7 +819,7 @@ app.post("/api/documents", async (req: Request, res: Response) => {
           amount_before_tax,
           item.discount ?? 0,
           item.discount_type ?? item.discountType ?? "thb",
-          item.tax ?? 0,
+          Number(item.tax ?? 0),
           item.tax_amount ?? 0,
         ];
         await conn.query(

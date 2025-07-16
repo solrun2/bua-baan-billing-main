@@ -772,7 +772,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
       amount_before_tax: item.amountBeforeTax ?? 0,
       discount: item.discount ?? 0,
       discount_type: item.discountType ?? "thb",
-      tax: item.tax ?? 0,
+      tax: form.priceType === "NO_VAT" ? 0 : Number(item.tax ?? 0),
       tax_amount: item.taxAmount ?? 0,
       withholding_tax_option: item.withholding_tax_option || "ไม่ระบุ",
     }));
