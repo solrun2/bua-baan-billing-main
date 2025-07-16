@@ -876,31 +876,6 @@ app.delete("/api/documents/:id", async (req: Request, res: Response) => {
   }
 });
 
-async function getDocumentItemsRecursive(documentId: string) {
-  const [docRows] = await pool.query("SELECT * FROM documents WHERE id = ?", [
-    documentId,
-  ]);
-  const doc = Array.isArray(docRows) ? docRows[0] : docRows;
-
-  if (!doc) {
-    return [];
-  }
-  if (doc.related_document_id) {
-    return getDocumentItemsRecursive(String(doc.related_document_id));
-  }
-  const items = await pool.query(
-    "SELECT * FROM document_items WHERE document_id = ?",
-    [documentId]
-  );
-  if (Array.isArray(items)) {
-    return items.map((item) => ({
-      ...item,
-      withholding_tax_option: item.withholding_tax_option ?? "-1",
-    }));
-  }
-  return items;
-}
-
 app.get("/api/documents/:id", async (req, res) => {
   const { id } = req.params;
   try {
@@ -964,13 +939,12 @@ app.get("/api/documents/:id", async (req, res) => {
       }));
     }
 
-    const items_recursive = await getDocumentItemsRecursive(id);
-    const summary = calculateDocumentSummary(items_recursive, doc.price_type);
+    // สรุป summary จาก document_items ของตัวเองเท่านั้น
+    const summary = calculateDocumentSummary(items, doc.price_type);
 
     const documentWithItems = {
       ...(Array.isArray(doc) ? doc[0] : doc),
-      items: Array.isArray(items) && items.length > 0 ? items : items_recursive,
-      items_recursive,
+      items,
       summary,
       ...(invoice_details ? { invoice_details } : {}),
       ...(receipt_details ? { receipt_details } : {}),
