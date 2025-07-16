@@ -601,32 +601,31 @@ async function createDocumentFromServer(data: any, pool: any) {
         [documentId, payment_date, payment_method, payment_reference]
       );
     }
-    if (!related_document_id || document_type.toLowerCase() === "quotation") {
-      for (const item of items as any[]) {
-        const params = [
-          documentId,
-          item.product_id ?? null,
-          item.productTitle ?? item.product_name ?? "",
-          item.unit ?? "",
-          item.quantity ?? 1,
-          item.unit_price ?? 0,
-          item.amount ?? 0,
-          item.description ?? "",
-          item.withholding_tax_amount ?? 0,
-          item.withholding_tax_option ?? -1,
-          item.amount_before_tax ?? 0,
-          item.discount ?? 0,
-          item.discount_type ?? item.discountType ?? "thb",
-          Number(item.tax ?? 0),
-          item.tax_amount ?? 0,
-        ];
-        await conn.query(
-          `INSERT INTO document_items (
-            document_id, product_id, product_name, unit, quantity, unit_price, amount, description, withholding_tax_amount, withholding_tax_option, amount_before_tax, discount, discount_type, tax, tax_amount
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          params
-        );
-      }
+    // ALWAYS insert document_items for every document type
+    for (const item of items as any[]) {
+      const params = [
+        documentId,
+        item.product_id ?? null,
+        item.product_name ?? item.productTitle ?? "",
+        item.unit ?? "",
+        item.quantity ?? 1,
+        item.unit_price ?? item.unitPrice ?? 0,
+        item.amount ?? 0,
+        item.description ?? "",
+        item.withholding_tax_amount ?? 0,
+        item.withholding_tax_option ?? -1,
+        item.amount_before_tax ?? 0,
+        item.discount ?? 0,
+        item.discount_type ?? "thb",
+        Number(item.tax ?? 0),
+        item.tax_amount ?? 0,
+      ];
+      await conn.query(
+        `INSERT INTO document_items (
+          document_id, product_id, product_name, unit, quantity, unit_price, amount, description, withholding_tax_amount, withholding_tax_option, amount_before_tax, discount, discount_type, tax, tax_amount
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        params
+      );
     }
     await conn.commit();
     return documentId;
@@ -1157,7 +1156,6 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
         issue_date: new Date().toISOString().slice(0, 10),
         notes: quotationDoc.notes || "",
         items: quotationItems.map((item: any) => ({
-          ...item,
           product_id: item.product_id,
           product_name: item.product_name,
           unit: item.unit,
@@ -1211,7 +1209,6 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
         issue_date: new Date().toISOString().slice(0, 10),
         notes: invoiceDoc.notes || "",
         items: invoiceItems.map((item: any) => ({
-          ...item,
           product_id: item.product_id,
           product_name: item.product_name,
           unit: item.unit,
