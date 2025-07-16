@@ -23,8 +23,6 @@ interface DocumentItem {
   tax_amount?: number;
   withholdingTaxAmount?: number;
   withholding_tax_amount?: number;
-  originalUnitPrice?: number;
-  original_unit_price?: number;
   amount_after_discount?: number;
 }
 
@@ -234,41 +232,19 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
   const labels = typeLabels[type];
 
   // เลือก items ที่จะแสดง (logic เดียวกันทุก type)
-  // 1. map original_unit_price => originalUnitPrice
+  // 1. map unitPrice => unitPrice
   const items: DocumentItem[] =
     Array.isArray(document.items) && document.items.length > 0
       ? document.items.map((item) => ({
           ...item,
-          originalUnitPrice:
-            item.original_unit_price ??
-            item.originalUnitPrice ??
-            item.unitPrice ??
-            item.unit_price ??
-            0,
-          unitPrice:
-            item.unitPrice ?? item.unit_price ?? item.original_unit_price ?? 0,
+          unitPrice: item.unitPrice ?? item.unit_price ?? 0,
         }))
       : Array.isArray(document.items_recursive)
         ? document.items_recursive.map((item) => ({
             ...item,
             productId: item.productId ?? item.product_id,
             productTitle: item.productTitle ?? item.product_name,
-            originalUnitPrice:
-              item.original_unit_price ??
-              item.originalUnitPrice ??
-              item.unitPrice ??
-              item.unit_price ??
-              0,
-            unitPrice:
-              item.unitPrice ??
-              item.unit_price ??
-              item.original_unit_price ??
-              0,
-            amountBeforeTax: item.amountBeforeTax ?? item.amount_before_tax,
-            discountType: item.discountType ?? item.discount_type,
-            taxAmount: item.taxAmount ?? item.tax_amount,
-            withholdingTaxAmount:
-              item.withholdingTaxAmount ?? item.withholding_tax_amount,
+            unitPrice: item.unitPrice ?? item.unit_price ?? 0,
           }))
         : [];
   console.log("DocumentModal items (with fallback):", items);
@@ -368,7 +344,7 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
   );
 
   // ตารางสินค้า: เพิ่มคอลัมน์ 'ส่วนลด' และ 'ภาษี'
-  // 2. renderTable: ใช้ originalUnitPrice เป็นหลัก
+  // 2. renderTable: ใช้ unitPrice เป็นหลัก
   const renderTable = () => {
     return (
       <table className="w-full border border-gray-300 mb-6 text-xs rounded-lg overflow-hidden shadow-sm">
@@ -407,8 +383,8 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
             items.map((item, idx) => {
               const prod = productMap[item.product_id];
               const qty = Number(item.quantity ?? 1);
-              // ใช้ field จาก backend โดยตรง
-              const displayUnitPrice = item.unit_price ?? 0;
+              // ใช้ field จาก backend/ฟอร์ม โดยรองรับทั้ง unitPrice และ unit_price
+              const displayUnitPrice = item.unitPrice ?? item.unit_price ?? 0;
               // ส่วนลด (คำนวณเองถ้าไม่มีใน db)
               const discount = Number(item.discount ?? 0);
               const discountType =

@@ -20,7 +20,6 @@ export interface DocumentItem {
   withholdingTaxAmount?: number;
   taxAmount?: number;
   withholding_tax_option?: WithholdingTaxOption;
-  originalUnitPrice?: number;
 }
 
 export interface DocumentSummary {

@@ -3,7 +3,6 @@ import { DocumentSummary } from "@/types/document";
 interface BaseItem {
   quantity: number;
   unitPrice: number;
-  originalUnitPrice?: number;
   priceType: "inclusive" | "exclusive" | "none";
   discount: number;
   discountType: "thb" | "percentage";
@@ -89,33 +88,74 @@ export const calculateItemAmounts = (item: BaseItem): CalculatedItem => {
   };
 };
 
+export interface DocumentSummary {
+  subtotal: number; // มูลค่าก่อนภาษี (ยังไม่หักส่วนลด)
+  discount: number; // ส่วนลดรวม
+  netAfterDiscount: number; // มูลค่าหลังหักส่วนลด
+  tax: number; // VAT
+  total: number; // รวมเป็นเงิน
+}
+
 /**
  * Calculate document summary including subtotal, discount, tax, and total
  */
 export const calculateDocumentSummary = <T extends BaseItem>(
-  items: T[]
+  items: T[],
+  priceType: "inclusive" | "exclusive" | "none" = "exclusive"
 ): DocumentSummary => {
-  const summary = items.reduce(
-    (acc, item) => {
-      const {
-        subtotal,
-        discountAmount,
-        amountBeforeTax,
-        taxAmount,
-        withholdingTaxAmount,
-      } = calculateItemAmounts(item);
+  let subtotal = 0;
+  let discountTotal = 0;
+  let netAfterDiscount = 0;
 
-      acc.subtotal += subtotal;
-      acc.discount += discountAmount;
-      acc.tax += taxAmount;
-      acc.total += amountBeforeTax + taxAmount; // This is the total before WHT
-      acc.withholdingTax += withholdingTaxAmount;
-      return acc;
-    },
-    { subtotal: 0, discount: 0, tax: 0, total: 0, withholdingTax: 0 }
-  );
+  for (const item of items) {
+    const quantity = Number(item.quantity ?? 1);
+    const unitPrice = Number(item.unitPrice ?? item.unit_price ?? 0);
+    const discount = Number(item.discount ?? 0);
+    const discountType = item.discountType ?? item.discount_type ?? "thb";
+    const discountAmount =
+      discountType === "percentage"
+        ? unitPrice * quantity * (discount / 100)
+        : discount * quantity;
 
-  return summary;
+    subtotal += unitPrice * quantity;
+    discountTotal += discountAmount;
+    // netAfterDiscount = ผลรวม (ราคาต่อหน่วย - ส่วนลด/หน่วย) × จำนวน
+    netAfterDiscount +=
+      (unitPrice -
+        (discountType === "percentage"
+          ? unitPrice * (discount / 100)
+          : discount)) *
+      quantity;
+  }
+
+  const firstTaxRate = items.length > 0 ? Number(items[0].tax ?? 0) / 100 : 0;
+
+  let summarySubtotal = subtotal;
+  let tax = 0;
+  let total = 0;
+
+  if (priceType === "inclusive" && firstTaxRate > 0) {
+    // รวม VAT แล้ว: มูลค่าก่อนภาษี = netAfterDiscount / (1 + VAT)
+    summarySubtotal = netAfterDiscount / (1 + firstTaxRate);
+    tax = netAfterDiscount - summarySubtotal;
+    total = netAfterDiscount;
+  } else if (priceType === "exclusive" && firstTaxRate > 0) {
+    summarySubtotal = subtotal;
+    tax = (subtotal - discountTotal) * firstTaxRate;
+    total = subtotal - discountTotal + tax;
+  } else {
+    summarySubtotal = subtotal;
+    tax = 0;
+    total = subtotal - discountTotal;
+  }
+
+  return {
+    subtotal: summarySubtotal,
+    discount: discountTotal,
+    netAfterDiscount,
+    tax,
+    total,
+  };
 };
 
 /**

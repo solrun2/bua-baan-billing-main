@@ -219,9 +219,6 @@ function mapDocumentFromBackend(doc: any): DocumentData {
       unit: item.unit ?? "",
       quantity: Number(item.quantity ?? 1),
       unitPrice: Number(item.unit_price ?? 0),
-      originalUnitPrice: Number(
-        item.original_unit_price ?? item.unit_price ?? 0
-      ),
       priceType: doc.price_type || "exclusive",
       discount: Number(item.discount ?? 0),
       discountType: item.discount_type ?? "thb",

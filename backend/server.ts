@@ -427,7 +427,7 @@ app.get("/api/documents/next-number", async (req, res) => {
 
 function calculateDocumentSummary(
   items: any[],
-  priceType: "inclusive" | "exclusive" | "none" = "exclusive"
+  priceType = "EXCLUDE_VAT" // "INCLUDE_VAT", "EXCLUDE_VAT", "NO_VAT"
 ) {
   let subtotal = 0;
   let discountTotal = 0;
@@ -438,25 +438,37 @@ function calculateDocumentSummary(
     const quantity = Number(item.quantity ?? 1);
     const unitPrice = Number(item.unit_price ?? item.unitPrice ?? 0);
     const taxRate = Number(item.tax ?? 0) / 100;
-
-    const priceBeforeTaxPerUnit =
-      priceType === "inclusive" && taxRate > 0
-        ? unitPrice / (1 + taxRate)
-        : unitPrice;
-
-    const itemTotalBeforeDiscount = priceBeforeTaxPerUnit * quantity;
-
     const discount = Number(item.discount ?? 0);
     const discountType = item.discount_type ?? item.discountType ?? "thb";
-    const discountAmount =
-      discountType === "percentage"
-        ? itemTotalBeforeDiscount * (discount / 100)
-        : discount * quantity;
 
-    const amountBeforeTax = itemTotalBeforeDiscount - discountAmount;
+    // 1. คำนวณส่วนลด
+    let discountAmount;
+    if (discountType === "percentage") {
+      discountAmount = unitPrice * quantity * (discount / 100);
+    } else {
+      discountAmount = discount * quantity;
+    }
 
-    const taxAmount = priceType !== "none" ? amountBeforeTax * taxRate : 0;
+    let amountBeforeTax, taxAmount, amount;
 
+    if (priceType === "INCLUDE_VAT" && taxRate > 0) {
+      // กรณีราคารวม VAT
+      amount = unitPrice * quantity - discountAmount;
+      amountBeforeTax = amount / (1 + taxRate);
+      taxAmount = amount - amountBeforeTax;
+    } else if (priceType === "EXCLUDE_VAT" && taxRate > 0) {
+      // กรณีราคาไม่รวม VAT
+      amountBeforeTax = unitPrice * quantity - discountAmount;
+      taxAmount = amountBeforeTax * taxRate;
+      amount = amountBeforeTax + taxAmount;
+    } else {
+      // ไม่มี VAT
+      amountBeforeTax = unitPrice * quantity - discountAmount;
+      taxAmount = 0;
+      amount = amountBeforeTax;
+    }
+
+    // หัก ณ ที่จ่าย (ถ้ามี)
     let whtRate = 0;
     if (typeof item.withholding_tax_option === "number") {
       whtRate = item.withholding_tax_option / 100;
@@ -466,7 +478,6 @@ function calculateDocumentSummary(
     ) {
       whtRate = parseFloat(item.withholding_tax_option) / 100;
     }
-
     let whtAmount = 0;
     if (
       item.withholding_tax_option === "กำหนดเอง" &&
@@ -1099,17 +1110,17 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
         item.product_id ?? null,
         item.product_name ?? "",
         item.unit ?? "",
-        item.quantity ?? 1,
-        item.unit_price ?? 0,
-        item.amount ?? 0,
+        Number(item.quantity ?? 1),
+        Number(item.unit_price ?? 0),
+        Number(item.amount ?? 0),
         item.description ?? "",
-        item.withholding_tax_amount ?? 0,
-        item.withholding_tax_option ?? -1,
-        item.amount_before_tax ?? 0,
-        item.discount ?? 0,
+        Number(item.withholding_tax_amount ?? 0),
+        item.withholding_tax_option ?? "ไม่ระบุ",
+        Number(item.amount_before_tax ?? 0),
+        Number(item.discount ?? 0),
         item.discount_type ?? "thb",
-        item.tax ?? 0,
-        item.tax_amount ?? 0,
+        Number(item.tax ?? 0),
+        Number(item.tax_amount ?? 0),
       ];
       await conn.query(
         `INSERT INTO document_items (
