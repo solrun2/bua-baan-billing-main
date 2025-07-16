@@ -230,15 +230,6 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
     return d.toLocaleDateString("th-TH");
   };
 
-  // Helper สำหรับคำนวณ Net (มูลค่าก่อนภาษี) ของแต่ละแถว
-  function getNetUnitPrice(item: DocumentItem, priceType: string) {
-    const taxRate = (item.tax ?? 7) / 100;
-    if (priceType === "INCLUDE_VAT") {
-      return (item.originalUnitPrice ?? 0) / (1 + taxRate);
-    }
-    return item.originalUnitPrice ?? 0;
-  }
-
   if (!open) return null;
   const labels = typeLabels[type];
 

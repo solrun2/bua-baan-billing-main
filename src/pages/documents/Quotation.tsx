@@ -323,7 +323,8 @@ const Quotation = () => {
                 </tbody>
               </table>
             </div>
-          )}a
+          )}
+        </CardContent>
       </Card>
 
       {isModalOpen && selectedQuotation && (
