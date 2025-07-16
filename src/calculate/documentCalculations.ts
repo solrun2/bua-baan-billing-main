@@ -94,6 +94,7 @@ export interface DocumentSummary {
   netAfterDiscount: number; // มูลค่าหลังหักส่วนลด
   tax: number; // VAT
   total: number; // รวมเป็นเงิน
+  withholdingTax: number; // เพิ่ม field นี้
 }
 
 /**
@@ -106,6 +107,7 @@ export const calculateDocumentSummary = <T extends BaseItem>(
   let subtotal = 0;
   let discountTotal = 0;
   let netAfterDiscount = 0;
+  let withholdingTaxTotal = 0;
 
   for (const item of items) {
     const quantity = Number(item.quantity ?? 1);
@@ -119,13 +121,23 @@ export const calculateDocumentSummary = <T extends BaseItem>(
 
     subtotal += unitPrice * quantity;
     discountTotal += discountAmount;
-    // netAfterDiscount = ผลรวม (ราคาต่อหน่วย - ส่วนลด/หน่วย) × จำนวน
     netAfterDiscount +=
       (unitPrice -
         (discountType === "percentage"
           ? unitPrice * (discount / 100)
           : discount)) *
       quantity;
+
+    // รวม withholdingTaxAmount ของแต่ละรายการ
+    const itemForCalc: BaseItem = {
+      ...item,
+      quantity,
+      unitPrice,
+      discount,
+      discountType,
+    };
+    const calc = calculateItemAmounts(itemForCalc);
+    withholdingTaxTotal += calc.withholdingTaxAmount;
   }
 
   const firstTaxRate = items.length > 0 ? Number(items[0].tax ?? 0) / 100 : 0;
@@ -135,7 +147,6 @@ export const calculateDocumentSummary = <T extends BaseItem>(
   let total = 0;
 
   if (priceType === "inclusive" && firstTaxRate > 0) {
-    // รวม VAT แล้ว: มูลค่าก่อนภาษี = netAfterDiscount / (1 + VAT)
     summarySubtotal = netAfterDiscount / (1 + firstTaxRate);
     tax = netAfterDiscount - summarySubtotal;
     total = netAfterDiscount;
@@ -155,6 +166,7 @@ export const calculateDocumentSummary = <T extends BaseItem>(
     netAfterDiscount,
     tax,
     total,
+    withholdingTax: withholdingTaxTotal, // เพิ่ม field นี้
   };
 };
 

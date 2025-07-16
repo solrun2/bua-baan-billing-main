@@ -61,6 +61,11 @@ const Invoice = () => {
           .map((doc: any): InvoiceItem => {
             const issueDate = new Date(doc.issue_date);
             const dueDate = doc.due_date ? new Date(doc.due_date) : null;
+            // คำนวณยอดสุทธิหลังหัก ณ ที่จ่าย
+            const netTotal =
+              doc.summary && typeof doc.summary.total === "number"
+                ? doc.summary.total - (doc.summary.withholdingTax ?? 0)
+                : (doc.total_amount ?? 0);
             return {
               id: doc.id,
               number: doc.document_number,
@@ -71,8 +76,7 @@ const Invoice = () => {
                 ? format(dueDate, "d MMM yy", { locale: th })
                 : "-",
               dueDateValue: dueDate?.getTime() || 0,
-              netTotal:
-                doc.summary?.netTotalAmount ?? Number(doc.total_amount ?? 0),
+              netTotal,
               status: doc.status,
               documentDate: format(issueDate, "yyyy-MM-dd"),
             };

@@ -340,17 +340,16 @@ app.get("/api/documents", async (req: Request, res: Response) => {
       }, {});
     }
 
-    const docsWithItems = rows.map((doc: any) => ({
-      ...doc,
-      items: itemsByDoc[doc.id] || [],
-      summary: {
-        subtotal: doc.subtotal,
-        tax: doc.tax_amount,
-        total: doc.total_amount,
-        discount: 0, // ถ้ามี field discount ใน DB ให้ใส่, ถ้าไม่มีใส่ 0
-        withholdingTax: 0, // ถ้ามี field withholdingTax ใน DB ให้ใส่, ถ้าไม่มีใส่ 0
-      },
-    }));
+    const docsWithItems = rows.map((doc: any) => {
+      const items = itemsByDoc[doc.id] || [];
+      // คำนวณ summary ด้วย calculateDocumentSummary (เหมือน /api/documents/:id)
+      const summary = calculateDocumentSummary(items, doc.price_type);
+      return {
+        ...doc,
+        items,
+        summary,
+      };
+    });
     res.json(docsWithItems);
   } catch (err) {
     console.error("Failed to fetch documents:", err);

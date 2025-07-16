@@ -57,17 +57,21 @@ const CreditNote = () => {
         setError(null);
         const data = await apiService.getDocuments();
         const creditNotesData = data
-          .filter((doc : any) => doc.document_type === "CREDIT_NOTE")
+          .filter((doc: any) => doc.document_type === "CREDIT_NOTE")
           .map((doc: any): CreditNoteItem => {
             const issueDate = new Date(doc.issue_date);
+            // คำนวณยอดสุทธิหลังหัก ณ ที่จ่าย
+            const netTotal =
+              doc.summary && typeof doc.summary.total === "number"
+                ? doc.summary.total - (doc.summary.withholdingTax ?? 0)
+                : Number(doc.total_amount ?? 0);
             return {
               id: doc.id,
               number: doc.document_number,
               customer: doc.customer_name,
               date: format(issueDate, "d MMM yy", { locale: th }),
               dateValue: issueDate.getTime(),
-              netTotal:
-                doc.summary?.netTotalAmount ?? Number(doc.total_amount ?? 0),
+              netTotal,
               status: doc.status,
               documentDate: format(issueDate, "yyyy-MM-dd"),
             };
