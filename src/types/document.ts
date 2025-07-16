@@ -87,6 +87,7 @@ export interface Document {
   items?: DocumentItem[];
   payment_method?: string;
   shipping_cost?: number;
+  related_document_id?: number; // เพิ่มบรรทัดนี้เพื่อแก้ error
 }
 
 export interface DocumentItemPayload {

@@ -7,6 +7,7 @@ import { documentService } from "@/pages/services/documentService";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { apiService } from "@/pages/services/apiService";
 
 // Helper type to ensure document has the correct type
 type EnsureDocumentType<T> = Omit<T, "documentType"> & {
@@ -163,6 +164,27 @@ const QuotationForm = ({
       setIsLoading(true);
       console.log("[QuotationForm] กำลังบันทึกเอกสาร:", data.documentNumber);
 
+      // --- เช็คก่อนตอบรับ/สร้างใบแจ้งหนี้จากใบเสนอราคา ---
+      try {
+        const allDocs = await apiService.getDocuments();
+        const existInvoice = allDocs.find(
+          (doc) =>
+            doc.document_type === "INVOICE" &&
+            (doc.reference === data.documentNumber ||
+              doc.document_number === data.documentNumber)
+        );
+        if (existInvoice) {
+          toast.error(
+            `มีใบแจ้งหนี้ (เลขที่: ${existInvoice.document_number}) ที่อ้างอิงใบเสนอราคานี้อยู่แล้ว กรุณาลบใบแจ้งหนี้นั้นก่อน`
+          );
+          setIsLoading(false);
+          return;
+        }
+      } catch (err) {
+        toast.error("เกิดข้อผิดพลาดในการตรวจสอบใบแจ้งหนี้ซ้ำ");
+        setIsLoading(false);
+        return;
+      }
       // Ensure document type is set correctly
       const documentToSave: EnsureDocumentType<DocumentData> = {
         ...data,
