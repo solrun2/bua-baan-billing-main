@@ -454,6 +454,7 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
       typeof summary.withholdingTax === "number" && summary.withholdingTax > 0
         ? summary.withholdingTax
         : 0;
+    const afterDiscount = summary.subtotal - summary.discount;
     return (
       <div className="flex justify-end mb-2">
         <div className="w-full max-w-xs space-y-1 bg-blue-50 rounded-lg p-4 shadow-sm">
@@ -463,16 +464,28 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
               {formatCurrency(summary.subtotal)}
             </span>
           </div>
+          <div className="flex justify-between mb-1">
+            <span>ส่วนลดรวม</span>
+            <span className="text-red-500">
+              -{formatCurrency(summary.discount)}
+            </span>
+          </div>
+          <div className="flex justify-between mb-1">
+            <span>ยอดหลังหักส่วนลด</span>
+            <span>{formatCurrency(afterDiscount)}</span>
+          </div>
           {summary.tax > 0 && (
             <div className="flex justify-between mb-1">
               <span>ภาษีมูลค่าเพิ่ม 7%</span>
               <span>{formatCurrency(summary.tax)}</span>
             </div>
           )}
-          <div className="flex justify-between mb-1 font-semibold">
-            <span>ยอดรวมหลังรวมภาษี</span>
-            <span>{formatCurrency(Number(summary.total ?? 0))}</span>
-          </div>
+          {summary.tax > 0 && (
+            <div className="flex justify-between mb-1 font-semibold">
+              <span>ยอดรวมหลังรวมภาษี</span>
+              <span>{formatCurrency(Number(summary.total ?? 0))}</span>
+            </div>
+          )}
           <div className="flex justify-between mb-1 text-yellow-700">
             <span>หัก ณ ที่จ่าย</span>
             <span>-{formatCurrency(summaryWithholdingTax)}</span>
