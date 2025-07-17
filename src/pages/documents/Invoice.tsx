@@ -20,6 +20,7 @@ import { searchData } from "@/utils/searchUtils";
 import { format, subDays } from "date-fns"; // ✨ import subDays
 import { th } from "date-fns/locale";
 import { Skeleton } from "@/components/ui/skeleton";
+import { DOCUMENT_PAGE_SIZE } from "@/constants/documentPageSize";
 
 interface InvoiceItem {
   id: string;
@@ -49,6 +50,40 @@ const Invoice = () => {
   const [searchText, setSearchText] = useState("");
   const [sortColumn, setSortColumn] = useState<string>("dateValue");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+
+  // 1. useMemo ก่อน
+  const filteredAndSortedInvoices = useMemo(() => {
+    let result = searchData(invoices, searchText, ["number", "customer"]);
+    result = result.filter((item) => {
+      const isStatusMatch =
+        !filters.status ||
+        filters.status === "all" ||
+        item.status === filters.status;
+      if (!isStatusMatch) return false;
+      const docDate = item.documentDate;
+      let adjustedDateFrom = filters.dateFrom;
+      if (filters.dateFrom) {
+        const fromDate = new Date(filters.dateFrom);
+        const prevDay = subDays(fromDate, 1);
+        adjustedDateFrom = format(prevDay, "yyyy-MM-dd");
+      }
+      const isAfterFrom =
+        !adjustedDateFrom || !docDate || docDate > adjustedDateFrom;
+      const isBeforeTo =
+        !filters.dateTo || !docDate || docDate <= filters.dateTo;
+      return isAfterFrom && isBeforeTo;
+    });
+    return sortData(result, sortColumn as keyof InvoiceItem, sortDirection);
+  }, [invoices, searchText, filters, sortColumn, sortDirection]);
+
+  // 2. pagination
+  const [page, setPage] = useState(1);
+  const pageSize = DOCUMENT_PAGE_SIZE;
+  const totalPages = Math.ceil(filteredAndSortedInvoices.length / pageSize);
+  const pagedData = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return filteredAndSortedInvoices.slice(start, start + pageSize);
+  }, [filteredAndSortedInvoices, page]);
 
   useEffect(() => {
     const loadInvoices = async () => {
@@ -133,36 +168,6 @@ const Invoice = () => {
     });
   }, []);
 
-  const filteredAndSortedInvoices = useMemo(() => {
-    let result = searchData(invoices, searchText, ["number", "customer"]);
-
-    result = result.filter((item) => {
-      const isStatusMatch =
-        !filters.status ||
-        filters.status === "all" ||
-        item.status === filters.status;
-      if (!isStatusMatch) return false;
-
-      const docDate = item.documentDate;
-
-      // ✨✨✨ แก้ไขตามคำขอ: ลบวันที่เริ่มต้นออก 1 วัน ✨✨✨
-      let adjustedDateFrom = filters.dateFrom;
-      if (filters.dateFrom) {
-        const fromDate = new Date(filters.dateFrom);
-        const prevDay = subDays(fromDate, 1);
-        adjustedDateFrom = format(prevDay, "yyyy-MM-dd");
-      }
-
-      const isAfterFrom =
-        !adjustedDateFrom || !docDate || docDate > adjustedDateFrom;
-      const isBeforeTo =
-        !filters.dateTo || !docDate || docDate <= filters.dateTo;
-      return isAfterFrom && isBeforeTo;
-    });
-
-    return sortData(result, sortColumn as keyof InvoiceItem, sortDirection);
-  }, [invoices, searchText, filters, sortColumn, sortDirection]);
-
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "ชำระแล้ว":
@@ -224,7 +229,17 @@ const Invoice = () => {
 
       <Card className="border border-border/40">
         <CardHeader>
-          <CardTitle>รายการใบแจ้งหนี้</CardTitle>
+          <div className="flex items-center justify-between w-full">
+            <CardTitle>รายการใบแจ้งหนี้</CardTitle>
+            <div className="text-sm text-muted-foreground">
+              {filters.status !== "all" ||
+              filters.dateFrom ||
+              filters.dateTo ||
+              searchText
+                ? `พบ ${filteredAndSortedInvoices.length} ฉบับ จากทั้งหมด ${invoices.length} ฉบับ`
+                : `${invoices.length} ฉบับ`}
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -266,7 +281,7 @@ const Invoice = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredAndSortedInvoices.length === 0 ? (
+                  {pagedData.length === 0 ? (
                     <tr>
                       <td
                         colSpan={7}
@@ -280,7 +295,7 @@ const Invoice = () => {
                       </td>
                     </tr>
                   ) : (
-                    filteredAndSortedInvoices.map((item) => (
+                    pagedData.map((item) => (
                       <tr
                         key={item.id}
                         className="border-b border-border/40 hover:bg-muted/30 transition-colors"
@@ -349,6 +364,34 @@ const Invoice = () => {
           invoice={selectedInvoice}
         />
       )}
+
+      <div className="flex justify-center mt-4 gap-1">
+        <button
+          onClick={() => setPage(page - 1)}
+          disabled={page === 1}
+          className="px-2"
+        >
+          ก่อนหน้า
+        </button>
+        {Array.from({ length: totalPages }, (_, i) => i + 1)
+          .filter((i) => i === 1 || i === totalPages || Math.abs(i - page) <= 2)
+          .map((i) => (
+            <button
+              key={i}
+              onClick={() => setPage(i)}
+              className={`px-2 ${page === i ? "font-bold underline" : ""}`}
+            >
+              {i}
+            </button>
+          ))}
+        <button
+          onClick={() => setPage(page + 1)}
+          disabled={page === totalPages}
+          className="px-2"
+        >
+          ถัดไป
+        </button>
+      </div>
     </div>
   );
 };

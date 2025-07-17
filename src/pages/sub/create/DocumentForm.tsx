@@ -737,9 +737,54 @@ export const DocumentForm: FC<DocumentFormProps> = ({
     return item.discount * item.quantity;
   }
 
+  // เพิ่มฟังก์ชันตรวจสอบส่วนลดและหัก ณ ที่จ่าย
+  function getMaxDiscount(item) {
+    return item.unitPrice * item.quantity;
+  }
+  function getMaxWithholding(item) {
+    // กรณีหัก ณ ที่จ่ายแบบกำหนดเอง
+    return item.unitPrice * item.quantity - getDiscountAmount(item);
+  }
+
+  // เพิ่มฟังก์ชันเช็คว่าสามารถหัก ณ ที่จ่ายได้หรือไม่
+  function canWithholding(item) {
+    return getMaxWithholding(item) > 0;
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSaving) return; // Prevent double submission
+
+    // ตรวจสอบส่วนลด/หัก ณ ที่จ่ายเกิน limit
+    for (const item of form.items) {
+      // ส่วนลด
+      if (item.discountType === "percentage" && item.discount > 100) {
+        toast.error(
+          "ส่วนลดต้องไม่เกิน 100% ในสินค้า: " + (item.productTitle || "")
+        );
+        setIsSaving(false);
+        return;
+      }
+      if (item.discountType === "thb" && item.discount > getMaxDiscount(item)) {
+        toast.error(
+          "ส่วนลดต้องไม่เกินราคารวมสินค้า: " + (item.productTitle || "")
+        );
+        setIsSaving(false);
+        return;
+      }
+      // หัก ณ ที่จ่ายแบบกำหนดเอง
+      if (
+        item.withholding_tax_option === "กำหนดเอง" &&
+        item.customWithholdingTaxAmount > getMaxWithholding(item)
+      ) {
+        toast.error(
+          "หัก ณ ที่จ่ายต้องไม่เกินยอดหลังหักส่วนลด: " +
+            (item.productTitle || "")
+        );
+        setIsSaving(false);
+        return;
+      }
+    }
 
     setIsSaving(true);
 
@@ -970,6 +1015,16 @@ export const DocumentForm: FC<DocumentFormProps> = ({
       priceType: val,
     }));
   };
+
+  // เพิ่ม useEffect สำหรับรีเซ็ต withholding_tax_option
+  useEffect(() => {
+    form.items.forEach(item => {
+      if (!canWithholding(item) && item.withholding_tax_option !== "ไม่ระบุ") {
+        handleItemChange(item.id, "withholding_tax_option", "ไม่ระบุ");
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.items]);
 
   return (
     <>
@@ -1413,14 +1468,37 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                               ? item.discount
                               : 0
                           }
-                          onChange={(e) =>
-                            handleItemChange(
-                              item.id,
-                              "discount",
-                              Number(e.target.value) || 0
-                            )
+                          min={0}
+                          max={
+                            item.discountType === "percentage"
+                              ? 100
+                              : getMaxDiscount(item)
                           }
+                          onChange={(e) => {
+                            let val = Number(e.target.value) || 0;
+                            if (item.discountType === "percentage") {
+                              if (val > 100) val = 100;
+                              if (val < 0) val = 0;
+                            } else {
+                              if (val > getMaxDiscount(item))
+                                val = getMaxDiscount(item);
+                              if (val < 0) val = 0;
+                            }
+                            handleItemChange(item.id, "discount", val);
+                          }}
                         />
+                        {item.discountType === "thb" &&
+                          item.discount > getMaxDiscount(item) && (
+                            <div className="text-xs text-red-500">
+                              ส่วนลดต้องไม่เกินราคารวมสินค้า
+                            </div>
+                          )}
+                        {item.discountType === "percentage" &&
+                          item.discount > 100 && (
+                            <div className="text-xs text-red-500">
+                              ส่วนลดต้องไม่เกิน 100%
+                            </div>
+                          )}
                         <Select
                           value={item.discountType}
                           onValueChange={(value) =>
@@ -1472,41 +1550,76 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                     <div className="space-y-2">
                       <Label>หัก ณ ที่จ่าย</Label>
                       <Select
-                        value={item.withholding_tax_option || "ไม่ระบุ"}
-                        onValueChange={(value) =>
+                        value={
+                          canWithholding(item)
+                            ? item.withholding_tax_option || "ไม่ระบุ"
+                            : "ไม่ระบุ"
+                        }
+                        onValueChange={(value) => {
+                          if (!canWithholding(item)) return;
                           handleItemChange(
                             item.id,
                             "withholding_tax_option",
                             value as any
-                          )
-                        }
+                          );
+                        }}
+                        disabled={!canWithholding(item)}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="เลือก" />
                         </SelectTrigger>
                         <SelectContent>
                           {WITHHOLDING_TAX_OPTIONS.map((option) => (
-                            <SelectItem key={option} value={option}>
+                            <SelectItem
+                              key={option}
+                              value={option}
+                              disabled={
+                                !canWithholding(item) && option !== "ไม่ระบุ"
+                              }
+                            >
                               {option}
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
-                      {item.withholding_tax_option === "กำหนดเอง" && (
-                        <Input
-                          type="number"
-                          placeholder="ระบุจำนวนเงิน"
-                          value={item.customWithholdingTaxAmount ?? ""}
-                          onChange={(e) =>
-                            handleItemChange(
-                              item.id,
-                              "customWithholdingTaxAmount",
-                              Number(e.target.value) || 0
-                            )
-                          }
-                          className="mt-2"
-                        />
-                      )}
+                      {!canWithholding(item) &&
+                        item.withholding_tax_option !== "ไม่ระบุ" && (
+                          <div className="text-xs text-red-500">
+                            ยอดหลังหักส่วนลดต้องมากกว่า 0 ถึงจะหัก ณ ที่จ่ายได้
+                            ระบบจะรีเซ็ตเป็น 'ไม่ระบุ'
+                          </div>
+                        )}
+                      {item.withholding_tax_option === "กำหนดเอง" &&
+                        canWithholding(item) && (
+                          <>
+                            <Input
+                              type="number"
+                              placeholder="ระบุจำนวนเงิน"
+                              min={0}
+                              max={getMaxWithholding(item)}
+                              value={item.customWithholdingTaxAmount ?? ""}
+                              onChange={(e) => {
+                                let val = Number(e.target.value) || 0;
+                                if (val > getMaxWithholding(item))
+                                  val = getMaxWithholding(item);
+                                if (val < 0) val = 0;
+                                handleItemChange(
+                                  item.id,
+                                  "customWithholdingTaxAmount",
+                                  val
+                                );
+                              }}
+                              className="mt-2"
+                              disabled={!canWithholding(item)}
+                            />
+                            {item.customWithholdingTaxAmount >
+                              getMaxWithholding(item) && (
+                              <div className="text-xs text-red-500">
+                                หัก ณ ที่จ่ายต้องไม่เกินยอดหลังหักส่วนลด
+                              </div>
+                            )}
+                          </>
+                        )}
                     </div>
                   </div>
                   <div className="flex justify-end">
@@ -2151,11 +2264,21 @@ export const DocumentForm: FC<DocumentFormProps> = ({
               <span>หัก ณ ที่จ่าย</span>
               <span>
                 -
-                {typeof calculatedSummary.withholdingTax === "number"
-                  ? calculatedSummary.withholdingTax.toLocaleString("th-TH", {
-                      minimumFractionDigits: 2,
-                    })
-                  : "0"}{" "}
+                {(() => {
+                  // รวมยอดหลังหักส่วนลดของทุก item
+                  const canWithhold = form.items.some((item) =>
+                    canWithholding(item)
+                  );
+                  if (!canWithhold) return "0.00";
+                  const val =
+                    typeof calculatedSummary.withholdingTax === "number" &&
+                    calculatedSummary.withholdingTax > 0
+                      ? calculatedSummary.withholdingTax
+                      : 0;
+                  return val.toLocaleString("th-TH", {
+                    minimumFractionDigits: 2,
+                  });
+                })()}{" "}
                 บาท
               </span>
             </div>
@@ -2163,15 +2286,18 @@ export const DocumentForm: FC<DocumentFormProps> = ({
               <span>จำนวนเงินทั้งสิ้น</span>
               <span>
                 {(() => {
+                  // ถ้ายอดหลังหักส่วนลด <= 0 ให้แสดง 0
                   const total =
                     typeof calculatedSummary.total === "number"
                       ? calculatedSummary.total
                       : 0;
                   const withholdingTax =
-                    typeof calculatedSummary.withholdingTax === "number"
+                    typeof calculatedSummary.withholdingTax === "number" &&
+                    calculatedSummary.withholdingTax > 0
                       ? calculatedSummary.withholdingTax
                       : 0;
-                  return (total - withholdingTax).toLocaleString("th-TH", {
+                  const net = total - withholdingTax;
+                  return (net > 0 ? net : 0).toLocaleString("th-TH", {
                     minimumFractionDigits: 2,
                   });
                 })()}{" "}

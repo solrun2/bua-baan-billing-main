@@ -13,6 +13,7 @@ import { searchData } from "@/utils/searchUtils";
 import { format } from "date-fns";
 import { th } from "date-fns/locale";
 import { Skeleton } from "@/components/ui/skeleton";
+import { DOCUMENT_PAGE_SIZE } from "@/constants/documentPageSize";
 
 interface QuotationItem {
   id: string;
@@ -42,6 +43,34 @@ const Quotation = () => {
   const [searchText, setSearchText] = useState("");
   const [sortColumn, setSortColumn] = useState<string>("dateValue");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+
+  // 1. useMemo ก่อน
+  const filteredAndSortedQuotations = useMemo(() => {
+    let result = searchData(quotations, searchText, ["number", "customer"]);
+    result = result.filter((q) => {
+      const isStatusMatch =
+        !filters.status ||
+        filters.status === "all" ||
+        q.status === filters.status;
+      if (!isStatusMatch) return false;
+      const docDate = q.documentDate;
+      const isAfterFrom =
+        !filters.dateFrom || !docDate || docDate >= filters.dateFrom;
+      const isBeforeTo =
+        !filters.dateTo || !docDate || docDate <= filters.dateTo;
+      return isAfterFrom && isBeforeTo;
+    });
+    return sortData(result, sortColumn as keyof QuotationItem, sortDirection);
+  }, [quotations, searchText, filters, sortColumn, sortDirection]);
+
+  // 2. pagination
+  const [page, setPage] = useState(1);
+  const pageSize = DOCUMENT_PAGE_SIZE;
+  const totalPages = Math.ceil(filteredAndSortedQuotations.length / pageSize);
+  const pagedData = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return filteredAndSortedQuotations.slice(start, start + pageSize);
+  }, [filteredAndSortedQuotations, page]);
 
   useEffect(() => {
     const loadQuotations = async () => {
@@ -137,26 +166,6 @@ const Quotation = () => {
     });
   }, []);
 
-  const filteredAndSortedQuotations = useMemo(() => {
-    let result = searchData(quotations, searchText, ["number", "customer"]);
-
-    result = result.filter((q) => {
-      const isStatusMatch =
-        !filters.status ||
-        filters.status === "all" ||
-        q.status === filters.status;
-      if (!isStatusMatch) return false;
-      const docDate = q.documentDate;
-      const isAfterFrom =
-        !filters.dateFrom || !docDate || docDate >= filters.dateFrom;
-      const isBeforeTo =
-        !filters.dateTo || !docDate || docDate <= filters.dateTo;
-      return isAfterFrom && isBeforeTo;
-    });
-
-    return sortData(result, sortColumn as keyof QuotationItem, sortDirection);
-  }, [quotations, searchText, filters, sortColumn, sortDirection]);
-
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "รอตอบรับ":
@@ -223,7 +232,17 @@ const Quotation = () => {
       {/* Content */}
       <Card className="border border-border/40">
         <CardHeader>
-          <CardTitle>รายการใบเสนอราคา</CardTitle>
+          <div className="flex items-center justify-between w-full">
+            <CardTitle>รายการใบเสนอราคา</CardTitle>
+            <div className="text-sm text-muted-foreground">
+              {filters.status !== "all" ||
+              filters.dateFrom ||
+              filters.dateTo ||
+              searchText
+                ? `พบ ${filteredAndSortedQuotations.length} ฉบับ จากทั้งหมด ${quotations.length} ฉบับ`
+                : `${quotations.length} ฉบับ`}
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -265,7 +284,7 @@ const Quotation = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredAndSortedQuotations.length === 0 ? (
+                  {pagedData.length === 0 ? (
                     <tr>
                       <td
                         colSpan={7}
@@ -279,7 +298,7 @@ const Quotation = () => {
                       </td>
                     </tr>
                   ) : (
-                    filteredAndSortedQuotations.map((q) => (
+                    pagedData.map((q) => (
                       <tr
                         key={q.id}
                         className="border-b border-border/40 hover:bg-muted/30 transition-colors"
@@ -341,6 +360,35 @@ const Quotation = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* เพิ่ม Pagination UI ด้านล่างตาราง */}
+      <div className="flex justify-center mt-4 gap-1">
+        <button
+          onClick={() => setPage(page - 1)}
+          disabled={page === 1}
+          className="px-2"
+        >
+          ก่อนหน้า
+        </button>
+        {Array.from({ length: totalPages }, (_, i) => i + 1)
+          .filter((i) => i === 1 || i === totalPages || Math.abs(i - page) <= 2)
+          .map((i) => (
+            <button
+              key={i}
+              onClick={() => setPage(i)}
+              className={`px-2 ${page === i ? "font-bold underline" : ""}`}
+            >
+              {i}
+            </button>
+          ))}
+        <button
+          onClick={() => setPage(page + 1)}
+          disabled={page === totalPages}
+          className="px-2"
+        >
+          ถัดไป
+        </button>
+      </div>
 
       {isModalOpen && selectedQuotation && (
         <QuotationModal
