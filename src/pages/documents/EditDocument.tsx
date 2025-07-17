@@ -10,6 +10,7 @@ const EditDocumentPage: React.FC = () => {
   const navigate = useNavigate();
   const [initialData, setInitialData] = useState<DocumentData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [hasRelated, setHasRelated] = useState(false);
 
   useEffect(() => {
     if (!id) {
@@ -67,6 +68,30 @@ const EditDocumentPage: React.FC = () => {
     };
 
     fetchDocument();
+  }, [id, navigate]);
+
+  useEffect(() => {
+    if (!id) return;
+    const checkRelated = async () => {
+      const data = await apiService.getDocuments();
+      const relatedDocs = data.filter(
+        (doc: any) => String(doc.related_document_id) === String(id)
+      );
+      if (relatedDocs.length > 0) {
+        const docList = relatedDocs
+          .map(
+            (doc: any) =>
+              `${doc.document_type || ""} เลขที่: ${doc.document_number || doc.id}`
+          )
+          .join(", ");
+        toast.error(
+          `ไม่สามารถแก้ไขเอกสารนี้ได้ เนื่องจากมีเอกสารอื่นอ้างอิงอยู่ (${docList})`
+        );
+        navigate(-1);
+      }
+      setHasRelated(relatedDocs.length > 0);
+    };
+    checkRelated();
   }, [id, navigate]);
 
   const handleSave = async (data: DocumentPayload) => {

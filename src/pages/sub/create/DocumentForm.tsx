@@ -806,34 +806,6 @@ export const DocumentForm: FC<DocumentFormProps> = ({
 
     // --- เช็ค reference หรือ related_document_id ก่อนสร้าง ---
     try {
-      const allDocs = await apiService.getDocuments();
-      // เช็คว่ามีเอกสารลูกที่อ้างอิงเอกสารนี้อยู่แล้วหรือไม่ (เช็ค related_document_id)
-      const existChildDoc = allDocs.find(
-        (doc) =>
-          typeof doc.related_document_id !== "undefined" &&
-          String(doc.related_document_id) === String(form.id)
-      );
-      if (existChildDoc) {
-        toast.error(
-          `มีเอกสาร (${existChildDoc.document_type} เลขที่: ${existChildDoc.document_number}) ที่อ้างอิงเอกสารนี้อยู่แล้ว กรุณาลบเอกสารลูกนั้นก่อน`
-        );
-        setIsSaving(false);
-        return;
-      }
-      // เช็ค reference ซ้ำ (ตัวเอง)
-      const existDoc = allDocs.find(
-        (doc) =>
-          form.reference &&
-          (doc.document_number === form.reference ||
-            String(doc.id) === String(form.reference))
-      );
-      if (existDoc) {
-        toast.error(
-          `กรุณาไปลบเอกสารที่อ้างอิงเอกสารนี้ก่อน (เลขที่เอกสาร: ${existDoc.document_number || existDoc.id})`
-        );
-        setIsSaving(false);
-        return;
-      }
     } catch (err) {
       toast.error("เกิดข้อผิดพลาดในการตรวจสอบเอกสารซ้ำ");
       setIsSaving(false);
@@ -1018,7 +990,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
 
   // เพิ่ม useEffect สำหรับรีเซ็ต withholding_tax_option
   useEffect(() => {
-    form.items.forEach(item => {
+    form.items.forEach((item) => {
       if (!canWithholding(item) && item.withholding_tax_option !== "ไม่ระบุ") {
         handleItemChange(item.id, "withholding_tax_option", "ไม่ระบุ");
       }
