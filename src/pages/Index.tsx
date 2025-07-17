@@ -173,7 +173,9 @@ const Index = () => {
                         ""
                       ).toLowerCase();
                       if (type && doc.id) {
-                        navigate(`/documents/${type}/edit/${doc.id}`);
+                        navigate(`/documents/${type}/edit/${doc.id}`, {
+                          state: { suppressToastSuccess: true },
+                        });
                       }
                     }}
                   >

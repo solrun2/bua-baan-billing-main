@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { DocumentForm } from "../sub/create/DocumentForm";
 import { apiService } from "../services/apiService";
 import { toast } from "sonner";
@@ -8,6 +8,7 @@ import { DocumentData, DocumentPayload } from "@/types/document";
 const EditDocumentPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const [initialData, setInitialData] = useState<DocumentData | null>(null);
   const [loading, setLoading] = useState(true);
   const [hasRelated, setHasRelated] = useState(false);
@@ -85,7 +86,7 @@ const EditDocumentPage: React.FC = () => {
           )
           .join(", ");
         toast.error(
-          `ไม่สามารถแก้ไขเอกสารนี้ได้ เนื่องจากมีเอกสารอื่นอ้างอิงอยู่ (${docList})`
+          `ไม่สามารถแก้ไขเอกสารนี้ได้ เนื่องจากมีเอกสาร ${docList} อ้างอิงอยู่`
         );
         navigate(-1);
       }
@@ -98,7 +99,10 @@ const EditDocumentPage: React.FC = () => {
     if (!id) return;
     try {
       await apiService.updateDocument(id, data);
-      toast.success("บันทึกเอกสารสำเร็จ");
+      // suppressToastSuccess จะถูกส่งมาจาก dashboard ถ้าไม่ต้องการ toast
+      if (!location.state || !location.state.suppressToastSuccess) {
+        toast.success("บันทึกเอกสารสำเร็จ");
+      }
       navigate(-1); // กลับไปหน้าก่อนหน้า
     } catch (e) {
       toast.error("บันทึกเอกสารไม่สำเร็จ");
