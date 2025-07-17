@@ -111,7 +111,6 @@ const Billing = () => {
           });
         setBillings(billingData);
       } catch (err) {
-        console.error("[Billing] Load error:", err);
         setError("ไม่สามารถโหลดข้อมูลได้");
       } finally {
         setLoading(false);

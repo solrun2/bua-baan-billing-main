@@ -112,7 +112,6 @@ const PurchaseOrder = () => {
           });
         setPurchaseOrders(poData);
       } catch (err) {
-        console.error("[PurchaseOrder] Load error:", err);
         setError("ไม่สามารถโหลดข้อมูลได้");
       } finally {
         setLoading(false);

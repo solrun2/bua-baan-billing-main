@@ -59,7 +59,6 @@ const EditDocumentPage: React.FC = () => {
 
         setInitialData(adjustedData);
       } catch (err) {
-        console.error("[EditDocument] Error loading document:", err);
         toast.error("เกิดข้อผิดพลาดในการโหลดข้อมูลเอกสาร");
         navigate(-1);
       } finally {
@@ -77,7 +76,6 @@ const EditDocumentPage: React.FC = () => {
       toast.success("บันทึกเอกสารสำเร็จ");
       navigate(-1); // กลับไปหน้าก่อนหน้า
     } catch (e) {
-      console.error("Failed to save document:", e);
       toast.error("บันทึกเอกสารไม่สำเร็จ");
     }
   };

@@ -111,7 +111,6 @@ const Receipt = () => {
           });
         setReceipts(receiptsData);
       } catch (err) {
-        console.error("[Receipt] Load error:", err);
         setError("ไม่สามารถโหลดข้อมูลได้");
       } finally {
         setLoading(false);

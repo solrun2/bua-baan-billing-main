@@ -85,19 +85,10 @@ const Quotation = () => {
             const validUntilDate = doc.valid_until
               ? new Date(doc.valid_until)
               : null;
-            // DEBUG log
-            console.log("summary:", doc.summary);
-            // คำนวณยอดสุทธิหลังหัก ณ ที่จ่าย (ใช้ค่าจาก summary เสมอ)
             const netTotal =
               doc.summary && typeof doc.summary.netTotalAmount === "number"
                 ? doc.summary.netTotalAmount
                 : (doc.total_amount ?? 0);
-            console.log(
-              "netTotal (calculated):",
-              netTotal,
-              "from summary:",
-              doc.summary
-            );
             return {
               id: doc.id,
               number: doc.document_number,
@@ -113,10 +104,8 @@ const Quotation = () => {
               documentDate: format(issueDate, "yyyy-MM-dd"),
             };
           });
-        console.log("quotationsData", quotationsData);
         setQuotations(quotationsData);
       } catch (err) {
-        console.error("[Quotation] Load error:", err);
         setError("ไม่สามารถโหลดข้อมูลได้");
       } finally {
         setLoading(false);

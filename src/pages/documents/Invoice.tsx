@@ -118,7 +118,6 @@ const Invoice = () => {
           });
         setInvoices(invoicesData);
       } catch (err) {
-        console.error("[Invoice] Load error:", err);
         setError("ไม่สามารถโหลดข้อมูลได้");
       } finally {
         setLoading(false);

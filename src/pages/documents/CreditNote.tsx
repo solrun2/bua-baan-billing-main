@@ -118,7 +118,6 @@ const CreditNote = () => {
           });
         setCreditNotes(creditNotesData);
       } catch (err) {
-        console.error("[CreditNote] Load error:", err);
         setError("ไม่สามารถโหลดข้อมูลได้");
       } finally {
         setLoading(false);

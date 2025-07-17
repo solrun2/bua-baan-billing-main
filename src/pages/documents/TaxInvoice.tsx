@@ -117,7 +117,6 @@ const TaxInvoice = () => {
           });
         setTaxInvoices(taxInvoicesData);
       } catch (err) {
-        console.error("[TaxInvoice] Load error:", err);
         setError("ไม่สามารถโหลดข้อมูลได้");
       } finally {
         setLoading(false);
