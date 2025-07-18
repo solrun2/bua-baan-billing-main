@@ -149,7 +149,7 @@ const Quotation = () => {
         } else {
           toast.error("ไม่พบข้อมูลเอกสาร");
         }
-        return "โหลดข้อมูลสำเร็จ";
+        return undefined; // คืน undefined เพื่อไม่ให้ toast เด้ง
       },
       error: "ไม่สามารถดูรายละเอียดได้",
     });
