@@ -84,17 +84,18 @@ export async function getDocumentNumberSettingByType(document_type: string) {
   }
 }
 
-// อัปเดต pattern และเลขรันปัจจุบัน
-export async function updateDocumentNumberSetting(
+// อัปเดต pattern และเลขรันปัจจุบัน พร้อม last_run_date
+export async function updateDocumentNumberSettingWithDate(
   document_type: string,
   pattern: string,
-  current_number: number
+  current_number: number,
+  last_run_date: Date
 ) {
   const conn = await pool.getConnection();
   try {
     await conn.query(
-      "UPDATE document_number_settings SET pattern = ?, current_number = ?, updated_at = NOW() WHERE document_type = ?",
-      [pattern, current_number, document_type]
+      "UPDATE document_number_settings SET pattern = ?, current_number = ?, last_run_date = ?, updated_at = NOW() WHERE document_type = ?",
+      [pattern, current_number, last_run_date, document_type]
     );
     return true;
   } finally {

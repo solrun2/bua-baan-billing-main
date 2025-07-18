@@ -7,7 +7,8 @@ import path from "path";
 import fs from "fs";
 import {
   getAllDocumentNumberSettings,
-  updateDocumentNumberSetting,
+  getDocumentNumberSettingByType,
+  updateDocumentNumberSettingWithDate,
 } from "./db";
 
 dotenv.config();
@@ -723,12 +724,50 @@ app.post("/api/documents", async (req: Request, res: Response) => {
       }
     }
 
-    const document_number = await generateDocumentNumber(
-      conn,
-      document_type,
-      issue_date
+    // --- generate document number ตาม pattern+current_number ---
+    const setting = await getDocumentNumberSettingByType(document_type);
+    if (!setting) {
+      await conn.rollback();
+      return res.status(400).json({ error: "ไม่พบการตั้งค่าเลขรันเอกสาร" });
+    }
+    const today = new Date(issue_date || new Date());
+    let reset = false;
+    let lastRunDate = setting.last_run_date
+      ? new Date(setting.last_run_date)
+      : null;
+    if (setting.pattern.includes("DD")) {
+      if (
+        !lastRunDate ||
+        lastRunDate.getFullYear() !== today.getFullYear() ||
+        lastRunDate.getMonth() !== today.getMonth() ||
+        lastRunDate.getDate() !== today.getDate()
+      )
+        reset = true;
+    } else if (setting.pattern.includes("MM")) {
+      if (
+        !lastRunDate ||
+        lastRunDate.getFullYear() !== today.getFullYear() ||
+        lastRunDate.getMonth() !== today.getMonth()
+      )
+        reset = true;
+    } else if (setting.pattern.includes("YYYY")) {
+      if (!lastRunDate || lastRunDate.getFullYear() !== today.getFullYear())
+        reset = true;
+    }
+    let nextNumber = reset ? 1 : Number(setting.current_number) + 1;
+    const yyyy = today.getFullYear();
+    const yy = String(yyyy).slice(-2);
+    const MM = String(today.getMonth() + 1).padStart(2, "0");
+    const dd = String(today.getDate()).padStart(2, "0");
+    let docNumber = setting.pattern;
+    docNumber = docNumber.replace(/YYYY/g, String(yyyy));
+    docNumber = docNumber.replace(/YY/g, yy);
+    docNumber = docNumber.replace(/MM/g, MM);
+    docNumber = docNumber.replace(/DD/g, dd);
+    docNumber = docNumber.replace(/X+/g, (m: string) =>
+      String(nextNumber).padStart(m.length, "0")
     );
-
+    // ... insert document ...
     const docResult = await conn.query(
       `INSERT INTO documents (
         customer_id, customer_name, document_number, document_type, status, price_type, issue_date,
@@ -738,7 +777,7 @@ app.post("/api/documents", async (req: Request, res: Response) => {
       [
         customer.id,
         customer.name,
-        document_number,
+        docNumber,
         document_type,
         status,
         priceType,
@@ -751,6 +790,13 @@ app.post("/api/documents", async (req: Request, res: Response) => {
         customer.phone || "",
         customer.email || "",
       ]
+    );
+    // --- update current_number และ last_run_date ---
+    await updateDocumentNumberSettingWithDate(
+      document_type,
+      setting.pattern,
+      nextNumber,
+      today
     );
 
     const documentId = Number((docResult as any).insertId);
@@ -1279,10 +1325,11 @@ app.put(
         .json({ error: "pattern และ current_number ห้ามว่าง" });
     }
     try {
-      await updateDocumentNumberSetting(
+      await updateDocumentNumberSettingWithDate(
         document_type,
         pattern,
-        Number(current_number)
+        Number(current_number),
+        new Date() // เพิ่ม argument นี้
       );
       res.json({ success: true });
     } catch (err) {
@@ -1290,6 +1337,62 @@ app.put(
       res
         .status(500)
         .json({ error: "Failed to update document number setting" });
+    }
+  }
+);
+
+// API: คืนเลขเอกสารใหม่ (next document number) ตาม pattern+current_number (แค่ preview, ไม่จองเลข)
+app.get(
+  "/api/document-number-settings/:document_type/next-number",
+  async (req: Request, res: Response) => {
+    const { document_type } = req.params;
+    try {
+      const setting = await getDocumentNumberSettingByType(document_type);
+      if (!setting)
+        return res.status(404).json({ error: "ไม่พบประเภทเอกสารนี้" });
+      const today = new Date();
+      let reset = false;
+      let lastRunDate = setting.last_run_date
+        ? new Date(setting.last_run_date)
+        : null;
+      // ตรวจสอบ pattern เพื่อรีเซ็ตเลขรัน
+      if (setting.pattern.includes("DD")) {
+        if (
+          !lastRunDate ||
+          lastRunDate.getFullYear() !== today.getFullYear() ||
+          lastRunDate.getMonth() !== today.getMonth() ||
+          lastRunDate.getDate() !== today.getDate()
+        )
+          reset = true;
+      } else if (setting.pattern.includes("MM")) {
+        if (
+          !lastRunDate ||
+          lastRunDate.getFullYear() !== today.getFullYear() ||
+          lastRunDate.getMonth() !== today.getMonth()
+        )
+          reset = true;
+      } else if (setting.pattern.includes("YYYY")) {
+        if (!lastRunDate || lastRunDate.getFullYear() !== today.getFullYear())
+          reset = true;
+      }
+      let nextNumber = reset ? 1 : Number(setting.current_number) + 1;
+      const yyyy = today.getFullYear();
+      const yy = String(yyyy).slice(-2);
+      const MM = String(today.getMonth() + 1).padStart(2, "0");
+      const dd = String(today.getDate()).padStart(2, "0");
+      let docNumber = setting.pattern;
+      docNumber = docNumber.replace(/YYYY/g, String(yyyy));
+      docNumber = docNumber.replace(/YY/g, yy);
+      docNumber = docNumber.replace(/MM/g, MM);
+      docNumber = docNumber.replace(/DD/g, dd);
+      docNumber = docNumber.replace(/X+/g, (m: string) =>
+        String(nextNumber).padStart(m.length, "0")
+      );
+      // ไม่ต้องอัปเดต current_number ที่นี่
+      res.json({ documentNumber: docNumber });
+    } catch (err) {
+      console.error("Failed to get next document number:", err);
+      res.status(500).json({ error: "Failed to get next document number" });
     }
   }
 );

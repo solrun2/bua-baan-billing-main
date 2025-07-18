@@ -547,38 +547,35 @@ export const DocumentForm: FC<DocumentFormProps> = ({
     setSummary(newSummary);
   }, [form.items]);
 
-  // Set initial document number when component mounts or document type changes
+  // เพิ่ม useEffect สำหรับดึงเลขเอกสารใหม่จาก backend (เฉพาะกรณีสร้างใหม่)
   useEffect(() => {
-    if (!initialData.id && !form.documentNumber) {
-      try {
-        // Get existing documents from localStorage
-        const storedDocs = JSON.parse(
-          localStorage.getItem("documents") || "[]"
-        );
-        const existingNumbers = storedDocs
-          .filter((doc: DocumentData) => doc.documentType === documentType)
-          .map((doc: DocumentData) => doc.documentNumber);
-
-        // Generate new document number using the utility function
-        const newNumber = generateDocumentNumber(documentType, existingNumbers);
-        handleFormChange("documentNumber", newNumber);
-      } catch (error) {
-        // Fallback to simple number if error
-        const prefix =
-          documentType === "quotation"
-            ? "QT"
-            : documentType === "invoice"
+    if (!editMode && !form.documentNumber) {
+      const fetchNextNumber = async () => {
+        try {
+          const res = await fetch(`/api/document-number-settings/${documentType}/next-number`);
+          if (!res.ok) throw new Error("ไม่สามารถดึงเลขเอกสารใหม่ได้");
+          const data = await res.json();
+          handleFormChange("documentNumber", data.documentNumber);
+        } catch (error) {
+          // fallback เดิม
+          const prefix =
+            documentType === "quotation"
+              ? "QT"
+              : documentType === "invoice"
               ? "IV"
               : documentType === "receipt"
-                ? "RC"
-                : "TAX";
-        handleFormChange(
-          "documentNumber",
-          `${prefix}-${new Date().getFullYear()}-0001`
-        );
-      }
+              ? "RC"
+              : "TAX";
+          handleFormChange(
+            "documentNumber",
+            `${prefix}-${new Date().getFullYear()}-00001`
+          );
+        }
+      };
+      fetchNextNumber();
     }
-  }, [documentType, initialData.id, form.documentNumber]);
+    // eslint-disable-next-line
+  }, [documentType, editMode, form.documentNumber]);
 
   // Sync document number with localStorage changes
   useEffect(() => {
