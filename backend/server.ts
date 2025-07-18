@@ -5,6 +5,10 @@ import pool from "./db";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import {
+  getAllDocumentNumberSettings,
+  updateDocumentNumberSetting,
+} from "./db";
 
 dotenv.config();
 
@@ -1246,6 +1250,49 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
     if (conn) conn.release();
   }
 });
+
+// API: ดึงข้อมูลการตั้งค่าเลขรันเอกสารทั้งหมด
+app.get(
+  "/api/document-number-settings",
+  async (req: Request, res: Response) => {
+    try {
+      const rows = await getAllDocumentNumberSettings();
+      res.json(rows);
+    } catch (err) {
+      console.error("Failed to fetch document number settings:", err);
+      res
+        .status(500)
+        .json({ error: "Failed to fetch document number settings" });
+    }
+  }
+);
+
+// API: อัปเดต pattern และเลขรันปัจจุบัน
+app.put(
+  "/api/document-number-settings/:document_type",
+  async (req: Request, res: Response) => {
+    const { document_type } = req.params;
+    const { pattern, current_number } = req.body;
+    if (!pattern || current_number === undefined) {
+      return res
+        .status(400)
+        .json({ error: "pattern และ current_number ห้ามว่าง" });
+    }
+    try {
+      await updateDocumentNumberSetting(
+        document_type,
+        pattern,
+        Number(current_number)
+      );
+      res.json({ success: true });
+    } catch (err) {
+      console.error("Failed to update document number setting:", err);
+      res
+        .status(500)
+        .json({ error: "Failed to update document number setting" });
+    }
+  }
+);
 
 app.listen(port, () => {
   console.log(`Backend server is running on http://localhost:${port}`);

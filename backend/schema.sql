@@ -70,3 +70,15 @@ CREATE TABLE `document_items` (
   KEY `document_id` (`document_id`),
   CONSTRAINT `document_items_ibfk_1` FOREIGN KEY (`document_id`) REFERENCES `documents` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=224 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+
+CREATE TABLE document_number_settings (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    document_type VARCHAR(50) NOT NULL,      -- ประเภทเอกสาร เช่น quotation, invoice, receipt
+    prefix VARCHAR(10) NOT NULL,             -- รหัสนำหน้า เช่น QT, INV, RC
+    pattern VARCHAR(100) NOT NULL,           -- รูปแบบเลขเอกสาร เช่น QT-YYYY-XXX
+    current_number INT NOT NULL DEFAULT 0,   -- เลขรันปัจจุบัน
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+ALTER TABLE document_number_settings
+ADD UNIQUE KEY unique_document_type (document_type);
