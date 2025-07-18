@@ -161,6 +161,56 @@ export const DocumentForm: FC<DocumentFormProps> = ({
 
   const [receiptMode, setReceiptMode] = useState<"basic" | "advanced">("basic");
 
+  // State สำหรับ settings ของเลขรันเอกสาร
+  const [docSettings, setDocSettings] = useState<any[]>([]);
+  const [loadingDocSettings, setLoadingDocSettings] = useState(true);
+
+  // ดึงข้อมูล settings ของเลขรันเอกสาร
+  useEffect(() => {
+    const fetchSettings = async () => {
+      setLoadingDocSettings(true);
+      try {
+        const res = await fetch("/api/document-number-settings");
+        const data = await res.json();
+        setDocSettings(data);
+      } catch (e) {
+        setDocSettings([]);
+      } finally {
+        setLoadingDocSettings(false);
+      }
+    };
+    fetchSettings();
+  }, []);
+
+  // ฟังก์ชันสร้างเลข preview
+  function previewDocumentNumber(pattern: string, currentNumber: number) {
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const yy = String(yyyy).slice(-2);
+    const MM = String(today.getMonth() + 1).padStart(2, "0");
+    const dd = String(today.getDate()).padStart(2, "0");
+    let docNumber = pattern;
+    docNumber = docNumber.replace(/YYYY/g, String(yyyy));
+    docNumber = docNumber.replace(/YY/g, yy);
+    docNumber = docNumber.replace(/MM/g, MM);
+    docNumber = docNumber.replace(/DD/g, dd);
+    docNumber = docNumber.replace(/X+/g, (m) =>
+      String(currentNumber + 1).padStart(m.length, "0")
+    );
+    return docNumber;
+  }
+
+  // หา setting ของเอกสารปัจจุบัน
+  const currentDocSetting = docSettings.find(
+    (d) => d.document_type === documentType
+  );
+  const previewNumber = currentDocSetting
+    ? previewDocumentNumber(
+        currentDocSetting.pattern,
+        Number(currentDocSetting.current_number)
+      )
+    : "";
+
   function createDefaultItem(): DocumentItem {
     return {
       id: `item-${Date.now()}`,
@@ -552,7 +602,9 @@ export const DocumentForm: FC<DocumentFormProps> = ({
     if (!editMode && !form.documentNumber) {
       const fetchNextNumber = async () => {
         try {
-          const res = await fetch(`/api/document-number-settings/${documentType}/next-number`);
+          const res = await fetch(
+            `/api/document-number-settings/${documentType}/next-number`
+          );
           if (!res.ok) throw new Error("ไม่สามารถดึงเลขเอกสารใหม่ได้");
           const data = await res.json();
           handleFormChange("documentNumber", data.documentNumber);
@@ -562,10 +614,10 @@ export const DocumentForm: FC<DocumentFormProps> = ({
             documentType === "quotation"
               ? "QT"
               : documentType === "invoice"
-              ? "IV"
-              : documentType === "receipt"
-              ? "RC"
-              : "TAX";
+                ? "IV"
+                : documentType === "receipt"
+                  ? "RC"
+                  : "TAX";
           handleFormChange(
             "documentNumber",
             `${prefix}-${new Date().getFullYear()}-00001`
@@ -1083,21 +1135,20 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                   {editMode ? (
                     <Input
                       id="documentNumber"
-                      value={form.documentNumber}
+                      value={previewNumber}
                       readOnly
                       className="font-mono bg-muted"
                       placeholder=""
                     />
                   ) : documentType === "receipt" &&
-                    (!form.documentNumber ||
-                      /RE-\d{4}-0001/.test(form.documentNumber)) ? (
+                    (!previewNumber || /RE-\d{4}-0001/.test(previewNumber)) ? (
                     <div className="text-muted-foreground italic py-2 px-3 bg-muted rounded border border-dashed border-gray-300">
                       เลขที่ใบเสร็จจะถูกกำหนดหลังบันทึก
                     </div>
                   ) : (
                     <Input
                       id="documentNumber"
-                      value={form.documentNumber}
+                      value={previewNumber}
                       readOnly
                       className="font-mono bg-muted"
                       placeholder=""
