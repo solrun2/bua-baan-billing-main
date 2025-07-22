@@ -278,23 +278,6 @@ export const DocumentForm: FC<DocumentFormProps> = ({
     };
   });
 
-  // sync form.priceType กับ initialData.priceType ทุกครั้งที่ initialData เปลี่ยน (เช่น async load)
-  useEffect(() => {
-    console.log(
-      "[DEBUG] useEffect sync priceType - initialData.priceType:",
-      initialData.priceType,
-      "form.priceType:",
-      form.priceType
-    );
-    if (initialData.priceType && initialData.priceType !== form.priceType) {
-      console.log("[DEBUG] useEffect sync priceType - กำลัง sync priceType");
-      setForm((prev) => ({
-        ...prev,
-        priceType: initialData.priceType,
-      }));
-    }
-  }, [initialData.priceType, form.priceType]);
-
   // เพิ่ม netTotalAmount ใน state summary
   const [summary, setSummary] = useState<
     DocumentSummary & { netTotalAmount?: number }
@@ -711,7 +694,6 @@ export const DocumentForm: FC<DocumentFormProps> = ({
   useEffect(() => {
     async function fillEditData() {
       if (editMode && initialData.customer?.id) {
-
         // ใช้ข้อมูลลูกค้าที่มีอยู่แล้ว ไม่ต้องโหลดใหม่
         const customer = initialData.customer;
 
@@ -1013,7 +995,6 @@ export const DocumentForm: FC<DocumentFormProps> = ({
       tax_amount: item.taxAmount ?? 0,
       withholding_tax_option: item.withholding_tax_option || "ไม่ระบุ",
     }));
-
 
     const dataToSave: DocumentPayload = {
       id: initialData.id,
