@@ -786,6 +786,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
 
         // โหลดข้อมูล receipt details สำหรับการแก้ไข
         if (documentType === "receipt" && initialData.receipt_details) {
+          console.log("[DEBUG] useEffect: initialData.receipt_details", initialData.receipt_details);
           const receiptDetails = initialData.receipt_details;
 
           // --- โหลด payment channels ---
@@ -805,6 +806,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
               note: ch.note || "",
               bankAccountId: ch.bankAccountId || null,
             }));
+            console.log("[DEBUG] setPaymentChannels:", channels);
             setPaymentChannels(channels);
           }
 
@@ -825,6 +827,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
               amount: f.amount || 0,
               note: f.note || "",
             }));
+            console.log("[DEBUG] setFees:", feeList);
             setFees(feeList);
           }
 
@@ -845,6 +848,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
               amount: d.amount || 0,
               note: d.note || "",
             }));
+            console.log("[DEBUG] setOffsetDocs:", offsetList);
             setOffsetDocs(offsetList);
           }
         }
@@ -1962,6 +1966,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
               {/* ช่องทางการรับชำระเงิน */}
               {paymentChannels.map((channel, idx) => (
                 <div key={idx}>
+                  {/* <pre style={{background:'#f5f5f5', color:'#333', fontSize:'12px', marginBottom:'4px'}}>{JSON.stringify(channel, null, 2)}</pre> */}
                   <label className="flex items-center gap-2 mb-2">
                     <input
                       type="checkbox"
@@ -1983,80 +1988,76 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                       </button>
                     )}
                   </label>
-                  {channel?.enabled && (
-                    <div className="grid grid-cols-12 gap-4 items-center bg-white p-4 rounded-lg border border-blue-100 mb-4">
-                      <div className="col-span-2">
-                        <Select
-                          value={channel.method}
-                          onValueChange={(v) =>
-                            updatePaymentChannel(idx, "method", v)
-                          }
-                        >
-                          <SelectTrigger className="bg-white border-blue-100">
-                            <SelectValue placeholder="รับชำระโดย" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="เงินสด">💵 เงินสด</SelectItem>
-                            <SelectItem value="โอนเงิน">🏦 โอนเงิน</SelectItem>
-                            <SelectItem value="บัตรเครดิต">
-                              💳 บัตรเครดิต
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="col-span-2">
-                        <Select
-                          value={channel.bankAccountId?.toString() || "null"}
-                          onValueChange={(v) =>
-                            updatePaymentChannel(
-                              idx,
-                              "bankAccountId",
-                              v && v !== "null" ? parseInt(v) : null
-                            )
-                          }
-                        >
-                          <SelectTrigger className="bg-white border-blue-100">
-                            <SelectValue placeholder="เลือกบัญชีธนาคาร" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="null">ไม่ระบุ</SelectItem>
-                            {bankAccounts.map((account) => (
-                              <SelectItem
-                                key={account.id}
-                                value={account.id.toString()}
-                              >
-                                {account.bank_name} - {account.account_number}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="col-span-2">
-                        <Input
-                          type="number"
-                          className="bg-white border-blue-100"
-                          placeholder={`จำนวนเงินที่รับชำระ`}
-                          value={channel.amount}
-                          onChange={(e) =>
-                            updatePaymentChannel(idx, "amount", e.target.value)
-                          }
-                          max={netTotal}
-                        />
-                      </div>
-                      <div className="col-span-5">
-                        <Input
-                          type="text"
-                          className="bg-white border-blue-100"
-                          placeholder="หมายเหตุ"
-                          maxLength={20}
-                          value={channel.note}
-                          onChange={(e) =>
-                            updatePaymentChannel(idx, "note", e.target.value)
-                          }
-                        />
-                      </div>
+                  <div className="grid grid-cols-12 gap-4 items-center bg-white p-4 rounded-lg border border-blue-100 mb-4">
+                    <div className="col-span-2">
+                      <Select
+                        value={channel.method}
+                        onValueChange={(v) =>
+                          updatePaymentChannel(idx, "method", v)
+                        }
+                      >
+                        <SelectTrigger className="bg-white border-blue-100">
+                          <SelectValue placeholder="รับชำระโดย" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="เงินสด">💵 เงินสด</SelectItem>
+                          <SelectItem value="โอนเงิน">🏦 โอนเงิน</SelectItem>
+                          <SelectItem value="บัตรเครดิต">�� บัตรเครดิต</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
-                  )}
+                    <div className="col-span-2">
+                      <Select
+                        value={channel.bankAccountId?.toString() || "null"}
+                        onValueChange={(v) =>
+                          updatePaymentChannel(
+                            idx,
+                            "bankAccountId",
+                            v && v !== "null" ? parseInt(v) : null
+                          )
+                        }
+                      >
+                        <SelectTrigger className="bg-white border-blue-100">
+                          <SelectValue placeholder="เลือกบัญชีธนาคาร" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="null">ไม่ระบุ</SelectItem>
+                          {bankAccounts.map((account) => (
+                            <SelectItem
+                              key={account.id}
+                              value={account.id.toString()}
+                            >
+                              {account.bank_name} - {account.account_number}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="col-span-2">
+                      <Input
+                        type="number"
+                        className="bg-white border-blue-100"
+                        placeholder={`จำนวนเงินที่รับชำระ`}
+                        value={channel.amount}
+                        onChange={(e) =>
+                          updatePaymentChannel(idx, "amount", e.target.value)
+                        }
+                        max={netTotal}
+                      />
+                    </div>
+                    <div className="col-span-5">
+                      <Input
+                        type="text"
+                        className="bg-white border-blue-100"
+                        placeholder="หมายเหตุ"
+                        maxLength={20}
+                        value={channel.note}
+                        onChange={(e) =>
+                          updatePaymentChannel(idx, "note", e.target.value)
+                        }
+                      />
+                    </div>
+                  </div>
                 </div>
               ))}
               <button
