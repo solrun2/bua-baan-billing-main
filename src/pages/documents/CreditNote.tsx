@@ -152,19 +152,17 @@ const CreditNote = () => {
   };
 
   const handleViewClick = useCallback(async (creditNote: CreditNoteItem) => {
-    toast.promise(apiService.getDocumentById(creditNote.id), {
-      loading: "กำลังโหลดข้อมูล...",
-      success: (fullDoc) => {
-        if (fullDoc) {
-          setSelectedCreditNote(fullDoc);
-          setIsModalOpen(true);
-        } else {
-          toast.error("ไม่พบข้อมูลเอกสาร");
-        }
-        return "โหลดข้อมูลสำเร็จ";
-      },
-      error: "ไม่สามารถดูรายละเอียดได้",
-    });
+    try {
+      const fullDoc = await apiService.getDocumentById(creditNote.id);
+      if (fullDoc) {
+        setSelectedCreditNote(fullDoc);
+        setIsModalOpen(true);
+      } else {
+        toast.error("ไม่พบข้อมูลเอกสาร");
+      }
+    } catch (e) {
+      toast.error("ไม่สามารถดูรายละเอียดได้");
+    }
   }, []);
 
   const getStatusBadge = (status: string) => {

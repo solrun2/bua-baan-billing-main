@@ -145,19 +145,17 @@ const Billing = () => {
   };
 
   const handleViewClick = useCallback(async (billing: BillingItem) => {
-    toast.promise(apiService.getDocumentById(billing.id), {
-      loading: "กำลังโหลดข้อมูล...",
-      success: (fullDoc) => {
-        if (fullDoc) {
-          setSelectedBilling(fullDoc);
-          setIsModalOpen(true);
-        } else {
-          toast.error("ไม่พบข้อมูลเอกสาร");
-        }
-        return "โหลดข้อมูลสำเร็จ";
-      },
-      error: "ไม่สามารถดูรายละเอียดได้",
-    });
+    try {
+      const fullDoc = await apiService.getDocumentById(billing.id);
+      if (fullDoc) {
+        setSelectedBilling(fullDoc);
+        setIsModalOpen(true);
+      } else {
+        toast.error("ไม่พบข้อมูลเอกสาร");
+      }
+    } catch (e) {
+      toast.error("ไม่สามารถดูรายละเอียดได้");
+    }
   }, []);
 
   const getStatusBadge = (status: string) => {

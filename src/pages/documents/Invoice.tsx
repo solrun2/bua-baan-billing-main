@@ -152,19 +152,17 @@ const Invoice = () => {
   };
 
   const handleViewClick = useCallback(async (invoice: InvoiceItem) => {
-    toast.promise(apiService.getDocumentById(invoice.id), {
-      loading: "กำลังโหลดข้อมูล...",
-      success: (fullDoc) => {
-        if (fullDoc) {
-          setSelectedInvoice(fullDoc);
-          setIsModalOpen(true);
-        } else {
-          toast.error("ไม่พบข้อมูลเอกสาร");
-        }
-        return "โหลดข้อมูลสำเร็จ";
-      },
-      error: "ไม่สามารถดูรายละเอียดได้",
-    });
+    try {
+      const fullDoc = await apiService.getDocumentById(invoice.id);
+      if (fullDoc) {
+        setSelectedInvoice(fullDoc);
+        setIsModalOpen(true);
+      } else {
+        toast.error("ไม่พบข้อมูลเอกสาร");
+      }
+    } catch (e) {
+      toast.error("ไม่สามารถดูรายละเอียดได้");
+    }
   }, []);
 
   const getStatusBadge = (status: string) => {

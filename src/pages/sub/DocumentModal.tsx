@@ -227,8 +227,7 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
     if (isNaN(d.getTime())) return dateStr;
     return d.toLocaleDateString("th-TH");
   };
-
-  if (!open) return null;
+  
   const labels = typeLabels[type];
 
   // เลือก items ที่จะแสดง (logic เดียวกันทุก type)
@@ -247,12 +246,6 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
             unitPrice: item.unitPrice ?? item.unit_price ?? 0,
           }))
         : [];
-  console.log("DocumentModal items (with fallback):", items);
-  console.log("DocumentModal document.items:", document.items);
-  console.log(
-    "DocumentModal document.items_recursive:",
-    document.items_recursive
-  );
 
   // Use summary from document, or recalculate if missing/zero
   const summary = document.summary || {
@@ -263,9 +256,6 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
     withholdingTax: (document as any).withholdingTax ?? 0,
   };
 
-  console.log("summary", summary);
-  console.log("DocumentModal document:", document);
-  console.log("DocumentModal items:", document.items);
 
   // --- Section Helper Functions ---
   // Header: โลโก้+ชื่อบริษัท (ซ้าย), Document Title (ขวาบน, บรรทัดเดียว)
@@ -312,7 +302,7 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
           {type === "quotation" && (
             <div>
               <b>วันหมดอายุ:</b>{" "}
-              {formatDate(document.valid_until || document.validUntil)}
+              {formatDate(document.validUntil)}
             </div>
           )}
         </div>
@@ -509,7 +499,7 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
         return (
           <div className="mt-4 text-xs text-gray-600">
             <b>เงื่อนไขการชำระเงิน:</b> กรุณาชำระเงินภายในวันที่{" "}
-            {formatDate(document.valid_until || document.validUntil)}
+            {formatDate(document.validUntil)}
             <br />
             <b>หมายเหตุ:</b> {document.notes || "-"}
           </div>

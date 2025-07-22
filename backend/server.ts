@@ -938,9 +938,16 @@ app.delete("/api/documents/:id", async (req: Request, res: Response) => {
 app.get("/api/documents/:id", async (req, res) => {
   const { id } = req.params;
   try {
-    const docRows = await pool.query("SELECT * FROM documents WHERE id = ?", [
-      id,
-    ]);
+    // JOIN ตาราง quotation_details ด้วย เพื่อให้ได้ valid_until
+    const docRows = await pool.query(
+      `
+      SELECT d.*, qd.valid_until
+      FROM documents d
+      LEFT JOIN quotation_details qd ON d.id = qd.document_id
+      WHERE d.id = ?
+    `,
+      [id]
+    );
     const doc = Array.isArray(docRows) ? docRows[0] : null;
     if (!doc || (Array.isArray(doc) && doc.length === 0)) {
       return res.status(404).json({ error: "Document not found" });

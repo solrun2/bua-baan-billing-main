@@ -140,19 +140,17 @@ const Quotation = () => {
   };
 
   const handleViewClick = useCallback(async (quotation: QuotationItem) => {
-    toast.promise(apiService.getDocumentById(quotation.id), {
-      loading: "กำลังโหลดข้อมูล...",
-      success: (fullDoc) => {
-        if (fullDoc) {
-          setSelectedQuotation(fullDoc);
-          setIsModalOpen(true);
-        } else {
-          toast.error("ไม่พบข้อมูลเอกสาร");
-        }
-        return undefined; // คืน undefined เพื่อไม่ให้ toast เด้ง
-      },
-      error: "ไม่สามารถดูรายละเอียดได้",
-    });
+    try {
+      const fullDoc = await apiService.getDocumentById(quotation.id);
+      if (fullDoc) {
+        setSelectedQuotation(fullDoc);
+        setIsModalOpen(true);
+      } else {
+        toast.error("ไม่พบข้อมูลเอกสาร");
+      }
+    } catch (e) {
+      toast.error("ไม่สามารถดูรายละเอียดได้");
+    }
   }, []);
 
   const getStatusBadge = (status: string) => {
