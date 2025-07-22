@@ -786,7 +786,10 @@ export const DocumentForm: FC<DocumentFormProps> = ({
 
         // โหลดข้อมูล receipt details สำหรับการแก้ไข
         if (documentType === "receipt" && initialData.receipt_details) {
-          console.log("[DEBUG] useEffect: initialData.receipt_details", initialData.receipt_details);
+          console.log(
+            "[DEBUG] useEffect: initialData.receipt_details",
+            initialData.receipt_details
+          );
           const receiptDetails = initialData.receipt_details;
 
           // --- โหลด payment channels ---
@@ -798,17 +801,12 @@ export const DocumentForm: FC<DocumentFormProps> = ({
               paymentChannelsData = [];
             }
           }
-          if (Array.isArray(paymentChannelsData)) {
-            const channels = paymentChannelsData.map((ch: any) => ({
-              enabled: true,
-              method: ch.channel || "",
-              amount: ch.amount || 0,
-              note: ch.note || "",
-              bankAccountId: ch.bankAccountId || null,
-            }));
-            console.log("[DEBUG] setPaymentChannels:", channels);
-            setPaymentChannels(channels);
-          }
+          console.log(
+            "[DEBUG] paymentChannelsData from backend:",
+            paymentChannelsData
+          );
+          // ลบการ setPaymentChannels ออกจากที่นี่ เพื่อป้องกันการทำงานซ้ำซ้อน
+          // จะใช้ useEffect แยกแทน
 
           // --- โหลด fees ---
           let feesData = receiptDetails.fees;
@@ -957,9 +955,19 @@ export const DocumentForm: FC<DocumentFormProps> = ({
 
     // ตรวจสอบยอดรับชำระไม่ให้เกินยอดที่ต้องชำระ (เฉพาะใบเสร็จ)
     if (documentType === "receipt") {
-      const totalPaymentAmount = paymentChannels
-        .filter((c) => c.enabled)
-        .reduce((sum, c) => sum + Number(c.amount || 0), 0);
+      // --- เพิ่ม validation ช่องทางรับชำระ ---
+      const validChannels = paymentChannels.filter(
+        (c) => c.enabled && c.method && Number(c.amount) > 0
+      );
+      if (validChannels.length === 0) {
+        toast.error("กรุณาระบุช่องทางรับชำระและจำนวนเงินอย่างน้อย 1 ช่องทาง");
+        setIsSaving(false);
+        return;
+      }
+      const totalPaymentAmount = validChannels.reduce(
+        (sum, c) => sum + Number(c.amount || 0),
+        0
+      );
       const totalOffsetAmount = offsetDocs
         .filter((d) => d.enabled)
         .reduce((sum, d) => sum + Number(d.amount || 0), 0);
@@ -967,7 +975,9 @@ export const DocumentForm: FC<DocumentFormProps> = ({
 
       if (totalReceiptAmount > netTotal) {
         toast.error("ยอดรับชำระเกินยอดที่ต้องชำระ", {
-          description: `ยอดรับชำระรวม: ${totalReceiptAmount.toLocaleString("th-TH")} บาท, ยอดที่ต้องชำระ: ${netTotal.toLocaleString("th-TH")} บาท`,
+          description: `ยอดรับชำระรวม: ${totalReceiptAmount.toLocaleString("th-TH")}
+บาท, ยอดที่ต้องชำระ: ${netTotal.toLocaleString("th-TH")}
+บาท`,
         });
         setIsSaving(false);
         return;
@@ -1030,15 +1040,15 @@ export const DocumentForm: FC<DocumentFormProps> = ({
         payment_date: form.documentDate, // ใช้วันที่เอกสารเป็นวันชำระเงิน
         payment_method:
           paymentChannels
-            .filter((c) => c.enabled && c.method)
+            .filter((c) => c.enabled && c.method && Number(c.amount) > 0)
             .map((c) => c.method)
             .join(", ") || "เงินสด",
         payment_reference: "",
         payment_channels: paymentChannels
-          .filter((c) => c.enabled)
+          .filter((c) => c.enabled && c.method && Number(c.amount) > 0)
           .map((c) => ({
-            channel: c.method || "เงินสด",
-            amount: Number(c.amount) || 0,
+            channel: c.method,
+            amount: Number(c.amount),
             note: c.note || "",
             bankAccountId: c.bankAccountId,
           })),
@@ -1259,6 +1269,64 @@ export const DocumentForm: FC<DocumentFormProps> = ({
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.items]);
+
+  // ลบ useEffect หลักที่ซ้ำซ้อนออก เพื่อป้องกันการ reset state ของ paymentChannels
+  // จะใช้ useEffect แยกสำหรับ paymentChannels เท่านั้น
+
+  // เพิ่ม useEffect แยกสำหรับ paymentChannels เพื่อให้ทำงานทันที
+  useEffect(() => {
+    if (editMode && documentType === "receipt" && initialData.receipt_details) {
+      const receiptDetails = initialData.receipt_details;
+      let paymentChannelsData = receiptDetails.payment_channels;
+
+      if (typeof paymentChannelsData === "string") {
+        try {
+          paymentChannelsData = JSON.parse(paymentChannelsData);
+        } catch (e) {
+          paymentChannelsData = [];
+        }
+      }
+
+      console.log(
+        "[DEBUG] SEPARATE useEffect - paymentChannelsData:",
+        paymentChannelsData
+      );
+
+      if (
+        Array.isArray(paymentChannelsData) &&
+        paymentChannelsData.length > 0
+      ) {
+        const channels = paymentChannelsData.map((ch: any) => ({
+          enabled: true,
+          method: ch.channel || ch.method || "",
+          amount: ch.amount || 0,
+          note: ch.note || "",
+          bankAccountId: ch.bankAccountId || null,
+        }));
+        console.log(
+          "[DEBUG] SEPARATE useEffect - setPaymentChannels:",
+          channels
+        );
+
+        // เช็คว่าข้อมูลเปลี่ยนหรือไม่ก่อน set
+        const currentFirstChannel = paymentChannels[0];
+        const newFirstChannel = channels[0];
+
+        if (
+          !currentFirstChannel ||
+          currentFirstChannel.method !== newFirstChannel.method ||
+          currentFirstChannel.amount !== newFirstChannel.amount
+        ) {
+          console.log("[DEBUG] SEPARATE useEffect - updating paymentChannels");
+          setPaymentChannels(channels);
+        } else {
+          console.log(
+            "[DEBUG] SEPARATE useEffect - skipping update (same data)"
+          );
+        }
+      }
+    }
+  }, [editMode, documentType, initialData.receipt_details, paymentChannels]);
 
   return (
     <>
@@ -1964,6 +2032,10 @@ export const DocumentForm: FC<DocumentFormProps> = ({
             </CardHeader>
             <CardContent className="space-y-6">
               {/* ช่องทางการรับชำระเงิน */}
+              {(() => {
+                console.log("[DEBUG] RENDER paymentChannels:", paymentChannels);
+                return null;
+              })()}
               {paymentChannels.map((channel, idx) => (
                 <div key={idx}>
                   {/* <pre style={{background:'#f5f5f5', color:'#333', fontSize:'12px', marginBottom:'4px'}}>{JSON.stringify(channel, null, 2)}</pre> */}
@@ -2002,7 +2074,9 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                         <SelectContent>
                           <SelectItem value="เงินสด">💵 เงินสด</SelectItem>
                           <SelectItem value="โอนเงิน">🏦 โอนเงิน</SelectItem>
-                          <SelectItem value="บัตรเครดิต">�� บัตรเครดิต</SelectItem>
+                          <SelectItem value="บัตรเครดิต">
+                            �� บัตรเครดิต
+                          </SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
