@@ -89,6 +89,15 @@ const Receipt = () => {
         setLoading(true);
         setError(null);
         const data = await apiService.getDocuments();
+        console.log(
+          "[DEBUG] loadReceipts - all documents:",
+          data.map((doc) => ({
+            id: doc.id,
+            document_number: doc.document_number,
+            document_type: doc.document_type,
+          }))
+        );
+
         const receiptsData = data
           .filter((doc) => doc.document_type === "RECEIPT")
           .map((doc: any): ReceiptItem => {
@@ -128,8 +137,13 @@ const Receipt = () => {
     }
   };
   const handleFilterChange = (newFilters: any) => setFilters(newFilters);
-  const handleEditClick = (id: string) =>
+  const handleEditClick = (id: string) => {
+    console.log(
+      "[DEBUG] handleEditClick - navigating to edit receipt with ID:",
+      id
+    );
     navigate(`/documents/receipt/edit/${id}`);
+  };
 
   const handleDeleteClick = async (id: string) => {
     if (window.confirm("คุณต้องการลบใบเสร็จรับเงินนี้ใช่หรือไม่?")) {
@@ -145,6 +159,11 @@ const Receipt = () => {
   };
 
   const handleViewClick = useCallback(async (receipt: ReceiptItem) => {
+    console.log("[DEBUG] handleViewClick - receipt:", {
+      id: receipt.id,
+      number: receipt.number,
+      customer: receipt.customer,
+    });
     try {
       const fullDoc = await apiService.getDocumentById(receipt.id);
       if (fullDoc) {

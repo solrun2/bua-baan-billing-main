@@ -64,7 +64,6 @@ const CreditNote = () => {
 
       const docDate = item.documentDate;
 
-      // ✨✨✨ แก้ไขตามคำขอ: ลบวันที่เริ่มต้นออก 1 วัน ✨✨✨
       let adjustedDateFrom = filters.dateFrom;
       if (filters.dateFrom) {
         const fromDate = new Date(filters.dateFrom);

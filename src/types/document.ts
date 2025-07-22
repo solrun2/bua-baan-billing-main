@@ -70,6 +70,8 @@ export interface DocumentData {
   tags?: string[];
   issueTaxInvoice?: boolean;
   related_document_id?: number;
+  // Fields for receipt details
+  receipt_details?: ReceiptDetails;
 }
 
 export interface Document {
@@ -125,6 +127,14 @@ export interface DocumentPayload {
   updatedAt?: string;
   tags?: string[];
   issueTaxInvoice?: boolean;
+  // Fields for receipt
+  payment_date?: string;
+  payment_method?: string;
+  payment_reference?: string;
+  payment_channels?: any[];
+  fees?: any[];
+  offset_docs?: any[];
+  net_total_receipt?: number;
 }
 
 export type WithholdingTaxOption =

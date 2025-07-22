@@ -50,7 +50,7 @@ const createDocument = async (
 
 // ย้ายฟังก์ชัน prepareDocumentData ให้อยู่เหนือ updateDocument (ถ้ายังไม่ได้อยู่)
 function prepareDocumentData(document: DocumentPayload): any {
-  return {
+  const backendData = {
     id: document.id,
     document_type: document.documentType,
     document_number: document.documentNumber,
@@ -68,8 +68,28 @@ function prepareDocumentData(document: DocumentPayload): any {
     tags: document.tags,
     updatedAt: document.updatedAt,
     issueTaxInvoice: document.issueTaxInvoice,
-    // เพิ่ม field อื่น ๆ ที่ backend ต้องการ
+    // เพิ่ม fields สำหรับ receipt
+    payment_date: document.payment_date,
+    payment_method: document.payment_method,
+    payment_reference: document.payment_reference,
+    payment_channels: document.payment_channels,
+    fees: document.fees,
+    offset_docs: document.offset_docs,
+    net_total_receipt: document.net_total_receipt,
   };
+
+  // Debug log สำหรับ receipt
+  if (document.documentType === "receipt") {
+    console.log("[prepareDocumentData] Receipt fields:");
+    console.log("- payment_date:", backendData.payment_date);
+    console.log("- payment_method:", backendData.payment_method);
+    console.log("- payment_channels:", backendData.payment_channels);
+    console.log("- fees:", backendData.fees);
+    console.log("- offset_docs:", backendData.offset_docs);
+    console.log("- net_total_receipt:", backendData.net_total_receipt);
+  }
+
+  return backendData;
 }
 
 // --- จุดที่แก้ไข ---
@@ -256,10 +276,13 @@ function mapDocumentFromBackend(doc: any): DocumentData {
     attachments: doc.attachments || [],
     issueTaxInvoice: doc.issue_tax_invoice ?? false,
     updatedAt: doc.updated_at,
+    // เพิ่ม receipt_details
+    receipt_details: doc.receipt_details || null,
   };
 }
 
 const getDocumentById = async (id: string): Promise<DocumentData> => {
+  console.log("[DEBUG] getDocumentById - Requested ID:", id);
   try {
     const response = await fetch(`${API_BASE_URL}/documents/${id}`);
 
@@ -267,7 +290,25 @@ const getDocumentById = async (id: string): Promise<DocumentData> => {
       throw new Error("Failed to fetch document by ID");
     }
     const doc = await response.json();
-    return mapDocumentFromBackend(doc);
+
+    // Debug log เพื่อตรวจสอบข้อมูลที่ได้จาก backend
+    console.log("[DEBUG] getDocumentById - raw doc from backend:", {
+      id: doc.id,
+      document_number: doc.document_number,
+      document_type: doc.document_type,
+    });
+
+    const mappedDoc = mapDocumentFromBackend(doc);
+
+    // Debug log เพื่อตรวจสอบข้อมูลหลังแปลง
+    console.log("[DEBUG] getDocumentById - mapped doc:", {
+      id: mappedDoc.id,
+      documentNumber: mappedDoc.documentNumber,
+      documentType: mappedDoc.documentType,
+      receipt_details: mappedDoc.receipt_details,
+    });
+
+    return mappedDoc;
   } catch (error) {
     console.error("Error fetching document by ID:", error);
     throw error;

@@ -9,11 +9,18 @@ const EditDocumentPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
+
+  console.log("[DEBUG] EditDocument - URL params:", { id });
+  console.log("[DEBUG] EditDocument - location:", {
+    pathname: location.pathname,
+    search: location.search,
+  });
   const [initialData, setInitialData] = useState<DocumentData | null>(null);
   const [loading, setLoading] = useState(true);
   const [hasRelated, setHasRelated] = useState(false);
 
   useEffect(() => {
+    console.log("[DEBUG] EditDocument useEffect - id from params:", id);
     if (!id) {
       toast.error("ไม่พบ ID ของเอกสาร");
       setLoading(false);
@@ -22,6 +29,7 @@ const EditDocumentPage: React.FC = () => {
     }
 
     const fetchDocument = async () => {
+      console.log("[DEBUG] EditDocument - fetching document with ID:", id);
       try {
         const data = await apiService.getDocumentById(id);
         if (!data) {

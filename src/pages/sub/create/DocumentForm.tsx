@@ -204,12 +204,6 @@ export const DocumentForm: FC<DocumentFormProps> = ({
   const currentDocSetting = docSettings.find(
     (d) => d.document_type === documentType
   );
-  const previewNumber = currentDocSetting
-    ? previewDocumentNumber(
-        currentDocSetting.pattern,
-        Number(currentDocSetting.current_number)
-      )
-    : "";
 
   function createDefaultItem(): DocumentItem {
     return {
@@ -285,13 +279,20 @@ export const DocumentForm: FC<DocumentFormProps> = ({
 
   // sync form.priceType กับ initialData.priceType ทุกครั้งที่ initialData เปลี่ยน (เช่น async load)
   useEffect(() => {
+    console.log(
+      "[DEBUG] useEffect sync priceType - initialData.priceType:",
+      initialData.priceType,
+      "form.priceType:",
+      form.priceType
+    );
     if (initialData.priceType && initialData.priceType !== form.priceType) {
+      console.log("[DEBUG] useEffect sync priceType - กำลัง sync priceType");
       setForm((prev) => ({
         ...prev,
         priceType: initialData.priceType,
       }));
     }
-  }, [initialData.priceType]);
+  }, [initialData.priceType, form.priceType]);
 
   // เพิ่ม netTotalAmount ใน state summary
   const [summary, setSummary] = useState<
@@ -346,10 +347,44 @@ export const DocumentForm: FC<DocumentFormProps> = ({
     setSummary(calculatedSummary);
   }, [calculatedSummary]);
 
+  // คำนวณ previewNumber หลังจากการประกาศ form
+  const previewNumber = useMemo(() => {
+    const result = editMode
+      ? form.documentNumber
+      : currentDocSetting
+        ? previewDocumentNumber(
+            currentDocSetting.pattern,
+            Number(currentDocSetting.current_number)
+          )
+        : "";
+
+    console.log("[DEBUG] previewNumber calculation:", {
+      editMode,
+      formDocumentNumber: form.documentNumber,
+      currentDocSetting: currentDocSetting
+        ? {
+            pattern: currentDocSetting.pattern,
+            current_number: currentDocSetting.current_number,
+          }
+        : null,
+      previewNumber: result,
+    });
+
+    return result;
+  }, [editMode, form.documentNumber, currentDocSetting]);
+
   // handle เปลี่ยนค่าในฟอร์ม
   const handleFormChange = useCallback(
     (field: string, value: any) => {
       console.log("[DocumentForm] เปลี่ยนค่า:", field, value);
+      if (field === "documentNumber") {
+        console.log(
+          "[DEBUG] handleFormChange - เปลี่ยน documentNumber จาก:",
+          form.documentNumber,
+          "เป็น:",
+          value
+        );
+      }
       setForm(
         (prev) =>
           ({
@@ -359,7 +394,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
           }) as typeof form
       );
     },
-    [summary]
+    [summary, form.documentNumber]
   );
 
   // handle เปลี่ยนค่าใน customer
@@ -599,7 +634,14 @@ export const DocumentForm: FC<DocumentFormProps> = ({
 
   // เพิ่ม useEffect สำหรับดึงเลขเอกสารใหม่จาก backend (เฉพาะกรณีสร้างใหม่)
   useEffect(() => {
+    console.log(
+      "[DEBUG] useEffect fetchNextNumber - editMode:",
+      editMode,
+      "form.documentNumber:",
+      form.documentNumber
+    );
     if (!editMode && !form.documentNumber) {
+      console.log("[DEBUG] กำลัง fetch เลขเอกสารใหม่...");
       const fetchNextNumber = async () => {
         try {
           const res = await fetch(
@@ -607,6 +649,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
           );
           if (!res.ok) throw new Error("ไม่สามารถดึงเลขเอกสารใหม่ได้");
           const data = await res.json();
+          console.log("[DEBUG] ได้เลขเอกสารใหม่:", data.documentNumber);
           handleFormChange("documentNumber", data.documentNumber);
         } catch (error) {
           // fallback เดิม
@@ -618,20 +661,26 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                 : documentType === "receipt"
                   ? "RC"
                   : "TAX";
-          handleFormChange(
-            "documentNumber",
-            `${prefix}-${new Date().getFullYear()}-00001`
-          );
+          const fallbackNumber = `${prefix}-${new Date().getFullYear()}-00001`;
+          console.log("[DEBUG] ใช้เลขเอกสาร fallback:", fallbackNumber);
+          handleFormChange("documentNumber", fallbackNumber);
         }
       };
       fetchNextNumber();
+    } else {
+      console.log(
+        "[DEBUG] ไม่ fetch เลขเอกสารใหม่ - editMode:",
+        editMode,
+        "มีเลขเอกสารแล้ว:",
+        !!form.documentNumber
+      );
     }
     // eslint-disable-next-line
-  }, [documentType, editMode, form.documentNumber]);
+  }, [documentType, editMode]);
 
-  // Sync document number with localStorage changes
+  // Sync document number with localStorage changes (เฉพาะเอกสารใหม่)
   useEffect(() => {
-    if (!initialData.id) {
+    if (!initialData.id && !editMode) {
       // Only for new documents
       const handleStorageChange = () => {
         try {
@@ -665,12 +714,20 @@ export const DocumentForm: FC<DocumentFormProps> = ({
         window.removeEventListener("storage", handleStorageChange);
       };
     }
-  }, [documentType, initialData.id, form.documentNumber]);
+  }, [documentType, initialData.id, editMode]);
 
   // Sync form state with initialData when initialData changes (for edit mode)
   useEffect(() => {
     async function fillEditData() {
       if (editMode && initialData.customer?.id) {
+        // Debug log เพื่อตรวจสอบข้อมูลที่โหลดมา
+        console.log("[DEBUG] fillEditData - initialData:", {
+          documentNumber: initialData.documentNumber,
+          documentDate: initialData.documentDate,
+          customer: initialData.customer,
+          id: initialData.id,
+        });
+
         // ใช้ข้อมูลลูกค้าที่มีอยู่แล้ว ไม่ต้องโหลดใหม่
         const customer = initialData.customer;
 
@@ -725,21 +782,40 @@ export const DocumentForm: FC<DocumentFormProps> = ({
               | "NO_VAT",
           };
         });
-        setForm((prev) => ({
-          ...prev,
-          customer: {
-            id:
-              typeof customer.id === "string"
-                ? parseInt(customer.id, 10)
-                : customer.id,
-            name: customer.name,
-            tax_id: customer.tax_id,
-            phone: customer.phone,
-            address: customer.address,
-            email: customer.email,
-          },
-          items,
-        }));
+        console.log(
+          "[DEBUG] fillEditData - กำลัง set form ด้วย documentNumber:",
+          initialData.documentNumber
+        );
+        setForm((prev) => {
+          const newForm = {
+            ...prev,
+            documentNumber: initialData.documentNumber || "",
+            documentDate: initialData.documentDate || "",
+            dueDate: initialData.dueDate || "",
+            validUntil: initialData.validUntil || "",
+            reference: initialData.reference || "",
+            notes: initialData.notes || "",
+            status: initialData.status || "draft",
+            customer: {
+              id:
+                typeof customer.id === "string"
+                  ? parseInt(customer.id, 10)
+                  : customer.id,
+              name: customer.name,
+              tax_id: customer.tax_id,
+              phone: customer.phone,
+              address: customer.address,
+              email: customer.email,
+            },
+            items,
+          };
+          console.log(
+            "[DEBUG] fillEditData - setForm callback - newForm.documentNumber:",
+            newForm.documentNumber
+          );
+          return newForm;
+        });
+        console.log("[DEBUG] fillEditData - set form เสร็จแล้ว");
         // คำนวณ summary ใหม่ทันทีหลัง normalize items
         // แปลง priceType ของแต่ละ item ก่อนส่งเข้า calculateDocumentSummary
         const mappedItems = items.map((item) => ({
@@ -750,11 +826,65 @@ export const DocumentForm: FC<DocumentFormProps> = ({
         newSummary2.netTotalAmount =
           newSummary2.total - newSummary2.withholdingTax;
         setSummary(newSummary2);
+
+        // โหลดข้อมูล receipt details สำหรับการแก้ไข
+
+        if (documentType === "receipt" && initialData.receipt_details) {
+          const receiptDetails = initialData.receipt_details;
+
+          // โหลด payment channels
+
+          if (
+            receiptDetails.payment_channels &&
+            Array.isArray(receiptDetails.payment_channels)
+          ) {
+            const channels = receiptDetails.payment_channels.map((ch: any) => ({
+              enabled: true,
+              method: ch.channel || "",
+              amount: ch.amount || 0,
+              note: ch.note || "",
+            }));
+            if (channels.length > 0) {
+              setPaymentChannels(channels);
+            }
+          }
+
+          // โหลด fees
+          if (receiptDetails.fees && Array.isArray(receiptDetails.fees)) {
+            const feeList = receiptDetails.fees.map((f: any) => ({
+              enabled: true,
+              type: f.type || "",
+              account: f.account || "",
+              amount: f.amount || 0,
+              note: f.note || "",
+            }));
+            if (feeList.length > 0) {
+              setFees(feeList);
+            }
+          }
+
+          // โหลด offset docs
+          if (
+            receiptDetails.offset_docs &&
+            Array.isArray(receiptDetails.offset_docs)
+          ) {
+            const offsetList = receiptDetails.offset_docs.map((d: any) => ({
+              enabled: true,
+              docType: d.doc_type || "",
+              docNumber: d.doc_no || "",
+              amount: d.amount || 0,
+              note: d.note || "",
+            }));
+            if (offsetList.length > 0) {
+              setOffsetDocs(offsetList);
+            }
+          }
+        }
       }
     }
     fillEditData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editMode, initialData]);
+  }, [editMode, initialData, documentType]);
 
   // เพิ่ม useEffect สำหรับกรณี editMode และมี related_document_id
   useEffect(() => {
@@ -853,6 +983,25 @@ export const DocumentForm: FC<DocumentFormProps> = ({
       return;
     }
 
+    // ตรวจสอบยอดรับชำระไม่ให้เกินยอดที่ต้องชำระ (เฉพาะใบเสร็จ)
+    if (documentType === "receipt") {
+      const totalPaymentAmount = paymentChannels
+        .filter((c) => c.enabled)
+        .reduce((sum, c) => sum + Number(c.amount || 0), 0);
+      const totalOffsetAmount = offsetDocs
+        .filter((d) => d.enabled)
+        .reduce((sum, d) => sum + Number(d.amount || 0), 0);
+      const totalReceiptAmount = totalPaymentAmount + totalOffsetAmount;
+
+      if (totalReceiptAmount > netTotal) {
+        toast.error("ยอดรับชำระเกินยอดที่ต้องชำระ", {
+          description: `ยอดรับชำระรวม: ${totalReceiptAmount.toLocaleString("th-TH")} บาท, ยอดที่ต้องชำระ: ${netTotal.toLocaleString("th-TH")} บาท`,
+        });
+        setIsSaving(false);
+        return;
+      }
+    }
+
     // --- เช็ค reference หรือ related_document_id ก่อนสร้าง ---
     try {
     } catch (err) {
@@ -914,6 +1063,40 @@ export const DocumentForm: FC<DocumentFormProps> = ({
       priceType: mapPriceTypeToEnum(form.priceType),
       status: form.status,
       attachments: attachments,
+      // เพิ่มข้อมูลสำหรับ receipt
+      ...(documentType === "receipt" && {
+        payment_date: form.documentDate, // ใช้วันที่เอกสารเป็นวันชำระเงิน
+        payment_method:
+          paymentChannels
+            .filter((c) => c.enabled && c.method)
+            .map((c) => c.method)
+            .join(", ") || "เงินสด",
+        payment_reference: "",
+        payment_channels: paymentChannels
+          .filter((c) => c.enabled)
+          .map((c) => ({
+            channel: c.method || "เงินสด",
+            amount: Number(c.amount) || 0,
+            note: c.note || "",
+          })),
+        fees: fees
+          .filter((f) => f.enabled)
+          .map((f) => ({
+            type: f.type || "ค่าธรรมเนียม",
+            amount: Number(f.amount) || 0,
+            account: f.account || "",
+            note: f.note || "",
+          })),
+        offset_docs: offsetDocs
+          .filter((d) => d.enabled)
+          .map((d) => ({
+            doc_type: d.docType || "",
+            doc_no: d.docNumber || "",
+            amount: Number(d.amount) || 0,
+            note: d.note || "",
+          })),
+        net_total_receipt: netTotal,
+      }),
     };
 
     // แปลง DocumentPayload เป็น DocumentData สำหรับบันทึก localStorage
@@ -954,6 +1137,24 @@ export const DocumentForm: FC<DocumentFormProps> = ({
       mapPriceTypeToEnum(form.priceType)
     );
     console.log("[DEBUG] dataToSave:", dataToSave);
+
+    // Debug log สำหรับ receipt details
+    if (documentType === "receipt") {
+      console.log("[DEBUG] Receipt Details ที่จะส่งไป backend:");
+      console.log("- payment_channels:", dataToSave.payment_channels);
+      console.log("- fees:", dataToSave.fees);
+      console.log("- offset_docs:", dataToSave.offset_docs);
+      console.log("- net_total_receipt:", dataToSave.net_total_receipt);
+      console.log("[DEBUG] การคำนวณ:");
+      console.log("- calculatedSummary.total:", calculatedSummary.total);
+      console.log(
+        "- calculatedSummary.withholdingTax:",
+        calculatedSummary.withholdingTax
+      );
+      console.log("- netTotal (หัก ณ ที่จ่ายแล้ว):", netTotal);
+      console.log("- totalPayment:", totalPayment);
+      console.log("- ต้องรับชำระเงินอีก:", netTotal - totalPayment);
+    }
     try {
       await onSave(dataToSave);
     } catch (error) {
@@ -986,10 +1187,24 @@ export const DocumentForm: FC<DocumentFormProps> = ({
     ]);
   const removePaymentChannel = (idx: number) =>
     setPaymentChannels(paymentChannels.filter((_, i) => i !== idx));
-  const updatePaymentChannel = (idx: number, field: string, value: any) =>
+  const updatePaymentChannel = (idx: number, field: string, value: any) => {
+    if (field === "amount") {
+      const currentAmount = Number(value) || 0;
+      const otherPayments = paymentChannels
+        .filter((c, i) => i !== idx && c.enabled)
+        .reduce((sum, c) => sum + Number(c.amount || 0), 0);
+      const maxAllowed = Math.max(0, netTotal - otherPayments);
+
+      // ถ้ายอดที่ป้อนเกินยอดที่ต้องชำระ ให้จำกัดไว้ที่ยอดสูงสุด
+      if (currentAmount > maxAllowed) {
+        value = maxAllowed;
+      }
+    }
+
     setPaymentChannels(
       paymentChannels.map((c, i) => (i === idx ? { ...c, [field]: value } : c))
     );
+  };
 
   const addFee = () =>
     setFees([
@@ -1007,10 +1222,27 @@ export const DocumentForm: FC<DocumentFormProps> = ({
     ]);
   const removeOffsetDoc = (idx: number) =>
     setOffsetDocs(offsetDocs.filter((_, i) => i !== idx));
-  const updateOffsetDoc = (idx: number, field: string, value: any) =>
+  const updateOffsetDoc = (idx: number, field: string, value: any) => {
+    if (field === "amount") {
+      const currentAmount = Number(value) || 0;
+      const otherPayments = paymentChannels
+        .filter((c) => c.enabled)
+        .reduce((sum, c) => sum + Number(c.amount || 0), 0);
+      const otherOffsets = offsetDocs
+        .filter((d, i) => i !== idx && d.enabled)
+        .reduce((sum, d) => sum + Number(d.amount || 0), 0);
+      const maxAllowed = Math.max(0, netTotal - otherPayments - otherOffsets);
+
+      // ถ้ายอดที่ป้อนเกินยอดที่ต้องชำระ ให้จำกัดไว้ที่ยอดสูงสุด
+      if (currentAmount > maxAllowed) {
+        value = maxAllowed;
+      }
+    }
+
     setOffsetDocs(
       offsetDocs.map((c, i) => (i === idx ? { ...c, [field]: value } : c))
     );
+  };
 
   // คำนวณยอดรวม
   const totalPayment = paymentChannels
@@ -1022,7 +1254,12 @@ export const DocumentForm: FC<DocumentFormProps> = ({
   const totalOffset = offsetDocs
     .filter((d) => d.enabled)
     .reduce((sum, d) => sum + Number(d.amount || 0), 0);
-  const netTotal = totalPayment - totalFee - totalOffset;
+
+  // คำนวณยอดสุทธิที่รับชำระ (หัก ณ ที่จ่ายแล้ว)
+  const netTotal =
+    typeof calculatedSummary.total === "number"
+      ? calculatedSummary.total - calculatedSummary.withholdingTax
+      : 0;
 
   // log debug form.priceType ทุกครั้งที่ render
   useEffect(() => {
@@ -1132,28 +1369,39 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                   </Tooltip>
                 </div>
                 <div className="relative">
-                  {editMode ? (
-                    <Input
-                      id="documentNumber"
-                      value={previewNumber}
-                      readOnly
-                      className="font-mono bg-muted"
-                      placeholder=""
-                    />
-                  ) : documentType === "receipt" &&
-                    (!previewNumber || /RE-\d{4}-0001/.test(previewNumber)) ? (
-                    <div className="text-muted-foreground italic py-2 px-3 bg-muted rounded border border-dashed border-gray-300">
-                      เลขที่ใบเสร็จจะถูกกำหนดหลังบันทึก
-                    </div>
-                  ) : (
-                    <Input
-                      id="documentNumber"
-                      value={previewNumber}
-                      readOnly
-                      className="font-mono bg-muted"
-                      placeholder=""
-                    />
-                  )}
+                  {(() => {
+                    console.log(
+                      "[DEBUG] UI render - editMode:",
+                      editMode,
+                      "previewNumber:",
+                      previewNumber,
+                      "form.documentNumber:",
+                      form.documentNumber
+                    );
+                    return editMode ? (
+                      <Input
+                        id="documentNumber"
+                        value={previewNumber}
+                        readOnly
+                        className="font-mono bg-muted"
+                        placeholder=""
+                      />
+                    ) : documentType === "receipt" &&
+                      (!previewNumber ||
+                        /RE-\d{4}-0001/.test(previewNumber)) ? (
+                      <div className="text-muted-foreground italic py-2 px-3 bg-muted rounded border border-dashed border-gray-300">
+                        เลขที่ใบเสร็จจะถูกกำหนดหลังบันทึก
+                      </div>
+                    ) : (
+                      <Input
+                        id="documentNumber"
+                        value={previewNumber}
+                        readOnly
+                        className="font-mono bg-muted"
+                        placeholder=""
+                      />
+                    );
+                  })()}
                 </div>
               </div>
             </Label>
@@ -1740,222 +1988,282 @@ export const DocumentForm: FC<DocumentFormProps> = ({
             </CardHeader>
             <CardContent className="space-y-6">
               {/* ช่องทางการรับชำระเงิน */}
-              <div>
-                <label className="flex items-center gap-2 mb-2">
-                  <input
-                    type="checkbox"
-                    checked={paymentChannels[0]?.enabled}
-                    onChange={(e) =>
-                      updatePaymentChannel(0, "enabled", e.target.checked)
-                    }
-                  />
-                  <span className="font-medium text-blue-900">
-                    ช่องทางการรับชำระเงิน
-                  </span>
-                </label>
-                {paymentChannels[0]?.enabled && (
-                  <div className="grid grid-cols-12 gap-4 items-center bg-white p-4 rounded-lg border border-blue-100 mb-4">
-                    <div className="col-span-3">
-                      <Select
-                        value={paymentChannels[0].method}
-                        onValueChange={(v) =>
-                          updatePaymentChannel(0, "method", v)
-                        }
+              {paymentChannels.map((channel, idx) => (
+                <div key={idx}>
+                  <label className="flex items-center gap-2 mb-2">
+                    <input
+                      type="checkbox"
+                      checked={channel?.enabled}
+                      onChange={(e) =>
+                        updatePaymentChannel(idx, "enabled", e.target.checked)
+                      }
+                    />
+                    <span className="font-medium text-blue-900">
+                      รับชำระเงินครั้งที่ {idx + 1}
+                    </span>
+                    {paymentChannels.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removePaymentChannel(idx)}
+                        className="ml-auto text-red-500 hover:text-red-700 text-sm"
                       >
-                        <SelectTrigger className="bg-white border-blue-100">
-                          <SelectValue placeholder="รับชำระโดย" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="cash">💵 เงินสด</SelectItem>
-                          <SelectItem value="transfer">🏦 โอนเงิน</SelectItem>
-                          <SelectItem value="credit">💳 บัตรเครดิต</SelectItem>
-                        </SelectContent>
-                      </Select>
+                        ลบ
+                      </button>
+                    )}
+                  </label>
+                  {channel?.enabled && (
+                    <div className="grid grid-cols-12 gap-4 items-center bg-white p-4 rounded-lg border border-blue-100 mb-4">
+                      <div className="col-span-3">
+                        <Select
+                          value={channel.method}
+                          onValueChange={(v) =>
+                            updatePaymentChannel(idx, "method", v)
+                          }
+                        >
+                          <SelectTrigger className="bg-white border-blue-100">
+                            <SelectValue placeholder="รับชำระโดย" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="เงินสด">💵 เงินสด</SelectItem>
+                            <SelectItem value="โอนเงิน">🏦 โอนเงิน</SelectItem>
+                            <SelectItem value="บัตรเครดิต">
+                              💳 บัตรเครดิต
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="col-span-3">
+                        <Input
+                          type="number"
+                          className="bg-white border-blue-100"
+                          placeholder={`จำนวนเงินที่รับชำระ`}
+                          value={channel.amount}
+                          onChange={(e) =>
+                            updatePaymentChannel(idx, "amount", e.target.value)
+                          }
+                          max={netTotal}
+                        />
+                      </div>
+                      <div className="col-span-5">
+                        <Input
+                          type="text"
+                          className="bg-white border-blue-100"
+                          placeholder="หมายเหตุ"
+                          maxLength={20}
+                          value={channel.note}
+                          onChange={(e) =>
+                            updatePaymentChannel(idx, "note", e.target.value)
+                          }
+                        />
+                      </div>
                     </div>
-                    <div className="col-span-3">
-                      <Input
-                        type="number"
-                        className="bg-white border-blue-100"
-                        placeholder="จำนวนเงินที่รับชำระ"
-                        value={paymentChannels[0].amount}
-                        onChange={(e) =>
-                          updatePaymentChannel(0, "amount", e.target.value)
-                        }
-                      />
-                    </div>
-                    <div className="col-span-5">
-                      <Input
-                        type="text"
-                        className="bg-white border-blue-100"
-                        placeholder="หมายเหตุ"
-                        maxLength={20}
-                        value={paymentChannels[0].note}
-                        onChange={(e) =>
-                          updatePaymentChannel(0, "note", e.target.value)
-                        }
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
+                  )}
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={addPaymentChannel}
+                className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+              >
+                + เพิ่มช่องทางการรับชำระเงิน
+              </button>
               {receiptMode === "advanced" && (
                 <>
                   <hr className="my-4 border-green-200" />
                   {/* ค่าธรรมเนียม หรือรายการปรับปรุง */}
-                  <div>
-                    <label className="flex items-center gap-2 mb-2">
-                      <input
-                        type="checkbox"
-                        checked={fees[0]?.enabled}
-                        onChange={(e) =>
-                          updateFee(0, "enabled", e.target.checked)
-                        }
-                      />
-                      <span className="font-medium text-green-900">
-                        ค่าธรรมเนียม หรือรายการปรับปรุง
-                      </span>
-                    </label>
-                    {fees[0]?.enabled && (
-                      <div className="grid grid-cols-12 gap-4 items-center bg-white p-4 rounded-lg border border-green-100">
-                        <div className="col-span-2">
-                          <Select
-                            value={fees[0].type}
-                            onValueChange={(v) => updateFee(0, "type", v)}
+                  {fees.map((fee, idx) => (
+                    <div key={idx}>
+                      <label className="flex items-center gap-2 mb-2">
+                        <input
+                          type="checkbox"
+                          checked={fee?.enabled}
+                          onChange={(e) =>
+                            updateFee(idx, "enabled", e.target.checked)
+                          }
+                        />
+                        <span className="font-medium text-green-900">
+                          ค่าธรรมเนียม หรือรายการปรับปรุง {idx + 1}
+                        </span>
+                        {fees.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeFee(idx)}
+                            className="ml-auto text-red-500 hover:text-red-700 text-sm"
                           >
-                            <SelectTrigger className="bg-white border-green-100">
-                              <SelectValue placeholder="ประเภท" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="fee">ปรับปรุง</SelectItem>
-                              <SelectItem value="other">อื่นๆ</SelectItem>
-                            </SelectContent>
-                          </Select>
+                            ลบ
+                          </button>
+                        )}
+                      </label>
+                      {fee?.enabled && (
+                        <div className="grid grid-cols-12 gap-4 items-center bg-white p-4 rounded-lg border border-green-100">
+                          <div className="col-span-2">
+                            <Select
+                              value={fee.type}
+                              onValueChange={(v) => updateFee(idx, "type", v)}
+                            >
+                              <SelectTrigger className="bg-white border-green-100">
+                                <SelectValue placeholder="ประเภท" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="fee">ปรับปรุง</SelectItem>
+                                <SelectItem value="other">อื่นๆ</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="col-span-3">
+                            <Select
+                              value={fee.account}
+                              onValueChange={(v) =>
+                                updateFee(idx, "account", v)
+                              }
+                            >
+                              <SelectTrigger className="bg-white border-green-100">
+                                <SelectValue placeholder="บัญชีที่เกี่ยวข้อง" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="530501">
+                                  530501 - ค่าธรรมเนียมธนาคาร
+                                </SelectItem>
+                                <SelectItem value="530502">
+                                  530502 - ค่าธรรมเนียมอื่นๆ
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="col-span-3">
+                            <Input
+                              type="number"
+                              className="bg-white border-green-100"
+                              placeholder="จำนวนเงินปรับปรุง"
+                              value={fee.amount}
+                              onChange={(e) =>
+                                updateFee(idx, "amount", e.target.value)
+                              }
+                            />
+                          </div>
+                          <div className="col-span-3">
+                            <Input
+                              type="text"
+                              className="bg-white border-green-100"
+                              placeholder="หมายเหตุ"
+                              maxLength={20}
+                              value={fee.note}
+                              onChange={(e) =>
+                                updateFee(idx, "note", e.target.value)
+                              }
+                            />
+                          </div>
                         </div>
-                        <div className="col-span-3">
-                          <Select
-                            value={fees[0].account}
-                            onValueChange={(v) => updateFee(0, "account", v)}
-                          >
-                            <SelectTrigger className="bg-white border-green-100">
-                              <SelectValue placeholder="บัญชีที่เกี่ยวข้อง" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="530501">
-                                530501 - ค่าธรรมเนียมธนาคาร
-                              </SelectItem>
-                              <SelectItem value="530502">
-                                530502 - ค่าธรรมเนียมอื่นๆ
-                              </SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="col-span-3">
-                          <Input
-                            type="number"
-                            className="bg-white border-green-100"
-                            placeholder="จำนวนเงินปรับปรุง"
-                            value={fees[0].amount}
-                            onChange={(e) =>
-                              updateFee(0, "amount", e.target.value)
-                            }
-                          />
-                        </div>
-                        <div className="col-span-3">
-                          <Input
-                            type="text"
-                            className="bg-white border-green-100"
-                            placeholder="หมายเหตุ"
-                            maxLength={20}
-                            value={fees[0].note}
-                            onChange={(e) =>
-                              updateFee(0, "note", e.target.value)
-                            }
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                      )}
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={addFee}
+                    className="text-green-600 hover:text-green-800 text-sm font-medium"
+                  >
+                    + เพิ่มค่าธรรมเนียม
+                  </button>
                   <hr className="my-4 border-green-200" />
                   {/* ตัดชำระกับเอกสาร */}
-                  <div>
-                    <label className="flex items-center gap-2 mb-2">
-                      <input
-                        type="checkbox"
-                        checked={offsetDocs[0]?.enabled}
-                        onChange={(e) =>
-                          updateOffsetDoc(0, "enabled", e.target.checked)
-                        }
-                      />
-                      <span className="font-medium text-purple-900">
-                        ตัดชำระกับเอกสาร
-                      </span>
-                    </label>
-                    {offsetDocs[0]?.enabled && (
-                      <div className="grid grid-cols-12 gap-4 items-center bg-white p-4 rounded-lg border border-purple-100">
-                        <div className="col-span-3">
-                          <Select
-                            value={offsetDocs[0].docType}
-                            onValueChange={(v) =>
-                              updateOffsetDoc(0, "docType", v)
-                            }
+                  {offsetDocs.map((offset, idx) => (
+                    <div key={idx}>
+                      <label className="flex items-center gap-2 mb-2">
+                        <input
+                          type="checkbox"
+                          checked={offset?.enabled}
+                          onChange={(e) =>
+                            updateOffsetDoc(idx, "enabled", e.target.checked)
+                          }
+                        />
+                        <span className="font-medium text-purple-900">
+                          ตัดชำระกับเอกสาร {idx + 1}
+                        </span>
+                        {offsetDocs.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeOffsetDoc(idx)}
+                            className="ml-auto text-red-500 hover:text-red-700 text-sm"
                           >
-                            <SelectTrigger className="bg-white border-purple-100">
-                              <SelectValue placeholder="ประเภทเอกสาร" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="invoice">
-                                ใบแจ้งหนี้
-                              </SelectItem>
-                              <SelectItem value="credit">ใบลดหนี้</SelectItem>
-                            </SelectContent>
-                          </Select>
+                            ลบ
+                          </button>
+                        )}
+                      </label>
+                      {offset?.enabled && (
+                        <div className="grid grid-cols-12 gap-4 items-center bg-white p-4 rounded-lg border border-purple-100">
+                          <div className="col-span-3">
+                            <Select
+                              value={offset.docType}
+                              onValueChange={(v) =>
+                                updateOffsetDoc(idx, "docType", v)
+                              }
+                            >
+                              <SelectTrigger className="bg-white border-purple-100">
+                                <SelectValue placeholder="ประเภทเอกสาร" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="invoice">
+                                  ใบแจ้งหนี้
+                                </SelectItem>
+                                <SelectItem value="credit">ใบลดหนี้</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="col-span-3">
+                            <Select
+                              value={offset.docNumber}
+                              onValueChange={(v) =>
+                                updateOffsetDoc(idx, "docNumber", v)
+                              }
+                            >
+                              <SelectTrigger className="bg-white border-purple-100">
+                                <SelectValue placeholder="เลขที่เอกสาร" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="INV-2025-0001">
+                                  INV-2025-0001
+                                </SelectItem>
+                                <SelectItem value="CR-2025-0001">
+                                  CR-2025-0001
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="col-span-3">
+                            <Input
+                              type="number"
+                              className="bg-white border-purple-100"
+                              placeholder={`จำนวนเงินที่รับชำระ (สูงสุด ${netTotal.toLocaleString("th-TH")} บาท)`}
+                              value={offset.amount}
+                              onChange={(e) =>
+                                updateOffsetDoc(idx, "amount", e.target.value)
+                              }
+                              max={netTotal}
+                            />
+                          </div>
+                          <div className="col-span-2">
+                            <Input
+                              type="text"
+                              className="bg-white border-purple-100"
+                              placeholder="หมายเหตุ"
+                              maxLength={20}
+                              value={offset.note}
+                              onChange={(e) =>
+                                updateOffsetDoc(idx, "note", e.target.value)
+                              }
+                            />
+                          </div>
                         </div>
-                        <div className="col-span-3">
-                          <Select
-                            value={offsetDocs[0].docNumber}
-                            onValueChange={(v) =>
-                              updateOffsetDoc(0, "docNumber", v)
-                            }
-                          >
-                            <SelectTrigger className="bg-white border-purple-100">
-                              <SelectValue placeholder="เลขที่เอกสาร" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="INV-2025-0001">
-                                INV-2025-0001
-                              </SelectItem>
-                              <SelectItem value="CR-2025-0001">
-                                CR-2025-0001
-                              </SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="col-span-3">
-                          <Input
-                            type="number"
-                            className="bg-white border-purple-100"
-                            placeholder="จำนวนเงินที่รับชำระ"
-                            value={offsetDocs[0].amount}
-                            onChange={(e) =>
-                              updateOffsetDoc(0, "amount", e.target.value)
-                            }
-                          />
-                        </div>
-                        <div className="col-span-2">
-                          <Input
-                            type="text"
-                            className="bg-white border-purple-100"
-                            placeholder="หมายเหตุ"
-                            maxLength={20}
-                            value={offsetDocs[0].note}
-                            onChange={(e) =>
-                              updateOffsetDoc(0, "note", e.target.value)
-                            }
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                      )}
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={addOffsetDoc}
+                    className="text-purple-600 hover:text-purple-800 text-sm font-medium"
+                  >
+                    + เพิ่มการตัดชำระ
+                  </button>
                 </>
               )}
               {/* กล่องสรุปยอดล่างสุด */}
@@ -1987,7 +2295,10 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                     </span>
                     <span className="font-bold text-xl bg-green-100 px-3 py-1 rounded">
                       {typeof calculatedSummary.total === "number"
-                        ? calculatedSummary.total.toLocaleString("th-TH", {
+                        ? (
+                            calculatedSummary.total -
+                            calculatedSummary.withholdingTax
+                          ).toLocaleString("th-TH", {
                             minimumFractionDigits: 2,
                           })
                         : "0"}{" "}
@@ -1999,13 +2310,21 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                   ต้องรับชำระเงินอีก{" "}
                   <span className="font-semibold">
                     {typeof calculatedSummary.total === "number"
-                      ? calculatedSummary.total.toLocaleString("th-TH", {
-                          minimumFractionDigits: 2,
-                        })
+                      ? (netTotal - totalPayment - totalOffset).toLocaleString(
+                          "th-TH",
+                          {
+                            minimumFractionDigits: 2,
+                          }
+                        )
                       : "0"}
                   </span>{" "}
                   บาท
                 </div>
+                {totalPayment + totalOffset > netTotal && (
+                  <div className="text-red-600 text-xs mt-1 text-center font-semibold">
+                    ⚠️ ยอดรับชำระเกินยอดที่ต้องชำระ
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>

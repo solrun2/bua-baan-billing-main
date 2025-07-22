@@ -323,7 +323,11 @@ app.get("/api/documents", async (req: Request, res: Response) => {
         qd.valid_until,
         id.due_date,
         rd.payment_date, 
-        rd.payment_method
+        rd.payment_method,
+        rd.payment_channels,
+        rd.fees,
+        rd.offset_docs,
+        rd.net_total_receipt
       FROM documents d
       LEFT JOIN quotation_details qd ON d.id = qd.document_id
       LEFT JOIN invoice_details id ON d.id = id.document_id
@@ -349,10 +353,28 @@ app.get("/api/documents", async (req: Request, res: Response) => {
       const items = itemsByDoc[doc.id] || [];
       // คำนวณ summary ด้วย calculateDocumentSummary (เหมือน /api/documents/:id)
       const summary = calculateDocumentSummary(items, doc.price_type);
+
+      // สร้าง receipt_details สำหรับใบเสร็จ
+      let receipt_details = null;
+      if (doc.document_type === "receipt" && doc.payment_date) {
+        receipt_details = {
+          payment_date: doc.payment_date,
+          payment_method: doc.payment_method,
+          payment_reference: doc.payment_reference || "",
+          payment_channels: doc.payment_channels
+            ? JSON.parse(doc.payment_channels)
+            : [],
+          fees: doc.fees ? JSON.parse(doc.fees) : [],
+          offset_docs: doc.offset_docs ? JSON.parse(doc.offset_docs) : [],
+          net_total_receipt: doc.net_total_receipt || 0,
+        };
+      }
+
       return {
         ...doc,
         items,
         summary,
+        receipt_details,
       };
     });
     res.json(docsWithItems);
@@ -647,6 +669,17 @@ app.post("/api/documents", async (req: Request, res: Response) => {
   console.log("Received document data:", req.body);
   console.log("[DEBUG] summary ที่รับมาจาก frontend:", req.body.summary);
   console.log("[DEBUG] priceType ที่รับมาจาก frontend:", req.body.priceType);
+
+  // Debug log สำหรับ receipt
+  if (req.body.document_type === "receipt") {
+    console.log("[DEBUG] Receipt fields ที่รับมาจาก frontend:");
+    console.log("- payment_date:", req.body.payment_date);
+    console.log("- payment_method:", req.body.payment_method);
+    console.log("- payment_channels:", req.body.payment_channels);
+    console.log("- fees:", req.body.fees);
+    console.log("- offset_docs:", req.body.offset_docs);
+    console.log("- net_total_receipt:", req.body.net_total_receipt);
+  }
   let conn: any; // ประกาศก่อน validation
   try {
     const {
@@ -662,6 +695,11 @@ app.post("/api/documents", async (req: Request, res: Response) => {
       payment_reference,
       related_document_id,
       summary = {},
+      // เพิ่ม fields สำหรับ receipt
+      payment_channels,
+      fees,
+      offset_docs,
+      net_total_receipt,
     } = req.body;
 
     // เพิ่ม validation สำหรับ priceType
@@ -830,10 +868,10 @@ app.post("/api/documents", async (req: Request, res: Response) => {
           payment_date,
           payment_method,
           payment_reference,
-          JSON.stringify(req.body.payment_channels || []),
-          JSON.stringify(req.body.fees || []),
-          JSON.stringify(req.body.offset_docs || []),
-          req.body.net_total_receipt || 0,
+          JSON.stringify(payment_channels || []),
+          JSON.stringify(fees || []),
+          JSON.stringify(offset_docs || []),
+          net_total_receipt || 0,
         ]
       );
     }
@@ -937,6 +975,7 @@ app.delete("/api/documents/:id", async (req: Request, res: Response) => {
 
 app.get("/api/documents/:id", async (req, res) => {
   const { id } = req.params;
+  console.log("[DEBUG] GET /api/documents/:id - Requested ID:", id);
   try {
     // JOIN ตาราง quotation_details ด้วย เพื่อให้ได้ valid_until
     const docRows = await pool.query(
@@ -953,6 +992,12 @@ app.get("/api/documents/:id", async (req, res) => {
       return res.status(404).json({ error: "Document not found" });
     }
 
+    console.log("[DEBUG] Document found:", {
+      id: doc.id,
+      document_number: doc.document_number,
+      document_type: doc.document_type,
+    });
+
     let invoice_details = null;
     if (doc.document_type && doc.document_type.toLowerCase() === "invoice") {
       const invoiceRows = await pool.query(
@@ -966,10 +1011,12 @@ app.get("/api/documents/:id", async (req, res) => {
 
     let receipt_details = null;
     if (doc.document_type && doc.document_type.toLowerCase() === "receipt") {
+      console.log("[DEBUG] Searching receipt_details for document_id:", id);
       const receiptRows = await pool.query(
         "SELECT * FROM receipt_details WHERE document_id = ?",
         [id]
       );
+      console.log("[DEBUG] receipt_details query result:", receiptRows);
       if (Array.isArray(receiptRows) && receiptRows.length > 0) {
         receipt_details = receiptRows[0];
         if (receipt_details.payment_channels) {
@@ -1019,6 +1066,16 @@ app.get("/api/documents/:id", async (req, res) => {
     if (invoice_details && invoice_details.due_date) {
       documentWithItems.due_date = invoice_details.due_date;
     }
+
+    // Debug log เพื่อตรวจสอบข้อมูลที่ส่งกลับ
+    console.log("[DEBUG] GET /api/documents/:id - documentWithItems:", {
+      id: documentWithItems.id,
+      document_number: documentWithItems.document_number,
+      document_type: documentWithItems.document_type,
+      customer: documentWithItems.customer,
+      receipt_details: documentWithItems.receipt_details,
+    });
+
     res.json(documentWithItems);
   } catch (err) {
     console.error("Failed to fetch document by id:", err);
@@ -1029,6 +1086,18 @@ app.get("/api/documents/:id", async (req, res) => {
 app.put("/api/documents/:id", async (req: Request, res: Response) => {
   let conn;
   const { id } = req.params;
+
+  // Debug log สำหรับ receipt
+  if (req.body.document_type === "receipt") {
+    console.log("[DEBUG] PUT Receipt fields ที่รับมาจาก frontend:");
+    console.log("- payment_date:", req.body.payment_date);
+    console.log("- payment_method:", req.body.payment_method);
+    console.log("- payment_channels:", req.body.payment_channels);
+    console.log("- fees:", req.body.fees);
+    console.log("- offset_docs:", req.body.offset_docs);
+    console.log("- net_total_receipt:", req.body.net_total_receipt);
+  }
+
   try {
     const {
       customer,
@@ -1044,6 +1113,11 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
       payment_method,
       payment_reference,
       summary = {},
+      // เพิ่ม fields สำหรับ receipt
+      payment_channels,
+      fees,
+      offset_docs,
+      net_total_receipt,
     } = req.body;
 
     // เพิ่ม validation สำหรับ priceType
@@ -1149,10 +1223,10 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
           payment_date,
           payment_method,
           payment_reference,
-          JSON.stringify(req.body.payment_channels || []),
-          JSON.stringify(req.body.fees || []),
-          JSON.stringify(req.body.offset_docs || []),
-          req.body.net_total_receipt || 0,
+          JSON.stringify(payment_channels || []),
+          JSON.stringify(fees || []),
+          JSON.stringify(offset_docs || []),
+          net_total_receipt || 0,
           id,
         ]
       );
