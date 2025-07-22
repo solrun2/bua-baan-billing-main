@@ -54,6 +54,7 @@ import {
 } from "@/calculate/documentCalculations";
 import { ProductForm } from "./ProductForm";
 import { documentService } from "@/pages/services/documentService";
+import { bankAccountService, BankAccount } from "@/services/bankAccountService";
 import {
   Accordion,
   AccordionItem,
@@ -601,7 +602,6 @@ export const DocumentForm: FC<DocumentFormProps> = ({
           }
           return item;
         });
-        console.log("[handleProductSelect] form.items:", newItems);
         return {
           ...prev,
           items: newItems,
@@ -634,14 +634,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
 
   // เพิ่ม useEffect สำหรับดึงเลขเอกสารใหม่จาก backend (เฉพาะกรณีสร้างใหม่)
   useEffect(() => {
-    console.log(
-      "[DEBUG] useEffect fetchNextNumber - editMode:",
-      editMode,
-      "form.documentNumber:",
-      form.documentNumber
-    );
     if (!editMode && !form.documentNumber) {
-      console.log("[DEBUG] กำลัง fetch เลขเอกสารใหม่...");
       const fetchNextNumber = async () => {
         try {
           const res = await fetch(
@@ -649,7 +642,6 @@ export const DocumentForm: FC<DocumentFormProps> = ({
           );
           if (!res.ok) throw new Error("ไม่สามารถดึงเลขเอกสารใหม่ได้");
           const data = await res.json();
-          console.log("[DEBUG] ได้เลขเอกสารใหม่:", data.documentNumber);
           handleFormChange("documentNumber", data.documentNumber);
         } catch (error) {
           // fallback เดิม
@@ -662,7 +654,6 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                   ? "RC"
                   : "TAX";
           const fallbackNumber = `${prefix}-${new Date().getFullYear()}-00001`;
-          console.log("[DEBUG] ใช้เลขเอกสาร fallback:", fallbackNumber);
           handleFormChange("documentNumber", fallbackNumber);
         }
       };
@@ -720,13 +711,6 @@ export const DocumentForm: FC<DocumentFormProps> = ({
   useEffect(() => {
     async function fillEditData() {
       if (editMode && initialData.customer?.id) {
-        // Debug log เพื่อตรวจสอบข้อมูลที่โหลดมา
-        console.log("[DEBUG] fillEditData - initialData:", {
-          documentNumber: initialData.documentNumber,
-          documentDate: initialData.documentDate,
-          customer: initialData.customer,
-          id: initialData.id,
-        });
 
         // ใช้ข้อมูลลูกค้าที่มีอยู่แล้ว ไม่ต้องโหลดใหม่
         const customer = initialData.customer;
@@ -782,10 +766,6 @@ export const DocumentForm: FC<DocumentFormProps> = ({
               | "NO_VAT",
           };
         });
-        console.log(
-          "[DEBUG] fillEditData - กำลัง set form ด้วย documentNumber:",
-          initialData.documentNumber
-        );
         setForm((prev) => {
           const newForm = {
             ...prev,
@@ -809,13 +789,8 @@ export const DocumentForm: FC<DocumentFormProps> = ({
             },
             items,
           };
-          console.log(
-            "[DEBUG] fillEditData - setForm callback - newForm.documentNumber:",
-            newForm.documentNumber
-          );
           return newForm;
         });
-        console.log("[DEBUG] fillEditData - set form เสร็จแล้ว");
         // คำนวณ summary ใหม่ทันทีหลัง normalize items
         // แปลง priceType ของแต่ละ item ก่อนส่งเข้า calculateDocumentSummary
         const mappedItems = items.map((item) => ({
@@ -828,56 +803,67 @@ export const DocumentForm: FC<DocumentFormProps> = ({
         setSummary(newSummary2);
 
         // โหลดข้อมูล receipt details สำหรับการแก้ไข
-
         if (documentType === "receipt" && initialData.receipt_details) {
           const receiptDetails = initialData.receipt_details;
 
-          // โหลด payment channels
-
-          if (
-            receiptDetails.payment_channels &&
-            Array.isArray(receiptDetails.payment_channels)
-          ) {
-            const channels = receiptDetails.payment_channels.map((ch: any) => ({
+          // --- โหลด payment channels ---
+          let paymentChannelsData = receiptDetails.payment_channels;
+          if (typeof paymentChannelsData === "string") {
+            try {
+              paymentChannelsData = JSON.parse(paymentChannelsData);
+            } catch (e) {
+              paymentChannelsData = [];
+            }
+          }
+          if (Array.isArray(paymentChannelsData)) {
+            const channels = paymentChannelsData.map((ch: any) => ({
               enabled: true,
               method: ch.channel || "",
               amount: ch.amount || 0,
               note: ch.note || "",
+              bankAccountId: ch.bankAccountId || null,
             }));
-            if (channels.length > 0) {
-              setPaymentChannels(channels);
-            }
+            setPaymentChannels(channels);
           }
 
-          // โหลด fees
-          if (receiptDetails.fees && Array.isArray(receiptDetails.fees)) {
-            const feeList = receiptDetails.fees.map((f: any) => ({
+          // --- โหลด fees ---
+          let feesData = receiptDetails.fees;
+          if (typeof feesData === "string") {
+            try {
+              feesData = JSON.parse(feesData);
+            } catch (e) {
+              feesData = [];
+            }
+          }
+          if (Array.isArray(feesData)) {
+            const feeList = feesData.map((f: any) => ({
               enabled: true,
               type: f.type || "",
               account: f.account || "",
               amount: f.amount || 0,
               note: f.note || "",
             }));
-            if (feeList.length > 0) {
-              setFees(feeList);
-            }
+            setFees(feeList);
           }
 
-          // โหลด offset docs
-          if (
-            receiptDetails.offset_docs &&
-            Array.isArray(receiptDetails.offset_docs)
-          ) {
-            const offsetList = receiptDetails.offset_docs.map((d: any) => ({
+          // --- โหลด offset docs ---
+          let offsetDocsData = receiptDetails.offset_docs;
+          if (typeof offsetDocsData === "string") {
+            try {
+              offsetDocsData = JSON.parse(offsetDocsData);
+            } catch (e) {
+              offsetDocsData = [];
+            }
+          }
+          if (Array.isArray(offsetDocsData)) {
+            const offsetList = offsetDocsData.map((d: any) => ({
               enabled: true,
               docType: d.doc_type || "",
               docNumber: d.doc_no || "",
               amount: d.amount || 0,
               note: d.note || "",
             }));
-            if (offsetList.length > 0) {
-              setOffsetDocs(offsetList);
-            }
+            setOffsetDocs(offsetList);
           }
         }
       }
@@ -1028,15 +1014,6 @@ export const DocumentForm: FC<DocumentFormProps> = ({
       withholding_tax_option: item.withholding_tax_option || "ไม่ระบุ",
     }));
 
-    // log เฉพาะ discount_type ของแต่ละ item ก่อนส่ง backend
-    console.log(
-      "itemsToSave (check discount_type):",
-      itemsToSave.map((i) => ({
-        discount_type: i.discount_type,
-        discount: i.discount,
-        product_name: i.product_name,
-      }))
-    );
 
     const dataToSave: DocumentPayload = {
       id: initialData.id,
@@ -1078,6 +1055,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
             channel: c.method || "เงินสด",
             amount: Number(c.amount) || 0,
             note: c.note || "",
+            bankAccountId: c.bankAccountId,
           })),
         fees: fees
           .filter((f) => f.enabled)
@@ -1131,17 +1109,10 @@ export const DocumentForm: FC<DocumentFormProps> = ({
     };
     documentService.save(dataForLocal);
 
-    console.log("[DEBUG] summary ที่จะส่งไป backend:", calculatedSummary);
-    console.log(
-      "[DEBUG] priceType ที่จะส่งไป backend:",
-      mapPriceTypeToEnum(form.priceType)
-    );
-    console.log("[DEBUG] dataToSave:", dataToSave);
-
-    // Debug log สำหรับ receipt details
     if (documentType === "receipt") {
       console.log("[DEBUG] Receipt Details ที่จะส่งไป backend:");
       console.log("- payment_channels:", dataToSave.payment_channels);
+      console.log("- paymentChannels state:", paymentChannels);
       console.log("- fees:", dataToSave.fees);
       console.log("- offset_docs:", dataToSave.offset_docs);
       console.log("- net_total_receipt:", dataToSave.net_total_receipt);
@@ -1170,7 +1141,13 @@ export const DocumentForm: FC<DocumentFormProps> = ({
 
   // เพิ่ม state สำหรับข้อมูลเพิ่มเติม (เฉพาะใบเสร็จ)
   const [paymentChannels, setPaymentChannels] = useState([
-    { enabled: true, method: "", amount: 0, note: "" },
+    {
+      enabled: true,
+      method: "",
+      amount: 0,
+      note: "",
+      bankAccountId: null as number | null,
+    },
   ]);
   const [fees, setFees] = useState([
     { enabled: false, type: "", account: "", amount: 0, note: "" },
@@ -1178,12 +1155,26 @@ export const DocumentForm: FC<DocumentFormProps> = ({
   const [offsetDocs, setOffsetDocs] = useState([
     { enabled: false, docType: "", docNumber: "", amount: 0, note: "" },
   ]);
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+
+  // โหลดข้อมูลบัญชีธนาคาร
+  useEffect(() => {
+    const loadBankAccounts = async () => {
+      try {
+        const accounts = await bankAccountService.getBankAccounts();
+        setBankAccounts(accounts);
+      } catch (error) {
+        console.error("Failed to load bank accounts:", error);
+      }
+    };
+    loadBankAccounts();
+  }, []);
 
   // ฟังก์ชันเพิ่ม/ลบ/แก้ไขแต่ละกลุ่ม
   const addPaymentChannel = () =>
     setPaymentChannels([
       ...paymentChannels,
-      { enabled: true, method: "", amount: 0, note: "" },
+      { enabled: true, method: "", amount: 0, note: "", bankAccountId: null },
     ]);
   const removePaymentChannel = (idx: number) =>
     setPaymentChannels(paymentChannels.filter((_, i) => i !== idx));
@@ -2013,7 +2004,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                   </label>
                   {channel?.enabled && (
                     <div className="grid grid-cols-12 gap-4 items-center bg-white p-4 rounded-lg border border-blue-100 mb-4">
-                      <div className="col-span-3">
+                      <div className="col-span-2">
                         <Select
                           value={channel.method}
                           onValueChange={(v) =>
@@ -2032,7 +2023,34 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                           </SelectContent>
                         </Select>
                       </div>
-                      <div className="col-span-3">
+                      <div className="col-span-2">
+                        <Select
+                          value={channel.bankAccountId?.toString() || "null"}
+                          onValueChange={(v) =>
+                            updatePaymentChannel(
+                              idx,
+                              "bankAccountId",
+                              v && v !== "null" ? parseInt(v) : null
+                            )
+                          }
+                        >
+                          <SelectTrigger className="bg-white border-blue-100">
+                            <SelectValue placeholder="เลือกบัญชีธนาคาร" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="null">ไม่ระบุ</SelectItem>
+                            {bankAccounts.map((account) => (
+                              <SelectItem
+                                key={account.id}
+                                value={account.id.toString()}
+                              >
+                                {account.bank_name} - {account.account_number}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="col-span-2">
                         <Input
                           type="number"
                           className="bg-white border-blue-100"

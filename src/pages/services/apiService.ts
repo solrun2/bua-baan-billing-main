@@ -315,6 +315,60 @@ const getDocumentById = async (id: string): Promise<DocumentData> => {
   }
 };
 
+// เพิ่ม generic HTTP methods
+const get = async (endpoint: string): Promise<any> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}${endpoint}`);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    return await response.json();
+  } catch (error) {
+    console.error(`Error in GET ${endpoint}:`, error);
+    throw error;
+  }
+};
+
+const post = async (endpoint: string, data: any): Promise<any> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(
+        errorData.error || `HTTP error! status: ${response.status}`
+      );
+    }
+    return await response.json();
+  } catch (error) {
+    console.error(`Error in POST ${endpoint}:`, error);
+    throw error;
+  }
+};
+
+const put = async (endpoint: string, data: any): Promise<any> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(
+        errorData.error || `HTTP error! status: ${response.status}`
+      );
+    }
+    return await response.json();
+  } catch (error) {
+    console.error(`Error in PUT ${endpoint}:`, error);
+    throw error;
+  }
+};
+
 export const apiService = {
   getDocuments,
   createDocument,
@@ -324,4 +378,7 @@ export const apiService = {
   createCustomer,
   uploadImage,
   getDocumentById,
+  get,
+  post,
+  put,
 };
