@@ -11,7 +11,7 @@ import { Loader2 } from "lucide-react";
 type EnsureDocumentType<T> = Omit<T, "documentType"> & {
   documentType: DocumentType;
   status: string;
-  priceType: "inclusive" | "exclusive" | "none";
+  priceType: "EXCLUDE_VAT" | "INCLUDE_VAT" | "NO_VAT";
 };
 
 interface InvoiceFormProps {
@@ -55,7 +55,7 @@ const InvoiceForm = ({
       .split("T")[0],
     reference: "",
     status: "รอชำระ",
-    priceType: "exclusive",
+    priceType: "EXCLUDE_VAT",
   });
 
   const [isEditing, setIsEditing] = useState(false);
@@ -68,7 +68,7 @@ const InvoiceForm = ({
         ...externalInitialData,
         documentType: "invoice",
         status: externalInitialData.status || "รอชำระ",
-        priceType: externalInitialData.priceType || "exclusive",
+        priceType: externalInitialData.priceType || "EXCLUDE_VAT",
       });
       setIsEditing(true);
       setIsLoading(false);
@@ -82,7 +82,7 @@ const InvoiceForm = ({
       documentNumber: newNumber,
       documentType: "invoice",
       status: "รอชำระ",
-      priceType: "exclusive",
+      priceType: "EXCLUDE_VAT",
     }));
     setIsLoading(false);
     setIsClient(true);
@@ -107,7 +107,7 @@ const InvoiceForm = ({
         updatedAt: new Date().toISOString(),
         // Ensure required fields are set
         status: data.status || "รอชำระ",
-        priceType: data.priceType || "exclusive",
+        priceType: data.priceType || "EXCLUDE_VAT",
         customer: data.customer || {
           name: "",
           tax_id: "",

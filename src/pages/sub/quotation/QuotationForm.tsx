@@ -13,7 +13,7 @@ import { apiService } from "@/pages/services/apiService";
 type EnsureDocumentType<T> = Omit<T, "documentType"> & {
   documentType: DocumentType;
   status: string;
-  priceType: "inclusive" | "exclusive" | "none";
+  priceType: "EXCLUDE_VAT" | "INCLUDE_VAT" | "NO_VAT";
 };
 
 interface QuotationFormProps {
@@ -58,7 +58,7 @@ const QuotationForm = ({
       .split("T")[0],
     reference: "",
     status: "รอตอบรับ",
-    priceType: "exclusive",
+    priceType: "EXCLUDE_VAT",
   });
 
   const [isEditing, setIsEditing] = useState(false);
@@ -89,7 +89,7 @@ const QuotationForm = ({
             ...doc,
             documentType: "quotation",
             status: doc.status || "รอตอบรับ",
-            priceType: doc.priceType || "exclusive",
+            priceType: doc.priceType || "EXCLUDE_VAT",
             customer: doc.customer || {
               name: "",
               tax_id: "",
@@ -122,7 +122,7 @@ const QuotationForm = ({
             ...externalInitialData,
             documentType: "quotation",
             status: externalInitialData.status || "รอตอบรับ",
-            priceType: externalInitialData.priceType || "exclusive",
+            priceType: externalInitialData.priceType || "EXCLUDE_VAT",
           });
           console.log("[QuotationForm] ใช้ข้อมูลเริ่มต้นจาก props");
         } else {
@@ -134,7 +134,7 @@ const QuotationForm = ({
             documentNumber: newNumber,
             documentType: "quotation",
             status: "รอตอบรับ",
-            priceType: "exclusive",
+            priceType: "EXCLUDE_VAT",
           }));
           console.log("[QuotationForm] สร้างเอกสารใหม่:", newNumber);
         }
@@ -170,8 +170,7 @@ const QuotationForm = ({
         const existInvoice = allDocs.find(
           (doc) =>
             doc.document_type === "INVOICE" &&
-            (doc.reference === data.documentNumber ||
-              doc.document_number === data.documentNumber)
+            doc.document_number === data.documentNumber
         );
         if (existInvoice) {
           toast.error(
@@ -192,7 +191,7 @@ const QuotationForm = ({
         updatedAt: new Date().toISOString(),
         // Ensure required fields are set
         status: data.status || "รอตอบรับ",
-        priceType: data.priceType || "exclusive",
+        priceType: data.priceType || "EXCLUDE_VAT",
         customer: data.customer || {
           name: "",
           tax_id: "",
