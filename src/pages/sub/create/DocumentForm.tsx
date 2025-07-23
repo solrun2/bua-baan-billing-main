@@ -512,7 +512,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
   // handle เลือกสินค้า
   const handleProductSelect = (product: Product | null, itemId: string) => {
     if (product) {
-      console.log('[DEBUG] handleProductSelect', { product, itemId });
+      console.log("[DEBUG] handleProductSelect", { product, itemId });
       setForm((prev) => {
         const newItems = prev.items.map((item) => {
           if (item.id === itemId) {
@@ -1290,7 +1290,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
         }
       }
     }
-  }, [editMode, documentType, initialData.receipt_details, paymentChannels]);
+  }, [editMode, documentType, initialData.receipt_details]);
 
   return (
     <>
