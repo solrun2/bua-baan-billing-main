@@ -655,16 +655,18 @@ async function createDocumentFromServer(data: any, pool: any) {
         : (item.productTitle ?? "-");
       const unit = item.unit ?? item.unitName ?? "";
       const description = item.description ?? item.productDescription ?? "";
+      const qty = Number(item.quantity ?? 1);
+      const unitPrice = Number(item.unit_price ?? item.unitPrice ?? 0);
+      const amount = qty * unitPrice;
 
       console.log("[DEBUG] Item:", {
         product_id,
         product_name,
         productTitle: item.productTitle,
         unit,
-        quantity: item.quantity,
-        unit_price: item.unit_price,
-        unitPrice: item.unitPrice,
-        amount: item.amount,
+        quantity: qty,
+        unit_price: unitPrice,
+        amount,
         description,
       });
 
@@ -673,9 +675,9 @@ async function createDocumentFromServer(data: any, pool: any) {
         product_id,
         product_name,
         unit,
-        item.quantity ?? 1,
-        item.unit_price ?? item.unitPrice ?? 0,
-        item.amount ?? 0,
+        qty,
+        unitPrice,
+        amount, // ใช้ค่าที่คำนวณเอง
         description,
         item.withholding_tax_amount ?? 0,
         item.withholding_tax_option ?? -1,
