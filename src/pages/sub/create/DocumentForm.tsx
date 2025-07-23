@@ -2088,7 +2088,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                         <SelectContent>
                           <SelectItem value="เงินสด">💵 เงินสด</SelectItem>
                           <SelectItem value="โอนเงิน">🏦 โอนเงิน</SelectItem>
-                          <SelectItem value="บัตรเครดิต"
+                          <SelectItem value="บัตรเครดิต">
                             💳 บัตรเครดิต
                           </SelectItem>
                         </SelectContent>
