@@ -2065,13 +2065,15 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                       รับชำระเงินครั้งที่ {idx + 1}
                     </span>
                     {paymentChannels.length > 1 && (
-                      <button
+                      <Button
                         type="button"
+                        variant="ghost"
+                        size="icon"
                         onClick={() => removePaymentChannel(idx)}
-                        className="ml-auto text-red-500 hover:text-red-700 text-sm"
+                        className="ml-auto text-red-500 hover:text-red-700"
                       >
-                        ลบ
-                      </button>
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
                     )}
                   </label>
                   <div className="grid grid-cols-12 gap-4 items-center bg-white p-4 rounded-lg border border-blue-100 mb-4">
@@ -2173,13 +2175,15 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                           ค่าธรรมเนียม หรือรายการปรับปรุง {idx + 1}
                         </span>
                         {fees.length > 1 && (
-                          <button
+                          <Button
                             type="button"
+                            variant="ghost"
+                            size="icon"
                             onClick={() => removeFee(idx)}
-                            className="ml-auto text-red-500 hover:text-red-700 text-sm"
+                            className="ml-auto text-red-500 hover:text-red-700"
                           >
-                            ลบ
-                          </button>
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
                         )}
                       </label>
                       {fee?.enabled && (
@@ -2268,13 +2272,15 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                           ตัดชำระกับเอกสาร {idx + 1}
                         </span>
                         {offsetDocs.length > 1 && (
-                          <button
+                          <Button
                             type="button"
+                            variant="ghost"
+                            size="icon"
                             onClick={() => removeOffsetDoc(idx)}
-                            className="ml-auto text-red-500 hover:text-red-700 text-sm"
+                            className="ml-auto text-red-500 hover:text-red-700"
                           >
-                            ลบ
-                          </button>
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
                         )}
                       </label>
                       {offset?.enabled && (

@@ -2,7 +2,14 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate, Link } from "react-router-dom"; // Import Link
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileText, Plus, Search, AlertTriangle, Loader2 } from "lucide-react";
+import {
+  FileText,
+  Plus,
+  Search,
+  AlertTriangle,
+  Loader2,
+  Trash2,
+} from "lucide-react";
 import { apiService } from "@/pages/services/apiService";
 import { toast } from "sonner";
 import QuotationModal from "@/pages/sub/quotation/QuotationModal";
@@ -330,11 +337,12 @@ const Quotation = () => {
                               แก้ไข
                             </Button>
                             <Button
-                              variant="destructive"
-                              size="sm"
+                              variant="ghost"
+                              size="icon"
+                              className="text-red-500 hover:text-red-700"
                               onClick={() => handleDeleteClick(q.id)}
                             >
-                              ลบ
+                              <Trash2 className="w-4 h-4" />
                             </Button>
                           </div>
                         </td>

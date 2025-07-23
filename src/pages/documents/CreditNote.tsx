@@ -9,6 +9,7 @@ import {
   AlertTriangle,
   Loader2,
   FileText,
+  Trash2,
 } from "lucide-react";
 import { apiService } from "@/pages/services/apiService";
 import { toast } from "sonner";
@@ -330,11 +331,12 @@ const CreditNote = () => {
                               แก้ไข
                             </Button>
                             <Button
-                              variant="destructive"
-                              size="sm"
+                              variant="ghost"
+                              size="icon"
+                              className="text-red-500 hover:text-red-700"
                               onClick={() => handleDeleteClick(item.id)}
                             >
-                              ลบ
+                              <Trash2 className="w-4 h-4" />
                             </Button>
                           </div>
                         </td>
