@@ -182,19 +182,6 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
     fetchProducts();
   }, [open, document]);
 
-  // Log document และ related_document_id ทุกครั้งที่ modal เปิด
-  if (open) {
-    console.log("DocumentModal document:", document);
-    console.log("related_document_id:", document.related_document_id);
-    console.log("receipt_details:", (document as any).receipt_details);
-    if ((document as any).receipt_details) {
-      console.log(
-        "payment_channels:",
-        (document as any).receipt_details.payment_channels
-      );
-    }
-  }
-
   // ดึงข้อมูลเอกสารที่เกี่ยวข้อง
   useEffect(() => {
     if (!open || !document?.related_document_id) {
@@ -226,6 +213,32 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
 
     fetchRelatedDocument();
   }, [open, document]);
+
+  // Log document และ related_document_id ทุกครั้งที่ modal เปิด
+  if (open) {
+    console.log("DocumentModal document:", document);
+    console.log(
+      "Document number:",
+      document.document_number || document.documentNumber
+    );
+    console.log("Document date:", document.issue_date || document.documentDate);
+    console.log(
+      "Customer name:",
+      document.customer_name || document.customer?.name
+    );
+    console.log(
+      "Customer address:",
+      document.customer_address || document.customer?.address
+    );
+    console.log(
+      "Customer phone:",
+      document.customer_phone || document.customer?.phone
+    );
+    console.log(
+      "Customer tax_id:",
+      document.customer_tax_id || document.customer?.tax_id
+    );
+  }
 
   // Helper for date formatting
   const formatDate = (dateStr?: string) => {
@@ -266,237 +279,160 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
   // --- Section Helper Functions ---
   // Header: โลโก้+ชื่อบริษัท (ซ้าย), Document Title (ขวาบน, บรรทัดเดียว)
   const renderHeader = () => (
-    <div className="flex flex-row justify-between items-end border-b-2 border-blue-200 pb-3 mb-3">
-      <div className="flex flex-row items-center gap-4">
-        <div className="w-14 h-14 border-2 border-blue-200 rounded-full flex items-center justify-center text-blue-300 text-base font-bold">
+    <div className="flex flex-row justify-between items-start border-b-2 border-blue-200 pb-4 mb-4">
+      <div className="flex flex-row items-center gap-3">
+        <div className="w-12 h-12 border-2 border-blue-200 rounded-full flex items-center justify-center text-blue-300 text-sm font-bold">
           LOGO
         </div>
         <div className="flex flex-col">
-          <span className="font-extrabold text-xl text-blue-900 leading-tight">
+          <span className="font-bold text-lg text-blue-900 leading-tight">
             {SELLER_INFO.company}
           </span>
-          <span className="text-sm text-gray-700 leading-tight">
+          <span className="text-xs text-gray-600 leading-tight">
             {SELLER_INFO.address}
           </span>
-          <span className="text-sm text-gray-700 leading-tight">
+          <span className="text-xs text-gray-600 leading-tight">
             เลขประจำตัวผู้เสียภาษี {SELLER_INFO.taxId}
-          </span>
-          <span className="text-sm text-gray-700 leading-tight">
-            โทร {SELLER_INFO.phone}
           </span>
         </div>
       </div>
       <div className="flex flex-col items-end">
-        <span className="font-extrabold text-3xl text-blue-700 mb-1 whitespace-nowrap">
-          {typeLabels[type].title}
+        <span className="font-bold text-2xl text-blue-900 mb-1">
+          {labels.title}
         </span>
-        <div className="text-sm text-gray-700 text-right">
+        <div className="text-xs text-gray-600">
           <div>
-            <b>เลขที่:</b>{" "}
-            {document.document_number || document.documentNumber || "-"}
+            เลขที่: {document.document_number || document.documentNumber || "-"}
           </div>
           <div>
-            <b>วันที่:</b>{" "}
-            {formatDate(document.documentDate || document.issue_date)}
+            วันที่: {formatDate(document.issue_date || document.documentDate)}
           </div>
-          {type === "invoice" && (
-            <div>
-              <b>ครบกำหนด:</b>{" "}
-              {formatDate(document.due_date || document.dueDate)}
-            </div>
-          )}
-          {type === "quotation" && (
-            <div>
-              <b>วันหมดอายุ:</b> {formatDate(document.validUntil)}
-            </div>
-          )}
         </div>
       </div>
     </div>
   );
 
-  // Section ข้อมูลลูกค้า (แสดงใต้ header ก่อนตาราง)
+  // Customer Info: ข้อมูลลูกค้าแบบกระชับ
   const renderCustomerInfo = () => (
-    <div className="bg-blue-50 rounded-lg border border-blue-200 px-5 py-3 mb-4 max-w-2xl shadow-sm">
-      <div className="font-bold text-blue-700 mb-2 text-base">ข้อมูลลูกค้า</div>
-      <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm text-gray-800">
-        <div className="font-bold">ชื่อลูกค้า</div>
+    <div className="bg-blue-50 rounded-lg border border-blue-200 px-4 py-3 mb-4">
+      <div className="font-bold text-blue-700 mb-2 text-sm">ข้อมูลลูกค้า</div>
+      <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+        <div className="font-semibold">ชื่อ:</div>
         <div>{document.customer_name || document.customer?.name || "-"}</div>
-        <div className="font-bold">ที่อยู่</div>
+        <div className="font-semibold">ที่อยู่:</div>
         <div>
           {document.customer_address || document.customer?.address || "-"}
         </div>
-        <div className="font-bold">เลขผู้เสียภาษี</div>
+        <div className="font-semibold">โทร:</div>
+        <div>{document.customer_phone || document.customer?.phone || "-"}</div>
+        <div className="font-semibold">เลขประจำตัวผู้เสียภาษี:</div>
         <div>
           {document.customer_tax_id || document.customer?.tax_id || "-"}
         </div>
-        <div className="font-bold">โทร</div>
-        <div>{document.customer_phone || document.customer?.phone || "-"}</div>
-        <div className="font-bold">อีเมล</div>
-        <div>{document.customer_email || document.customer?.email || "-"}</div>
       </div>
     </div>
   );
 
-  // ตารางสินค้า: เพิ่มคอลัมน์ 'ส่วนลด' และ 'ภาษี'
-  // 2. renderTable: ใช้ unitPrice เป็นหลัก
-  const renderTable = () => {
-    return (
-      <table className="w-full border border-gray-300 mb-4 text-sm rounded-lg overflow-hidden shadow-sm">
-        <thead className="bg-gray-100 text-gray-900">
-          <tr>
-            <th className="border border-gray-300 p-1 w-6 font-bold">ลำดับ</th>
-            <th className="border border-gray-300 p-1 w-[30%] text-left font-bold">
-              รายการสินค้า
+  // Table: ตารางรายการสินค้าแบบกระชับ
+  const renderTable = () => (
+    <div className="mb-4">
+      <table className="w-full border border-gray-300 text-xs">
+        <thead>
+          <tr className="bg-gray-50">
+            <th className="border border-gray-300 px-2 py-1 text-left font-semibold">
+              รายการ
             </th>
-            <th className="border border-gray-300 p-1 w-10 font-bold">จำนวน</th>
-            <th className="border border-gray-300 p-1 w-16 text-right font-bold">
-              ราคาต่อหน่วย
+            <th className="border border-gray-300 px-2 py-1 text-center font-semibold w-16">
+              จำนวน
             </th>
-            <th className="border border-gray-300 p-1 w-16 text-right font-bold">
-              ส่วนลด
+            <th className="border border-gray-300 px-2 py-1 text-center font-semibold w-20">
+              หน่วย
             </th>
-            <th className="border border-gray-300 p-1 w-12 text-center font-bold">
-              VAT
+            <th className="border border-gray-300 px-2 py-1 text-right font-semibold w-24">
+              ราคา/หน่วย
             </th>
-            <th className="border border-gray-300 p-1 w-20 text-right font-bold">
-              ราคารวม
+            <th className="border border-gray-300 px-2 py-1 text-right font-semibold w-24">
+              จำนวนเงิน
             </th>
           </tr>
         </thead>
         <tbody>
-          {items.length === 0 ? (
-            <tr>
-              <td
-                colSpan={7}
-                className="text-center text-muted-foreground py-2"
-              >
-                ไม่มีรายการสินค้า/บริการ
+          {items.map((item, idx) => (
+            <tr key={idx}>
+              <td className="border border-gray-300 px-2 py-1">
+                <div className="font-medium">
+                  {item.productTitle || item.description}
+                </div>
+                {item.description && item.productTitle && (
+                  <div className="text-gray-600 text-xs">
+                    {item.description}
+                  </div>
+                )}
+              </td>
+              <td className="border border-gray-300 px-2 py-1 text-center">
+                {item.quantity}
+              </td>
+              <td className="border border-gray-300 px-2 py-1 text-center">
+                {item.unit || "-"}
+              </td>
+              <td className="border border-gray-300 px-2 py-1 text-right">
+                {formatCurrency(item.unitPrice || 0)}
+              </td>
+              <td className="border border-gray-300 px-2 py-1 text-right font-semibold">
+                {formatCurrency(item.amount || 0)}
               </td>
             </tr>
-          ) : (
-            items.map((item, idx) => {
-              const prod = productMap[item.product_id];
-              const qty = Number(item.quantity ?? 1);
-              // ใช้ field จาก backend/ฟอร์ม โดยรองรับทั้ง unitPrice และ unit_price
-              const displayUnitPrice = item.unitPrice ?? item.unit_price ?? 0;
-              // ส่วนลด (คำนวณเองถ้าไม่มีใน db)
-              const discount = Number(item.discount ?? 0);
-              const discountType =
-                item.discount_type ?? item.discountType ?? "thb";
-              let discountAmount = 0;
-              if (discountType === "percentage") {
-                discountAmount = displayUnitPrice * qty * (discount / 100);
-              } else {
-                discountAmount = discount * qty;
-              }
-              // VAT (แสดง % ตาม field tax)
-              const vat = (item.tax ?? item.tax_amount) || 0;
-              // ราคารวม: ใช้ amount จาก backend ตรงๆ ถ้ามี ถ้าไม่มี fallback เป็น 0
-              const displayTotal = item.amount ?? 0;
-              return (
-                <tr key={idx}>
-                  <td className="border border-gray-300 p-1 text-center">
-                    {idx + 1}
-                  </td>
-                  <td className="border border-gray-300 p-1 text-left">
-                    {prod?.name ||
-                      item.product_name ||
-                      item.productTitle ||
-                      item.description ||
-                      "-"}
-                  </td>
-                  <td className="border border-gray-300 p-1 text-center">
-                    {qty}
-                  </td>
-                  <td className="border border-gray-300 p-1 text-right bg-yellow-100 font-bold text-yellow-700">
-                    {formatCurrency(displayUnitPrice)}
-                  </td>
-                  <td className="border border-gray-300 p-1 text-right">
-                    {discountAmount > 0 ? formatCurrency(discountAmount) : "-"}
-                  </td>
-                  <td className="border border-gray-300 p-1 text-center">
-                    {vat ? `${vat}%` : "-"}
-                  </td>
-                  <td className="border border-gray-300 p-1 text-right">
-                    {formatCurrency(displayTotal)}
-                  </td>
-                </tr>
-              );
-            })
-          )}
-          {/* แถวว่างสำหรับเขียนเพิ่ม - ลดจำนวนแถว */}
-          {Array.from({ length: Math.max(0, 1 - items.length) }).map((_, i) => (
-            <tr key={"empty-" + i}>
-              <td className="border border-gray-300 p-1 text-center">&nbsp;</td>
-              <td className="border border-gray-300 p-1 text-left">&nbsp;</td>
-              <td className="border border-gray-300 p-1 text-center">&nbsp;</td>
-              <td className="border border-gray-300 p-1 text-right">&nbsp;</td>
-              <td className="border border-gray-300 p-1 text-right">&nbsp;</td>
-              <td className="border border-gray-300 p-1 text-center">&nbsp;</td>
-              <td className="border border-gray-300 p-1 text-right">&nbsp;</td>
+          ))}
+          {/* เพิ่มบรรทัดว่างถ้าสินค้าน้อยเกินไป */}
+          {Array.from({ length: Math.max(0, 3 - items.length) }).map((_, i) => (
+            <tr key={`empty-${i}`}>
+              <td className="border border-gray-300 px-2 py-1">&nbsp;</td>
+              <td className="border border-gray-300 px-2 py-1">&nbsp;</td>
+              <td className="border border-gray-300 px-2 py-1">&nbsp;</td>
+              <td className="border border-gray-300 px-2 py-1">&nbsp;</td>
+              <td className="border border-gray-300 px-2 py-1">&nbsp;</td>
             </tr>
           ))}
         </tbody>
       </table>
-    );
-  };
+    </div>
+  );
 
-  // สรุปยอด: แก้ไขให้ใช้ค่าจาก summary backend เท่านั้น
-  const renderSummary = () => {
-    // รวม withholding tax จาก summary หรือจากทุกแถว
-    const summaryWithholdingTax =
-      typeof summary.withholdingTax === "number" && summary.withholdingTax > 0
-        ? summary.withholdingTax
-        : 0;
-    const afterDiscount = summary.subtotal - summary.discount;
-    return (
-      <div className="flex justify-end mb-2">
-        <div className="w-full max-w-xs space-y-1 bg-blue-50 rounded-lg p-3 shadow-sm">
-          <div className="flex justify-between mb-1 text-sm">
-            <span>มูลค่าสินค้าหรือค่าบริการ</span>
-            <span className="font-semibold">
-              {formatCurrency(summary.subtotal)}
-            </span>
+  // Summary: สรุปยอดแบบกระชับ
+  const renderSummary = () => (
+    <div className="flex justify-end mb-4">
+      <div className="w-48 space-y-1 bg-blue-50 rounded-lg p-3 text-xs">
+        <div className="flex justify-between">
+          <span>รวมเป็นเงิน:</span>
+          <span>{formatCurrency(summary.subtotal || 0)}</span>
+        </div>
+        {summary.discount > 0 && (
+          <div className="flex justify-between text-red-600">
+            <span>ส่วนลด:</span>
+            <span>-{formatCurrency(summary.discount || 0)}</span>
           </div>
-          <div className="flex justify-between mb-1 text-sm">
-            <span>ส่วนลดรวม</span>
-            <span className="text-red-500">
-              -{formatCurrency(summary.discount)}
-            </span>
+        )}
+        {summary.tax > 0 && (
+          <div className="flex justify-between">
+            <span>ภาษีมูลค่าเพิ่ม:</span>
+            <span>{formatCurrency(summary.tax || 0)}</span>
           </div>
-          <div className="flex justify-between mb-1 text-sm">
-            <span>ยอดหลังหักส่วนลด</span>
-            <span>{formatCurrency(afterDiscount)}</span>
+        )}
+        {summary.withholdingTax > 0 && (
+          <div className="flex justify-between text-red-600">
+            <span>หัก ณ ที่จ่าย:</span>
+            <span>-{formatCurrency(summary.withholdingTax || 0)}</span>
           </div>
-          {summary.tax > 0 && (
-            <div className="flex justify-between mb-1 text-sm">
-              <span>ภาษีมูลค่าเพิ่ม 7%</span>
-              <span>{formatCurrency(summary.tax)}</span>
-            </div>
-          )}
-          {summary.tax > 0 && (
-            <div className="flex justify-between mb-1 font-semibold text-sm">
-              <span>ยอดรวมหลังรวมภาษี</span>
-              <span>{formatCurrency(Number(summary.total ?? 0))}</span>
-            </div>
-          )}
-          <div className="flex justify-between mb-1 text-yellow-700 text-sm">
-            <span>หัก ณ ที่จ่าย</span>
-            <span>-{formatCurrency(summaryWithholdingTax)}</span>
-          </div>
-          <div className="flex justify-between font-bold text-lg border-t border-blue-200 pt-1 mt-1">
-            <span>จำนวนเงินทั้งสิ้น</span>
-            <span className="text-blue-700">
-              {formatCurrency(
-                Number(summary.total ?? 0) - summaryWithholdingTax
-              )}
-            </span>
+        )}
+        <div className="border-t border-gray-300 pt-1">
+          <div className="flex justify-between font-bold text-base">
+            <span>รวมทั้งสิ้น:</span>
+            <span>{formatCurrency(summary.total || 0)}</span>
           </div>
         </div>
       </div>
-    );
-  };
+    </div>
+  );
 
   const renderFooter = () => {
     switch (type) {
@@ -536,22 +472,20 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
             {/* ข้อมูลการรับชำระ */}
             {(document as any).receipt_details && (
               <div className="bg-green-50 rounded-lg border border-green-200 px-4 py-3 mb-3">
-                <div className="font-bold text-green-700 mb-2 text-base">
+                <div className="font-bold text-green-700 mb-2 text-sm">
                   ข้อมูลการรับชำระ
                 </div>
-                <div className="grid grid-cols-3 gap-x-4 gap-y-1 text-sm">
+                <div className="grid grid-cols-3 gap-x-4 gap-y-1 text-xs">
                   <div className="font-semibold">วันที่:</div>
                   <div>
                     {formatDate((document as any).receipt_details.payment_date)}
                   </div>
                   <div></div>
-
                   <div className="font-semibold">วิธี:</div>
                   <div>
                     {(document as any).receipt_details.payment_method || "-"}
                   </div>
                   <div></div>
-
                   {(document as any).receipt_details.payment_reference && (
                     <>
                       <div className="font-semibold">อ้างอิง:</div>
@@ -561,7 +495,6 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
                       <div></div>
                     </>
                   )}
-
                   <div className="font-semibold">ยอดรับ:</div>
                   <div className="font-bold text-green-700">
                     {formatCurrency(
@@ -579,60 +512,39 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
                   (document as any).receipt_details.payment_channels.length >
                     0 && (
                     <div className="mt-2">
-                      <div className="font-semibold text-green-700 mb-1 text-sm">
+                      <div className="font-semibold text-green-700 mb-1 text-xs">
                         ช่องทางการชำระ:
                       </div>
-                      <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1">
                         {(document as any).receipt_details.payment_channels.map(
-                          (channel: any, idx: number) => {
-                            // Debug: แสดงข้อมูล payment_channels
-                            console.log(`Channel ${idx}:`, channel);
-                            console.log(`Channel ${idx} type:`, typeof channel);
-                            console.log(
-                              `Channel ${idx} keys:`,
-                              Object.keys(channel || {})
-                            );
-                            console.log(
-                              `Channel ${idx} method:`,
-                              channel?.method
-                            );
-                            console.log(
-                              `Channel ${idx} channel:`,
-                              channel?.channel
-                            );
-                            console.log(
-                              `Channel ${idx} amount:`,
-                              channel?.amount
-                            );
-                            return (
-                              <div
-                                key={idx}
-                                className="flex justify-between items-center bg-white rounded px-2 py-1 border border-green-100 text-sm"
-                              >
-                                <div className="flex items-center gap-1">
-                                  <span>
-                                    {(channel?.method || channel?.channel) ===
-                                      "เงินสด" && "💵"}
-                                    {(channel?.method || channel?.channel) ===
-                                      "โอนเงิน" && "🏦"}
-                                    {(channel?.method || channel?.channel) ===
-                                      "บัตรเครดิต" && "💳"}
-                                    {channel?.method ||
-                                      channel?.channel ||
-                                      "ไม่ระบุ"}
+                          (channel: any, idx: number) => (
+                            <div
+                              key={idx}
+                              className="flex justify-between items-center bg-white rounded px-2 py-1 border border-green-100 text-xs"
+                            >
+                              <div className="flex items-center gap-1">
+                                <span>
+                                  {(channel?.method || channel?.channel) ===
+                                    "เงินสด" && "💵"}
+                                  {(channel?.method || channel?.channel) ===
+                                    "โอนเงิน" && "🏦"}
+                                  {(channel?.method || channel?.channel) ===
+                                    "บัตรเครดิต" && "💳"}
+                                  {channel?.method ||
+                                    channel?.channel ||
+                                    "ไม่ระบุ"}
+                                </span>
+                                {channel?.note && (
+                                  <span className="text-gray-500">
+                                    ({channel.note})
                                   </span>
-                                  {channel?.note && (
-                                    <span className="text-gray-500">
-                                      ({channel.note})
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="font-semibold text-green-700">
-                                  {formatCurrency(channel?.amount || 0)}
-                                </div>
+                                )}
                               </div>
-                            );
-                          }
+                              <div className="font-semibold text-green-700">
+                                {formatCurrency(channel?.amount || 0)}
+                              </div>
+                            </div>
+                          )
                         )}
                       </div>
                     </div>
@@ -646,7 +558,7 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
                     (fee: any) => fee.enabled
                   ) && (
                     <div className="mt-2">
-                      <div className="font-semibold text-green-700 mb-1 text-sm">
+                      <div className="font-semibold text-green-700 mb-1 text-xs">
                         ค่าธรรมเนียม:
                       </div>
                       <div className="space-y-1">
@@ -655,7 +567,7 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
                           .map((fee: any, idx: number) => (
                             <div
                               key={idx}
-                              className="flex justify-between items-center bg-white rounded px-2 py-1 border border-green-100 text-sm"
+                              className="flex justify-between items-center bg-white rounded px-2 py-1 border border-green-100 text-xs"
                             >
                               <div>
                                 {fee.description || `ค่าธรรมเนียม ${idx + 1}`}
@@ -679,7 +591,7 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
                     (doc: any) => doc.enabled
                   ) && (
                     <div className="mt-2">
-                      <div className="font-semibold text-green-700 mb-1 text-sm">
+                      <div className="font-semibold text-green-700 mb-1 text-xs">
                         เอกสารออฟเซ็ต:
                       </div>
                       <div className="space-y-1">
@@ -688,7 +600,7 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
                           .map((doc: any, idx: number) => (
                             <div
                               key={idx}
-                              className="flex justify-between items-center bg-white rounded px-2 py-1 border border-green-100 text-sm"
+                              className="flex justify-between items-center bg-white rounded px-2 py-1 border border-green-100 text-xs"
                             >
                               <div className="flex items-center gap-1">
                                 <span>
@@ -710,9 +622,13 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
                   )}
               </div>
             )}
-
-            <div className="thankyou text-green-700 font-bold text-xl">
-              ขอขอบพระคุณที่ไว้วางใจใช้บริการ
+            <div className="text-center">
+              <div className="text-green-700 font-bold text-lg mb-2">
+                ขอขอบพระคุณที่ไว้วางใจใช้บริการ
+              </div>
+              <div className="text-xs text-gray-600">
+                กรุณาเก็บใบเสร็จนี้ไว้เป็นหลักฐาน
+              </div>
             </div>
           </div>
         );
@@ -894,21 +810,21 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
               &times;
             </button>
             {/* Header */}
-            <div className="flex flex-col mb-4 border-b-2 border-blue-200 pb-4">
-              <div className="flex justify-between items-start">
-                <div>{renderHeader()}</div>
-                {/* เส้น header */}
-                <hr className="border-blue-200 mb-2" />
-              </div>
-              {renderCustomerInfo()}
-            </div>
+            {renderHeader()}
+            {/* Customer Info */}
+            {renderCustomerInfo()}
             {/* Table */}
-            <div className="overflow-x-auto">{renderTable()}</div>
+            {renderTable()}
             {/* Summary */}
-            <div className="mt-2 mb-4">{renderSummary()}</div>
+            {renderSummary()}
             {/* Footer */}
-            <div className="border-t-2 border-blue-200 pt-2 mt-3">
-              {renderFooter()}
+            {renderFooter()}
+            {/* Signature */}
+            <div className="flex justify-end mt-6">
+              <div className="text-center">
+                <div className="border-t-2 border-gray-400 w-32 h-8 mb-1"></div>
+                <div className="text-xs text-gray-600">ผู้รับเงิน</div>
+              </div>
             </div>
             {/* กล่องหมายเหตุ (ถ้ามี) */}
             {document.notes && (
