@@ -1229,6 +1229,29 @@ export const DocumentForm: FC<DocumentFormProps> = ({
       ? calculatedSummary.total - calculatedSummary.withholdingTax
       : 0;
 
+  // คำนวณยอดที่ชำระแล้ว
+  const totalPaid = totalPayment + totalOffset;
+  const remainingAmount = netTotal - totalPaid;
+
+  // อัปเดตสถานะอัตโนมัติตามยอดที่ชำระ
+  useEffect(() => {
+    if (documentType === "receipt" && netTotal > 0) {
+      let newStatus = form.status;
+
+      if (totalPaid === 0) {
+        newStatus = "ร่าง";
+      } else if (totalPaid >= netTotal) {
+        newStatus = "ชำระแล้ว";
+      } else if (totalPaid > 0) {
+        newStatus = "ชำระบางส่วน";
+      }
+
+      if (newStatus !== form.status) {
+        setForm((prev) => ({ ...prev, status: newStatus }));
+      }
+    }
+  }, [totalPaid, netTotal, documentType, form.status]);
+
   // log debug form.priceType ทุกครั้งที่ render
   useEffect(() => {
     console.log("[DEBUG] form.priceType:", form.priceType);
@@ -2066,7 +2089,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                           <SelectItem value="เงินสด">💵 เงินสด</SelectItem>
                           <SelectItem value="โอนเงิน">🏦 โอนเงิน</SelectItem>
                           <SelectItem value="บัตรเครดิต">
-                            �� บัตรเครดิต
+                            💳 บัตรเครดิต
                           </SelectItem>
                         </SelectContent>
                       </Select>

@@ -618,14 +618,31 @@ async function createDocumentFromServer(data: any, pool: any) {
         "INSERT INTO invoice_details (document_id, due_date) VALUES (?, ?)",
         [documentId, due_date]
       );
-    } else if (
-      document_type.toLowerCase() === "receipt" &&
-      payment_date &&
-      payment_method
-    ) {
+    } else if (document_type.toLowerCase() === "receipt") {
+      // บันทึกข้อมูล receipt_details พร้อมข้อมูลเพิ่มเติม
+      const payment_channels_json = data.payment_channels
+        ? JSON.stringify(data.payment_channels)
+        : null;
+      const fees_json = data.fees ? JSON.stringify(data.fees) : null;
+      const offset_docs_json = data.offset_docs
+        ? JSON.stringify(data.offset_docs)
+        : null;
+
       await conn.query(
-        "INSERT INTO receipt_details (document_id, payment_date, payment_method, payment_reference) VALUES (?, ?, ?, ?)",
-        [documentId, payment_date, payment_method, payment_reference]
+        `INSERT INTO receipt_details (
+          document_id, payment_date, payment_method, payment_reference, 
+          payment_channels, fees, offset_docs, net_total_receipt
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          documentId,
+          payment_date || new Date().toISOString().slice(0, 10),
+          payment_method || "เงินสด",
+          payment_reference || "",
+          payment_channels_json,
+          fees_json,
+          offset_docs_json,
+          data.net_total_receipt || 0,
+        ]
       );
     }
     // ALWAYS insert document_items for every document type
@@ -859,11 +876,7 @@ app.post("/api/documents", async (req: Request, res: Response) => {
         "INSERT INTO invoice_details (document_id, due_date) VALUES (?, ?)",
         [documentId, due_date]
       );
-    } else if (
-      document_type.toLowerCase() === "receipt" &&
-      payment_date &&
-      payment_method
-    ) {
+    } else if (document_type.toLowerCase() === "receipt") {
       // หา bank_account_id จาก payment_channels
       let bankAccountId = null;
       if (
@@ -886,13 +899,13 @@ app.post("/api/documents", async (req: Request, res: Response) => {
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           documentId,
-          payment_date,
-          payment_method,
-          payment_reference,
+          payment_date || issue_date, // ใช้วันที่เอกสารถ้าไม่มีวันที่ชำระ
+          payment_method || "เงินสด", // ใช้เงินสดเป็นค่าเริ่มต้น
+          payment_reference || "",
           JSON.stringify(payment_channels || []),
           JSON.stringify(fees || []),
           JSON.stringify(offset_docs || []),
-          net_total_receipt || 0,
+          net_total_receipt || total_amount, // ใช้ยอดรวมถ้าไม่มี net_total_receipt
           bankAccountId,
         ]
       );
@@ -921,7 +934,7 @@ app.post("/api/documents", async (req: Request, res: Response) => {
                 "income",
                 channel.amount,
                 `รับชำระ ${channel.method} - ${docNumber}`,
-                payment_date,
+                payment_date || issue_date,
                 channel.bankAccountId || null,
                 documentId,
                 "รายได้จากการขาย",
@@ -1315,11 +1328,7 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
           [id, due_date]
         );
       }
-    } else if (
-      document_type.toLowerCase() === "receipt" &&
-      payment_date &&
-      payment_method
-    ) {
+    } else if (document_type.toLowerCase() === "receipt") {
       // หา bank_account_id จาก payment_channels
       let bankAccountId = null;
       if (
@@ -1365,13 +1374,13 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
       await conn.query(
         `UPDATE receipt_details SET payment_date = ?, payment_method = ?, payment_reference = ?, payment_channels = ?, fees = ?, offset_docs = ?, net_total_receipt = ?, bank_account_id = ? WHERE document_id = ?`,
         [
-          payment_date,
-          payment_method,
-          payment_reference,
+          payment_date || issue_date,
+          payment_method || "เงินสด",
+          payment_reference || "",
           JSON.stringify(payment_channels || []),
           JSON.stringify(fees || []),
           JSON.stringify(offset_docs || []),
-          net_total_receipt || 0,
+          net_total_receipt || total_amount,
           bankAccountId,
           id,
         ]
