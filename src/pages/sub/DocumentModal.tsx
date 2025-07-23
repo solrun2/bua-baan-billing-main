@@ -349,7 +349,7 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
               จำนวน
             </th>
             <th className="border border-gray-300 px-2 py-1 text-center font-semibold w-20">
-              หน่วย
+              ส่วนลด
             </th>
             <th className="border border-gray-300 px-2 py-1 text-right font-semibold w-24">
               ราคา/หน่วย
@@ -382,7 +382,9 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
                 {item.quantity}
               </td>
               <td className="border border-gray-300 px-2 py-1 text-center">
-                {item.unit || "-"}
+                {item.discountType === "percentage"
+                  ? `${item.discount || 0}%`
+                  : `${formatCurrency(item.discount || 0)}`}
               </td>
               <td className="border border-gray-300 px-2 py-1 text-right">
                 {formatCurrency(item.unitPrice || 0)}
@@ -413,7 +415,9 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
       <div className="w-48 space-y-1 bg-blue-50 rounded-lg p-3 text-xs">
         <div className="flex justify-between">
           <span>รวมเป็นเงิน:</span>
-          <span>{formatCurrency(summary.subtotal || 0)}</span>
+          <span>
+            {formatCurrency((summary.subtotal || 0) + (summary.discount || 0))}
+          </span>
         </div>
         {summary.discount > 0 && (
           <div className="flex justify-between text-red-600">
@@ -436,7 +440,11 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
         <div className="border-t border-gray-300 pt-1">
           <div className="flex justify-between font-bold text-base">
             <span>รวมทั้งสิ้น:</span>
-            <span>{formatCurrency(summary.total || 0)}</span>
+            <span>
+              {formatCurrency(
+                (summary.total || 0) - (summary.withholdingTax || 0)
+              )}
+            </span>
           </div>
         </div>
       </div>

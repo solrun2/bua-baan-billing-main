@@ -267,10 +267,10 @@ function mapDocumentFromBackend(doc: any): DocumentData {
     })),
     items_recursive: doc.items_recursive || [],
     summary: doc.summary || {
-      subtotal: 0,
+      subtotal: Number(doc.subtotal ?? 0),
       discount: 0,
-      tax: 0,
-      total: 0,
+      tax: Number(doc.tax_amount ?? 0),
+      total: Number(doc.total_amount ?? 0),
       withholdingTax: 0,
     },
     attachments: doc.attachments || [],

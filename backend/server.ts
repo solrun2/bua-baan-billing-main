@@ -650,9 +650,10 @@ async function createDocumentFromServer(data: any, pool: any) {
     for (const item of items as any[]) {
       // Fallback logic สำหรับ field สำคัญ
       const product_id = item.product_id ?? item.productId ?? null;
-      const product_name = (item.product_name && item.product_name !== "-")
-        ? item.product_name
-        : (item.productTitle ?? "-");
+      const product_name =
+        item.product_name && item.product_name !== "-"
+          ? item.product_name
+          : (item.productTitle ?? "-");
       const unit = item.unit ?? item.unitName ?? "";
       const description = item.description ?? item.productDescription ?? "";
       const qty = Number(item.quantity ?? 1);
