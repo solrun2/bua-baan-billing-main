@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileText, Settings } from "lucide-react";
+import { FileText, Settings, Info } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -8,6 +8,12 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useState, useEffect } from "react";
 const DocumentNumbering = () => {
   const [editIndex, setEditIndex] = useState<number | null>(null);
@@ -194,16 +200,6 @@ const DocumentNumbering = () => {
         </CardContent>
       </Card>
 
-      <Card className="border border-border/40">
-        <CardHeader>
-          <CardTitle>หมายเหตุ</CardTitle>
-        </CardHeader>
-        <CardContent className="text-sm text-muted-foreground space-y-2">
-          <p>• YYYY = ปี ค.ศ. (เช่น 2024)</p>
-          <p>• XXX = เลขรันเอกสาร 3 หลัก (เช่น 001, 002, 003)</p>
-          <p>• ตัวอย่าง: QT-2024-001, INV-2024-156</p>
-        </CardContent>
-      </Card>
       {editIndex !== null && (
         <Dialog open={true} onOpenChange={handleCloseEdit}>
           <DialogContent>
@@ -211,7 +207,64 @@ const DocumentNumbering = () => {
               <DialogTitle>ตั้งค่ารูปแบบเลขรันเอกสาร</DialogTitle>
             </DialogHeader>
             <div className="space-y-2">
-              <div>รูปแบบเลขรัน (Format):</div>
+              <div className="flex items-center gap-2">
+                <span>รูปแบบเลขรัน (Format):</span>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-md">
+                      <div className="space-y-2">
+                        <div>
+                          <strong>Format ที่สามารถใช้ได้:</strong>
+                        </div>
+                        <div>
+                          • <code>YYYY</code> = ปี ค.ศ. 4 หลัก (เช่น 2024)
+                        </div>
+                        <div>
+                          • <code>YY</code> = ปี ค.ศ. 2 หลัก (เช่น 24)
+                        </div>
+                        <div>
+                          • <code>MM</code> = เดือน 2 หลัก (เช่น 01, 02, 12)
+                        </div>
+                        <div>
+                          • <code>DD</code> = วัน 2 หลัก (เช่น 01, 15, 31)
+                        </div>
+                        <div>
+                          • <code>X</code> = เลขรัน 1 หลัก (เช่น 1, 2, 9)
+                        </div>
+                        <div>
+                          • <code>XX</code> = เลขรัน 2 หลัก (เช่น 01, 02, 99)
+                        </div>
+                        <div>
+                          • <code>XXX</code> = เลขรัน 3 หลัก (เช่น 001, 002,
+                          999)
+                        </div>
+                        <div>
+                          • <code>XXXX</code> = เลขรัน 4 หลัก (เช่น 0001, 0002,
+                          9999)
+                        </div>
+                        <div className="mt-2">
+                          <strong>ตัวอย่าง:</strong>
+                        </div>
+                        <div>
+                          • <code>QT-YYYY-XXX</code> → QT-2024-001
+                        </div>
+                        <div>
+                          • <code>INV-YY-MM-XX</code> → INV-24-01-01
+                        </div>
+                        <div>
+                          • <code>PO-YYYYMMDD-XXXX</code> → PO-20240115-0001
+                        </div>
+                        <div>
+                          • <code>RE-YY-XXX</code> → RE-24-001
+                        </div>
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
               <input
                 className="border rounded px-2 py-1 w-full"
                 value={editPattern}
@@ -226,10 +279,6 @@ const DocumentNumbering = () => {
                   value={currentRunning}
                   onChange={(e) => setCurrentRunning(Number(e.target.value))}
                 />
-                <div className="text-xs text-muted-foreground mb-2">
-                  เลขรันปัจจุบัน (Current Running Number):
-                  ใส่เลขล่าสุดที่ใช้อยู่ เช่น 1234 เอกสารถัดไปจะเป็น 1235
-                </div>
                 <div className="flex items-center gap-2 mt-2">
                   <span className="text-xs">ตัวอย่างเลขรันถัดไป:</span>
                   <span className="font-mono text-sm bg-gray-100 px-2 py-1 rounded">
