@@ -646,16 +646,37 @@ async function createDocumentFromServer(data: any, pool: any) {
       );
     }
     // ALWAYS insert document_items for every document type
+    console.log("[DEBUG] Items ที่จะ insert ลง document_items:");
     for (const item of items as any[]) {
+      // Fallback logic สำหรับ field สำคัญ
+      const product_id = item.product_id ?? item.productId ?? null;
+      const product_name = (item.product_name && item.product_name !== "-")
+        ? item.product_name
+        : (item.productTitle ?? "-");
+      const unit = item.unit ?? item.unitName ?? "";
+      const description = item.description ?? item.productDescription ?? "";
+
+      console.log("[DEBUG] Item:", {
+        product_id,
+        product_name,
+        productTitle: item.productTitle,
+        unit,
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+        unitPrice: item.unitPrice,
+        amount: item.amount,
+        description,
+      });
+
       const params = [
         documentId,
-        item.product_id ?? null,
-        item.product_name ?? item.productTitle ?? "",
-        item.unit ?? "",
+        product_id,
+        product_name,
+        unit,
         item.quantity ?? 1,
         item.unit_price ?? item.unitPrice ?? 0,
         item.amount ?? 0,
-        item.description ?? "",
+        description,
         item.withholding_tax_amount ?? 0,
         item.withholding_tax_option ?? -1,
         item.amount_before_tax ?? 0,
@@ -664,6 +685,8 @@ async function createDocumentFromServer(data: any, pool: any) {
         Number(item.tax ?? 0),
         item.tax_amount ?? 0,
       ];
+      console.log("[DEBUG] Params ที่จะ insert:", params);
+
       await conn.query(
         `INSERT INTO document_items (
           document_id, product_id, product_name, unit, quantity, unit_price, amount, description, withholding_tax_amount, withholding_tax_option, amount_before_tax, discount, discount_type, tax, tax_amount

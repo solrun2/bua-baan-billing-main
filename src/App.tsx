@@ -88,10 +88,10 @@ const App = () => {
           ...receiptData,
           items: receiptData.items.map((item) => ({
             product_id: item.productId || null,
-            product_name: item.productTitle || "",
+            product_name: item.productTitle || item.description || "-", // fallback
             unit: item.unit || "",
             quantity: item.quantity || 1,
-            unit_price: item.unitPrice || 0,
+            unit_price: item.unitPrice || item.amount || 0, // fallback
             amount: item.amount || 0,
             description: item.description || "",
             withholding_tax_amount: item.withholdingTaxAmount || 0,

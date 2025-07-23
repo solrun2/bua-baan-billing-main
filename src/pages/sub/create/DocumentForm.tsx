@@ -512,75 +512,25 @@ export const DocumentForm: FC<DocumentFormProps> = ({
   // handle เลือกสินค้า
   const handleProductSelect = (product: Product | null, itemId: string) => {
     if (product) {
+      console.log('[DEBUG] handleProductSelect', { product, itemId });
       setForm((prev) => {
         const newItems = prev.items.map((item) => {
           if (item.id === itemId) {
-            // normalize discountType ให้ถูกต้อง
-            let normalizedDiscountType: "thb" | "percentage" = "thb";
-            if (item.discountType === "percentage") {
-              normalizedDiscountType = "percentage";
-            }
-            // เตรียมข้อมูล item (spread ...item ก่อน แล้ว override)
-            const mergedItem: DocumentItem = {
+            // map ข้อมูล product ให้ถูกต้องเสมอ
+            return {
               ...item,
-              id: item.id ?? `item-${Date.now()}`,
-              productId: product.id
-                ? product.id.toString()
-                : (item.productId ?? ""),
-              productTitle: product.title ?? item.productTitle ?? "",
-              description: product.description ?? item.description ?? "",
-              unitPrice:
-                typeof product.price === "number"
-                  ? product.price
-                  : (item.unitPrice ?? 0), // แก้ให้ใช้ราคาสินค้าใหม่
-              unit: product.unit ?? item.unit ?? "",
-              tax:
-                typeof product.vat_rate === "number"
-                  ? product.vat_rate
-                  : (item.tax ?? 7),
+              productId: product.id ? product.id.toString() : "",
+              productTitle: product.title || product.name || "-",
+              unit: product.unit || "",
+              description: product.description || "",
+              unitPrice: typeof product.price === "number" ? product.price : 0,
+              tax: typeof product.vat_rate === "number" ? product.vat_rate : 7,
+              // field อื่นๆ ตาม logic เดิม
               discount: item.discount ?? 0,
-              discountType: normalizedDiscountType,
+              discountType: item.discountType ?? "thb",
               withholding_tax_option: item.withholding_tax_option ?? "ไม่ระบุ",
               customWithholdingTaxAmount: item.customWithholdingTaxAmount ?? 0,
               isEditing: false,
-            };
-            // ลบ field ที่เกี่ยวกับผลลัพธ์การคำนวณ
-            delete (mergedItem as any).amount;
-            delete (mergedItem as any).amountBeforeTax;
-            delete (mergedItem as any).taxAmount;
-            delete (mergedItem as any).withholdingTaxAmount;
-            // Logic sync withholdingTax ตาม withholding_tax_option
-            if (mergedItem.withholding_tax_option === "กำหนดเอง") {
-              mergedItem.withholdingTax = "custom";
-            } else if (
-              typeof mergedItem.withholding_tax_option === "string" &&
-              mergedItem.withholding_tax_option.endsWith("%")
-            ) {
-              mergedItem.withholdingTax = parseFloat(
-                mergedItem.withholding_tax_option
-              );
-            } else if (
-              mergedItem.withholding_tax_option === "ไม่มี" ||
-              mergedItem.withholding_tax_option === "ไม่ระบุ"
-            ) {
-              mergedItem.withholdingTax = 0;
-            } else if (typeof mergedItem.withholdingTax !== "number") {
-              mergedItem.withholdingTax =
-                Number(mergedItem.withholdingTax) || 0;
-            }
-            // แปลง priceType ก่อนส่งเข้า updateItemWithCalculations
-            const calculated = updateItemWithCalculations({
-              ...mergedItem,
-              discountType: normalizedDiscountType, // ให้ type ตรง
-              priceType: mapPriceTypeToBaseItem(mergedItem.priceType),
-            });
-            return {
-              ...mergedItem,
-              ...calculated,
-              priceType: mapPriceTypeToDocumentItem(calculated.priceType) as
-                | "EXCLUDE_VAT"
-                | "INCLUDE_VAT"
-                | "NO_VAT",
             };
           }
           return item;
@@ -712,8 +662,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
             isEditing: false,
             unitPrice: item.unitPrice ?? 0,
           };
-          // ลบ field ที่เกี่ยวกับผลลัพธ์การคำนวณ
-          delete mergedItem.amount;
+          // ลบ field ที่เกี่ยวกับผลลัพธ์การคำนวณ (แต่ไม่ลบ amount เพราะใช้เป็น fallback)
           delete mergedItem.amountBeforeTax;
           delete mergedItem.taxAmount;
           delete mergedItem.withholdingTaxAmount;

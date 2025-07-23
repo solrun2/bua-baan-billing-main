@@ -364,13 +364,19 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
             <tr key={idx}>
               <td className="border border-gray-300 px-2 py-1">
                 <div className="font-medium">
-                  {item.productTitle || item.description}
+                  {item.product_name ||
+                    item.productTitle ||
+                    item.description ||
+                    "-"}
                 </div>
-                {item.description && item.productTitle && (
-                  <div className="text-gray-600 text-xs">
-                    {item.description}
-                  </div>
-                )}
+                {item.description &&
+                  (item.product_name || item.productTitle) &&
+                  item.description !==
+                    (item.product_name || item.productTitle) && (
+                    <div className="text-gray-600 text-xs">
+                      {item.description}
+                    </div>
+                  )}
               </td>
               <td className="border border-gray-300 px-2 py-1 text-center">
                 {item.quantity}
