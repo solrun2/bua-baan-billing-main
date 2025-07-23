@@ -136,6 +136,8 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
 }) => {
   const [productMap, setProductMap] = useState<Record<string, any>>({});
   const [relatedDocument, setRelatedDocument] = useState<any>(null);
+  // เพิ่ม state สำหรับข้อมูลธนาคาร
+  const [bankAccounts, setBankAccounts] = useState<any[]>([]);
 
   useEffect(() => {
     if (!open || !document?.items) {
@@ -214,31 +216,32 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
     fetchRelatedDocument();
   }, [open, document]);
 
+  // ดึงข้อมูลธนาคาร
+  useEffect(() => {
+    const fetchBankAccounts = async () => {
+      try {
+        const response = await fetch("http://localhost:3001/api/bank-accounts");
+        if (response.ok) {
+          const data = await response.json();
+          setBankAccounts(data);
+        }
+      } catch (error) {
+        console.error("Failed to fetch bank accounts:", error);
+      }
+    };
+
+    if (open) {
+      fetchBankAccounts();
+    }
+  }, [open]);
+
+  // ฟังก์ชันหาชื่อธนาคารจาก ID
+  const getBankName = (bankAccountId: number) => {
+    const bankAccount = bankAccounts.find((bank) => bank.id === bankAccountId);
+    return bankAccount ? bankAccount.bank_name : `ธนาคาร ${bankAccountId}`;
+  };
+
   // Log document และ related_document_id ทุกครั้งที่ modal เปิด
-  if (open) {
-    console.log("DocumentModal document:", document);
-    console.log(
-      "Document number:",
-      document.document_number || document.documentNumber
-    );
-    console.log("Document date:", document.issue_date || document.documentDate);
-    console.log(
-      "Customer name:",
-      document.customer_name || document.customer?.name
-    );
-    console.log(
-      "Customer address:",
-      document.customer_address || document.customer?.address
-    );
-    console.log(
-      "Customer phone:",
-      document.customer_phone || document.customer?.phone
-    );
-    console.log(
-      "Customer tax_id:",
-      document.customer_tax_id || document.customer?.tax_id
-    );
-  }
 
   // Helper for date formatting
   const formatDate = (dateStr?: string) => {
@@ -539,6 +542,15 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
                                     ({channel.note})
                                   </span>
                                 )}
+                                {channel?.bankAccountId &&
+                                  ((channel?.method || channel?.channel) ===
+                                    "โอนเงิน" ||
+                                    (channel?.method || channel?.channel) ===
+                                      "บัตรเครดิต") && (
+                                    <span className="text-blue-600">
+                                      ({getBankName(channel.bankAccountId)})
+                                    </span>
+                                  )}
                               </div>
                               <div className="font-semibold text-green-700">
                                 {formatCurrency(channel?.amount || 0)}
