@@ -75,7 +75,7 @@ const ReceiptForm = ({
             .toISOString()
             .split("T")[0],
           reference: "",
-          status: "ชำระแล้ว",
+          status: "ร่าง",
           priceType: "exclusive",
         });
         setIsEditing(false);
@@ -96,12 +96,12 @@ const ReceiptForm = ({
       try {
         console.log("Fetching receipt data from API:", id);
         const data = await apiService.getDocumentById(id);
-                console.log("API response (ReceiptForm)", data);
+        console.log("API response (ReceiptForm)", data);
 
         setInitialData({
           ...data,
           documentType: "receipt",
-          status: data.status || "ชำระแล้ว",
+          status: data.status || "ร่าง",
           priceType: data.priceType || "exclusive",
         });
         setIsEditing(true);
@@ -136,7 +136,7 @@ const ReceiptForm = ({
         ...data,
         documentType: "receipt",
         updatedAt: new Date().toISOString(),
-        status: data.status || "ชำระแล้ว",
+        status: data.status || "ร่าง",
         priceType: data.priceType || "exclusive",
         customer: data.customer || {
           name: "",

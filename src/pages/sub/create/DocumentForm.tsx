@@ -757,7 +757,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
             validUntil: initialData.validUntil || "",
             reference: initialData.reference || "",
             notes: initialData.notes || "",
-            status: initialData.status || "draft",
+            status: initialData.status || "ร่าง",
             customer: {
               id:
                 typeof customer.id === "string"
@@ -1015,7 +1015,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
       documentType: documentType,
       documentNumber: form.documentNumber,
       documentDate: form.documentDate,
-      dueDate: documentType === "invoice" ? form.dueDate : undefined, // ฝั่ง backend ต้องรองรับ dueDate (camelCase)
+      dueDate: documentType === "invoice" ? form.dueDate : undefined,
       validUntil: documentType === "quotation" ? form.validUntil : undefined,
       reference: form.reference,
       customer: {
@@ -1103,24 +1103,6 @@ export const DocumentForm: FC<DocumentFormProps> = ({
       summary: summary,
     };
     documentService.save(dataForLocal);
-
-    if (documentType === "receipt") {
-      console.log("[DEBUG] Receipt Details ที่จะส่งไป backend:");
-      console.log("- payment_channels:", dataToSave.payment_channels);
-      console.log("- paymentChannels state:", paymentChannels);
-      console.log("- fees:", dataToSave.fees);
-      console.log("- offset_docs:", dataToSave.offset_docs);
-      console.log("- net_total_receipt:", dataToSave.net_total_receipt);
-      console.log("[DEBUG] การคำนวณ:");
-      console.log("- calculatedSummary.total:", calculatedSummary.total);
-      console.log(
-        "- calculatedSummary.withholdingTax:",
-        calculatedSummary.withholdingTax
-      );
-      console.log("- netTotal (หัก ณ ที่จ่ายแล้ว):", netTotal);
-      console.log("- totalPayment:", totalPayment);
-      console.log("- ต้องรับชำระเงินอีก:", netTotal - totalPayment);
-    }
     try {
       await onSave(dataToSave);
     } catch (error) {
@@ -1505,13 +1487,22 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                 <SelectContent>
                   {documentType === "quotation" ? (
                     <>
+                      <SelectItem value="ร่าง">ร่าง</SelectItem>
                       <SelectItem value="รอตอบรับ">รอตอบรับ</SelectItem>
                       <SelectItem value="ตอบรับแล้ว">ตอบรับแล้ว</SelectItem>
                       <SelectItem value="พ้นกำหนด">พ้นกำหนด</SelectItem>
                       <SelectItem value="ยกเลิก">ยกเลิก</SelectItem>
                     </>
+                  ) : documentType === "receipt" ? (
+                    <>
+                      <SelectItem value="ร่าง">ร่าง</SelectItem>
+                      <SelectItem value="ชำระแล้ว">ชำระแล้ว</SelectItem>
+                      <SelectItem value="ชำระบางส่วน">ชำระบางส่วน</SelectItem>
+                      <SelectItem value="ยกเลิก">ยกเลิก</SelectItem>
+                    </>
                   ) : (
                     <>
+                      <SelectItem value="ร่าง">ร่าง</SelectItem>
                       <SelectItem value="รอชำระ">รอชำระ</SelectItem>
                       <SelectItem value="ชำระแล้ว">ชำระแล้ว</SelectItem>
                       <SelectItem value="พ้นกำหนด">พ้นกำหนด</SelectItem>

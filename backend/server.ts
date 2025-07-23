@@ -1244,7 +1244,9 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
     conn = await pool.getConnection();
     await conn.beginTransaction();
 
-    let docRows = await conn.query("SELECT * FROM documents WHERE id = ?", [id]);
+    let docRows = await conn.query("SELECT * FROM documents WHERE id = ?", [
+      id,
+    ]);
     if (Array.isArray(docRows) && Array.isArray(docRows[0])) {
       // mysql2: [rows, fields]
       docRows = docRows[0];
@@ -1501,7 +1503,7 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
           email: quotationDoc.customer_email,
         },
         document_type: "INVOICE",
-        status: "รอชำระ",
+        status: "ร่าง",
         priceType: quotationDoc.price_type,
         issue_date: new Date().toISOString().slice(0, 10),
         notes: quotationDoc.notes || "",
@@ -1554,7 +1556,7 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
           email: invoiceDoc.customer_email,
         },
         document_type: "RECEIPT",
-        status: "ชำระแล้ว",
+        status: "ร่าง",
         priceType: invoiceDoc.price_type,
         issue_date: new Date().toISOString().slice(0, 10),
         notes: invoiceDoc.notes || "",

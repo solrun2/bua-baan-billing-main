@@ -4,7 +4,7 @@ CREATE TABLE `documents` (
   `customer_name` varchar(255) NOT NULL,
   `document_number` varchar(100) NOT NULL,
   `document_type` enum('QUOTATION','INVOICE','RECEIPT','TAX_INVOICE') NOT NULL,
-  `status` enum('รอตอบรับ','ตอบรับแล้ว','พ้นกำหนด','รอชำระ','ชำระแล้ว','ยกเลิก') NOT NULL,
+  `status` enum('ร่าง','รอตอบรับ','ตอบรับแล้ว','พ้นกำหนด','รอชำระ','ชำระแล้ว','ชำระบางส่วน','ยกเลิก') NOT NULL,
   `issue_date` date NOT NULL,
   `subtotal` decimal(15,2) NOT NULL DEFAULT 0.00,
   `tax_amount` decimal(15,2) NOT NULL DEFAULT 0.00,

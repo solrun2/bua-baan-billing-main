@@ -79,12 +79,33 @@ const App = () => {
           id: `receipt_${Date.now()}`,
           documentType: "receipt",
           documentNumber: receiptNumber,
-          status: "ต้นฉบับ",
+          status: "ร่าง",
           reference: savedInvoice.documentNumber,
         };
 
+        // Convert DocumentData to DocumentPayload for API
+        const receiptPayload = {
+          ...receiptData,
+          items: receiptData.items.map((item) => ({
+            product_id: item.productId || null,
+            product_name: item.productTitle || "",
+            unit: item.unit || "",
+            quantity: item.quantity || 1,
+            unit_price: item.unitPrice || 0,
+            amount: item.amount || 0,
+            description: item.description || "",
+            withholding_tax_amount: item.withholdingTaxAmount || 0,
+            amount_before_tax: item.amountBeforeTax || 0,
+            discount: item.discount || 0,
+            discount_type: item.discountType || "thb",
+            tax: item.tax || 0,
+            tax_amount: item.taxAmount || 0,
+            withholding_tax_option: item.withholding_tax_option || "ไม่ระบุ",
+          })),
+        };
+
         // Save receipt to database and localStorage
-        const savedReceipt = await apiService.createDocument(receiptData);
+        const savedReceipt = await apiService.createDocument(receiptPayload);
         documentService.save(savedReceipt);
 
         toast({
