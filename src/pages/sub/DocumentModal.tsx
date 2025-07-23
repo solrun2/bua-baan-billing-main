@@ -186,6 +186,13 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
   if (open) {
     console.log("DocumentModal document:", document);
     console.log("related_document_id:", document.related_document_id);
+    console.log("receipt_details:", (document as any).receipt_details);
+    if ((document as any).receipt_details) {
+      console.log(
+        "payment_channels:",
+        (document as any).receipt_details.payment_channels
+      );
+    }
   }
 
   // ดึงข้อมูลเอกสารที่เกี่ยวข้อง
@@ -227,7 +234,7 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
     if (isNaN(d.getTime())) return dateStr;
     return d.toLocaleDateString("th-TH");
   };
-  
+
   const labels = typeLabels[type];
 
   // เลือก items ที่จะแสดง (logic เดียวกันทุก type)
@@ -256,26 +263,25 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
     withholdingTax: (document as any).withholdingTax ?? 0,
   };
 
-
   // --- Section Helper Functions ---
   // Header: โลโก้+ชื่อบริษัท (ซ้าย), Document Title (ขวาบน, บรรทัดเดียว)
   const renderHeader = () => (
-    <div className="flex flex-row justify-between items-end border-b-2 border-blue-200 pb-4 mb-2">
+    <div className="flex flex-row justify-between items-end border-b-2 border-blue-200 pb-3 mb-3">
       <div className="flex flex-row items-center gap-4">
-        <div className="w-16 h-16 border-2 border-blue-200 rounded-full flex items-center justify-center text-blue-300 text-lg font-bold">
+        <div className="w-14 h-14 border-2 border-blue-200 rounded-full flex items-center justify-center text-blue-300 text-base font-bold">
           LOGO
         </div>
         <div className="flex flex-col">
           <span className="font-extrabold text-xl text-blue-900 leading-tight">
             {SELLER_INFO.company}
           </span>
-          <span className="text-xs text-gray-700 leading-tight">
+          <span className="text-sm text-gray-700 leading-tight">
             {SELLER_INFO.address}
           </span>
-          <span className="text-xs text-gray-700 leading-tight">
+          <span className="text-sm text-gray-700 leading-tight">
             เลขประจำตัวผู้เสียภาษี {SELLER_INFO.taxId}
           </span>
-          <span className="text-xs text-gray-700 leading-tight">
+          <span className="text-sm text-gray-700 leading-tight">
             โทร {SELLER_INFO.phone}
           </span>
         </div>
@@ -284,7 +290,7 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
         <span className="font-extrabold text-3xl text-blue-700 mb-1 whitespace-nowrap">
           {typeLabels[type].title}
         </span>
-        <div className="text-xs text-gray-700 text-right">
+        <div className="text-sm text-gray-700 text-right">
           <div>
             <b>เลขที่:</b>{" "}
             {document.document_number || document.documentNumber || "-"}
@@ -301,8 +307,7 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
           )}
           {type === "quotation" && (
             <div>
-              <b>วันหมดอายุ:</b>{" "}
-              {formatDate(document.validUntil)}
+              <b>วันหมดอายุ:</b> {formatDate(document.validUntil)}
             </div>
           )}
         </div>
@@ -312,9 +317,9 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
 
   // Section ข้อมูลลูกค้า (แสดงใต้ header ก่อนตาราง)
   const renderCustomerInfo = () => (
-    <div className="bg-blue-50 rounded-lg border border-blue-200 px-6 py-3 mb-4 max-w-2xl shadow-sm">
-      <div className="font-bold text-blue-700 mb-2">ข้อมูลลูกค้า</div>
-      <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-800">
+    <div className="bg-blue-50 rounded-lg border border-blue-200 px-5 py-3 mb-4 max-w-2xl shadow-sm">
+      <div className="font-bold text-blue-700 mb-2 text-base">ข้อมูลลูกค้า</div>
+      <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm text-gray-800">
         <div className="font-bold">ชื่อลูกค้า</div>
         <div>{document.customer_name || document.customer?.name || "-"}</div>
         <div className="font-bold">ที่อยู่</div>
@@ -337,24 +342,24 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
   // 2. renderTable: ใช้ unitPrice เป็นหลัก
   const renderTable = () => {
     return (
-      <table className="w-full border border-gray-300 mb-6 text-xs rounded-lg overflow-hidden shadow-sm">
+      <table className="w-full border border-gray-300 mb-4 text-sm rounded-lg overflow-hidden shadow-sm">
         <thead className="bg-gray-100 text-gray-900">
           <tr>
-            <th className="border border-gray-300 p-2 w-8 font-bold">ลำดับ</th>
-            <th className="border border-gray-300 p-2 w-[30%] text-left font-bold">
+            <th className="border border-gray-300 p-1 w-6 font-bold">ลำดับ</th>
+            <th className="border border-gray-300 p-1 w-[30%] text-left font-bold">
               รายการสินค้า
             </th>
-            <th className="border border-gray-300 p-2 w-12 font-bold">จำนวน</th>
-            <th className="border border-gray-300 p-2 w-20 text-right font-bold">
+            <th className="border border-gray-300 p-1 w-10 font-bold">จำนวน</th>
+            <th className="border border-gray-300 p-1 w-16 text-right font-bold">
               ราคาต่อหน่วย
             </th>
-            <th className="border border-gray-300 p-2 w-20 text-right font-bold">
+            <th className="border border-gray-300 p-1 w-16 text-right font-bold">
               ส่วนลด
             </th>
-            <th className="border border-gray-300 p-2 w-14 text-center font-bold">
+            <th className="border border-gray-300 p-1 w-12 text-center font-bold">
               VAT
             </th>
-            <th className="border border-gray-300 p-2 w-24 text-right font-bold">
+            <th className="border border-gray-300 p-1 w-20 text-right font-bold">
               ราคารวม
             </th>
           </tr>
@@ -364,7 +369,7 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
             <tr>
               <td
                 colSpan={7}
-                className="text-center text-muted-foreground py-4"
+                className="text-center text-muted-foreground py-2"
               >
                 ไม่มีรายการสินค้า/บริการ
               </td>
@@ -391,45 +396,45 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
               const displayTotal = item.amount ?? 0;
               return (
                 <tr key={idx}>
-                  <td className="border border-gray-300 p-2 text-center">
+                  <td className="border border-gray-300 p-1 text-center">
                     {idx + 1}
                   </td>
-                  <td className="border border-gray-300 p-2 text-left">
+                  <td className="border border-gray-300 p-1 text-left">
                     {prod?.name ||
                       item.product_name ||
                       item.productTitle ||
                       item.description ||
                       "-"}
                   </td>
-                  <td className="border border-gray-300 p-2 text-center">
+                  <td className="border border-gray-300 p-1 text-center">
                     {qty}
                   </td>
-                  <td className="border border-gray-300 p-2 text-right bg-yellow-100 font-bold text-yellow-700">
+                  <td className="border border-gray-300 p-1 text-right bg-yellow-100 font-bold text-yellow-700">
                     {formatCurrency(displayUnitPrice)}
                   </td>
-                  <td className="border border-gray-300 p-2 text-right">
+                  <td className="border border-gray-300 p-1 text-right">
                     {discountAmount > 0 ? formatCurrency(discountAmount) : "-"}
                   </td>
-                  <td className="border border-gray-300 p-2 text-center">
+                  <td className="border border-gray-300 p-1 text-center">
                     {vat ? `${vat}%` : "-"}
                   </td>
-                  <td className="border border-gray-300 p-2 text-right">
+                  <td className="border border-gray-300 p-1 text-right">
                     {formatCurrency(displayTotal)}
                   </td>
                 </tr>
               );
             })
           )}
-          {/* แถวว่างสำหรับเขียนเพิ่ม */}
-          {Array.from({ length: Math.max(0, 5 - items.length) }).map((_, i) => (
+          {/* แถวว่างสำหรับเขียนเพิ่ม - ลดจำนวนแถว */}
+          {Array.from({ length: Math.max(0, 1 - items.length) }).map((_, i) => (
             <tr key={"empty-" + i}>
-              <td className="border border-gray-300 p-2 text-center">&nbsp;</td>
-              <td className="border border-gray-300 p-2 text-left">&nbsp;</td>
-              <td className="border border-gray-300 p-2 text-center">&nbsp;</td>
-              <td className="border border-gray-300 p-2 text-right">&nbsp;</td>
-              <td className="border border-gray-300 p-2 text-right">&nbsp;</td>
-              <td className="border border-gray-300 p-2 text-center">&nbsp;</td>
-              <td className="border border-gray-300 p-2 text-right">&nbsp;</td>
+              <td className="border border-gray-300 p-1 text-center">&nbsp;</td>
+              <td className="border border-gray-300 p-1 text-left">&nbsp;</td>
+              <td className="border border-gray-300 p-1 text-center">&nbsp;</td>
+              <td className="border border-gray-300 p-1 text-right">&nbsp;</td>
+              <td className="border border-gray-300 p-1 text-right">&nbsp;</td>
+              <td className="border border-gray-300 p-1 text-center">&nbsp;</td>
+              <td className="border border-gray-300 p-1 text-right">&nbsp;</td>
             </tr>
           ))}
         </tbody>
@@ -447,40 +452,40 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
     const afterDiscount = summary.subtotal - summary.discount;
     return (
       <div className="flex justify-end mb-2">
-        <div className="w-full max-w-xs space-y-1 bg-blue-50 rounded-lg p-4 shadow-sm">
-          <div className="flex justify-between mb-1">
+        <div className="w-full max-w-xs space-y-1 bg-blue-50 rounded-lg p-3 shadow-sm">
+          <div className="flex justify-between mb-1 text-sm">
             <span>มูลค่าสินค้าหรือค่าบริการ</span>
             <span className="font-semibold">
               {formatCurrency(summary.subtotal)}
             </span>
           </div>
-          <div className="flex justify-between mb-1">
+          <div className="flex justify-between mb-1 text-sm">
             <span>ส่วนลดรวม</span>
             <span className="text-red-500">
               -{formatCurrency(summary.discount)}
             </span>
           </div>
-          <div className="flex justify-between mb-1">
+          <div className="flex justify-between mb-1 text-sm">
             <span>ยอดหลังหักส่วนลด</span>
             <span>{formatCurrency(afterDiscount)}</span>
           </div>
           {summary.tax > 0 && (
-            <div className="flex justify-between mb-1">
+            <div className="flex justify-between mb-1 text-sm">
               <span>ภาษีมูลค่าเพิ่ม 7%</span>
               <span>{formatCurrency(summary.tax)}</span>
             </div>
           )}
           {summary.tax > 0 && (
-            <div className="flex justify-between mb-1 font-semibold">
+            <div className="flex justify-between mb-1 font-semibold text-sm">
               <span>ยอดรวมหลังรวมภาษี</span>
               <span>{formatCurrency(Number(summary.total ?? 0))}</span>
             </div>
           )}
-          <div className="flex justify-between mb-1 text-yellow-700">
+          <div className="flex justify-between mb-1 text-yellow-700 text-sm">
             <span>หัก ณ ที่จ่าย</span>
             <span>-{formatCurrency(summaryWithholdingTax)}</span>
           </div>
-          <div className="flex justify-between font-bold text-lg border-t border-blue-200 pt-2 mt-2">
+          <div className="flex justify-between font-bold text-lg border-t border-blue-200 pt-1 mt-1">
             <span>จำนวนเงินทั้งสิ้น</span>
             <span className="text-blue-700">
               {formatCurrency(
@@ -527,8 +532,188 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
         );
       case "receipt":
         return (
-          <div className="mt-4 thankyou text-green-700 font-bold text-lg">
-            ขอขอบพระคุณที่ไว้วางใจใช้บริการ
+          <div className="mt-4">
+            {/* ข้อมูลการรับชำระ */}
+            {(document as any).receipt_details && (
+              <div className="bg-green-50 rounded-lg border border-green-200 px-4 py-3 mb-3">
+                <div className="font-bold text-green-700 mb-2 text-base">
+                  ข้อมูลการรับชำระ
+                </div>
+                <div className="grid grid-cols-3 gap-x-4 gap-y-1 text-sm">
+                  <div className="font-semibold">วันที่:</div>
+                  <div>
+                    {formatDate((document as any).receipt_details.payment_date)}
+                  </div>
+                  <div></div>
+
+                  <div className="font-semibold">วิธี:</div>
+                  <div>
+                    {(document as any).receipt_details.payment_method || "-"}
+                  </div>
+                  <div></div>
+
+                  {(document as any).receipt_details.payment_reference && (
+                    <>
+                      <div className="font-semibold">อ้างอิง:</div>
+                      <div>
+                        {(document as any).receipt_details.payment_reference}
+                      </div>
+                      <div></div>
+                    </>
+                  )}
+
+                  <div className="font-semibold">ยอดรับ:</div>
+                  <div className="font-bold text-green-700">
+                    {formatCurrency(
+                      (document as any).receipt_details.net_total_receipt || 0
+                    )}
+                  </div>
+                  <div></div>
+                </div>
+
+                {/* ช่องทางการชำระเงิน - แสดงแบบกระชับ */}
+                {(document as any).receipt_details.payment_channels &&
+                  Array.isArray(
+                    (document as any).receipt_details.payment_channels
+                  ) &&
+                  (document as any).receipt_details.payment_channels.length >
+                    0 && (
+                    <div className="mt-2">
+                      <div className="font-semibold text-green-700 mb-1 text-sm">
+                        ช่องทางการชำระ:
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        {(document as any).receipt_details.payment_channels.map(
+                          (channel: any, idx: number) => {
+                            // Debug: แสดงข้อมูล payment_channels
+                            console.log(`Channel ${idx}:`, channel);
+                            console.log(`Channel ${idx} type:`, typeof channel);
+                            console.log(
+                              `Channel ${idx} keys:`,
+                              Object.keys(channel || {})
+                            );
+                            console.log(
+                              `Channel ${idx} method:`,
+                              channel?.method
+                            );
+                            console.log(
+                              `Channel ${idx} channel:`,
+                              channel?.channel
+                            );
+                            console.log(
+                              `Channel ${idx} amount:`,
+                              channel?.amount
+                            );
+                            return (
+                              <div
+                                key={idx}
+                                className="flex justify-between items-center bg-white rounded px-2 py-1 border border-green-100 text-sm"
+                              >
+                                <div className="flex items-center gap-1">
+                                  <span>
+                                    {(channel?.method || channel?.channel) ===
+                                      "เงินสด" && "💵"}
+                                    {(channel?.method || channel?.channel) ===
+                                      "โอนเงิน" && "🏦"}
+                                    {(channel?.method || channel?.channel) ===
+                                      "บัตรเครดิต" && "💳"}
+                                    {channel?.method ||
+                                      channel?.channel ||
+                                      "ไม่ระบุ"}
+                                  </span>
+                                  {channel?.note && (
+                                    <span className="text-gray-500">
+                                      ({channel.note})
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="font-semibold text-green-700">
+                                  {formatCurrency(channel?.amount || 0)}
+                                </div>
+                              </div>
+                            );
+                          }
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                {/* ค่าธรรมเนียม - แสดงแบบกระชับ */}
+                {(document as any).receipt_details.fees &&
+                  Array.isArray((document as any).receipt_details.fees) &&
+                  (document as any).receipt_details.fees.length > 0 &&
+                  (document as any).receipt_details.fees.some(
+                    (fee: any) => fee.enabled
+                  ) && (
+                    <div className="mt-2">
+                      <div className="font-semibold text-green-700 mb-1 text-sm">
+                        ค่าธรรมเนียม:
+                      </div>
+                      <div className="space-y-1">
+                        {(document as any).receipt_details.fees
+                          .filter((fee: any) => fee.enabled)
+                          .map((fee: any, idx: number) => (
+                            <div
+                              key={idx}
+                              className="flex justify-between items-center bg-white rounded px-2 py-1 border border-green-100 text-sm"
+                            >
+                              <div>
+                                {fee.description || `ค่าธรรมเนียม ${idx + 1}`}
+                              </div>
+                              <div className="font-semibold text-green-700">
+                                {formatCurrency(fee.amount || 0)}
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+
+                {/* เอกสารออฟเซ็ต - แสดงแบบกระชับ */}
+                {(document as any).receipt_details.offset_docs &&
+                  Array.isArray(
+                    (document as any).receipt_details.offset_docs
+                  ) &&
+                  (document as any).receipt_details.offset_docs.length > 0 &&
+                  (document as any).receipt_details.offset_docs.some(
+                    (doc: any) => doc.enabled
+                  ) && (
+                    <div className="mt-2">
+                      <div className="font-semibold text-green-700 mb-1 text-sm">
+                        เอกสารออฟเซ็ต:
+                      </div>
+                      <div className="space-y-1">
+                        {(document as any).receipt_details.offset_docs
+                          .filter((doc: any) => doc.enabled)
+                          .map((doc: any, idx: number) => (
+                            <div
+                              key={idx}
+                              className="flex justify-between items-center bg-white rounded px-2 py-1 border border-green-100 text-sm"
+                            >
+                              <div className="flex items-center gap-1">
+                                <span>
+                                  {doc.document_number || `เอกสาร ${idx + 1}`}
+                                </span>
+                                {doc.note && (
+                                  <span className="text-gray-500">
+                                    ({doc.note})
+                                  </span>
+                                )}
+                              </div>
+                              <div className="font-semibold text-green-700">
+                                {formatCurrency(doc.amount || 0)}
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+              </div>
+            )}
+
+            <div className="thankyou text-green-700 font-bold text-xl">
+              ขอขอบพระคุณที่ไว้วางใจใช้บริการ
+            </div>
           </div>
         );
       default:
@@ -581,7 +766,7 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
                 max-width: 210mm;
                 max-height: 297mm;
                 overflow: hidden !important;
-                transform: scale(0.91);
+                transform: scale(0.95);
                 transform-origin: top left;
                 page-break-inside: avoid !important;
                 page-break-before: avoid !important;
@@ -589,7 +774,7 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
                 margin: 0 !important;
                 border-radius: 0 !important;
                 box-shadow: none !important;
-                padding: 0 12mm !important;
+                padding: 15mm 10mm 10mm 10mm !important;
               }
               .header-row, table, .summary-box, .note-box {
                 width: 100% !important;
@@ -604,7 +789,7 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
                 margin-top: 0;
                 margin-bottom: 0;
                 align-self: flex-start;
-                font-size: 2.1rem;
+                font-size: 2rem;
                 font-weight: bold;
                 color: #2563eb;
                 text-align: right;
@@ -612,6 +797,68 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
               }
               table, tr, td, th, .summary-box, .note-box {
                 page-break-inside: avoid !important;
+              }
+              /* ปรับขนาดตัวอักษรให้ใหญ่ขึ้น */
+              .print-area * {
+                font-size: 1em !important;
+              }
+              .print-area h1, .print-area h2, .print-area h3 {
+                font-size: 1.3em !important;
+              }
+              /* ปรับ margin และ padding ให้เหมาะสม */
+              .print-area > * {
+                margin-bottom: 0.5em !important;
+              }
+              .print-area table {
+                margin-bottom: 0.5em !important;
+              }
+              .print-area .bg-green-50 {
+                margin-bottom: 0.5em !important;
+                padding: 0.5em !important;
+              }
+              .print-area .bg-blue-50 {
+                margin-bottom: 0.5em !important;
+                padding: 0.5em !important;
+              }
+              /* ปรับขนาดตาราง */
+              .print-area table td,
+              .print-area table th {
+                padding: 0.4em !important;
+              }
+              /* ปรับขนาดช่องเซ็น */
+              .print-area .flex.justify-end {
+                margin-top: 1em !important;
+              }
+              .print-area .h-8 {
+                height: 1.5em !important;
+              }
+              .print-area .w-40 {
+                width: 12em !important;
+              }
+              /* ปรับขนาดหัวข้อเอกสาร */
+              .print-area .font-extrabold.text-lg {
+                font-size: 1.2em !important;
+              }
+              .print-area .font-extrabold.text-2xl {
+                font-size: 1.8em !important;
+              }
+              /* ปรับขนาดข้อความขอบคุณ */
+              .print-area .thankyou {
+                font-size: 1.2em !important;
+              }
+              /* กำจัดหน้า 2 */
+              @page {
+                size: A4;
+                margin: 0;
+              }
+              /* บังคับให้เนื้อหาอยู่ในหน้าเดียว */
+              .print-area {
+                page-break-after: avoid !important;
+                page-break-inside: avoid !important;
+              }
+              /* ลบส่วนที่อาจทำให้เกิดหน้า 2 */
+              .print-area::after {
+                display: none !important;
               }
             }
             .modal-scroll {
@@ -637,7 +884,7 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
           className="modal-scroll"
           style={{ maxHeight: "90vh", overflowY: "auto" }}
         >
-          <div className="print-area">
+          <div className="print-area pt-6">
             {/* ปุ่มปิดขวาบน */}
             <button
               onClick={onClose}
@@ -660,20 +907,20 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
             {/* Summary */}
             <div className="mt-2 mb-4">{renderSummary()}</div>
             {/* Footer */}
-            <div className="border-t-2 border-blue-200 pt-4 mt-6">
+            <div className="border-t-2 border-blue-200 pt-2 mt-3">
               {renderFooter()}
             </div>
             {/* กล่องหมายเหตุ (ถ้ามี) */}
             {document.notes && (
-              <div className="mt-4 p-3 bg-yellow-50 rounded text-sm text-yellow-900 border border-yellow-200 max-w-xl mx-auto">
+              <div className="mt-2 p-2 bg-yellow-50 rounded text-xs text-yellow-900 border border-yellow-200 max-w-xl mx-auto">
                 <span className="font-semibold">หมายเหตุ: </span>
                 {document.notes}
               </div>
             )}
             {/* ช่องเซ็นชื่อ */}
-            <div className="flex justify-end mt-10 print:mt-16">
+            <div className="flex justify-end mt-6 print:mt-8">
               <div className="text-center">
-                <div className="h-12 border-b border-gray-400 w-48 mx-auto mb-1"></div>
+                <div className="h-8 border-b border-gray-400 w-40 mx-auto mb-1"></div>
                 <div className="text-xs text-gray-500">(ผู้มีอำนาจลงนาม)</div>
               </div>
             </div>
