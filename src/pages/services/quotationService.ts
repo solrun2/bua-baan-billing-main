@@ -9,10 +9,10 @@ function convertToDocumentPayload(data: DocumentData): DocumentPayload {
     ...data,
     items: data.items.map((item) => ({
       product_id: item.productId || null,
-      product_name: item.productTitle,
+      product_name: item.productTitle || item.description || "-", // fallback
       unit: item.unit,
       quantity: item.quantity,
-      unit_price: item.unitPrice,
+      unit_price: item.unitPrice || item.amount || 0, // fallback
       amount: item.amount,
       description: item.description,
       amount_before_tax: item.amountBeforeTax,

@@ -993,22 +993,28 @@ export const DocumentForm: FC<DocumentFormProps> = ({
     }
 
     // map items ให้ field ตรงกับ schema database
-    const itemsToSave: DocumentItemPayload[] = form.items.map((item) => ({
-      product_id: item.productId ?? null,
-      product_name: item.productTitle ?? "",
-      unit: item.unit ?? "",
-      quantity: item.quantity ?? 1,
-      unit_price: item.unitPrice ?? 0,
-      amount: item.amount ?? 0,
-      description: item.description ?? "",
-      withholding_tax_amount: item.withholdingTaxAmount ?? 0,
-      amount_before_tax: item.amountBeforeTax ?? 0,
-      discount: item.discount ?? 0,
-      discount_type: item.discountType ?? "thb",
-      tax: form.priceType === "NO_VAT" ? 0 : Number(item.tax ?? 0),
-      tax_amount: item.taxAmount ?? 0,
-      withholding_tax_option: item.withholding_tax_option || "ไม่ระบุ",
-    }));
+    const itemsToSave: DocumentItemPayload[] = form.items.map((item) => {
+      const mappedItem = {
+        product_id: item.productId ?? null,
+        product_name: item.productTitle || item.description || "-", // fallback
+        unit: item.unit ?? "",
+        quantity: item.quantity ?? 1,
+        unit_price: item.unitPrice ?? item.amount ?? 0, // fallback
+        amount: item.amount ?? 0,
+        description: item.description ?? "",
+        withholding_tax_amount: item.withholdingTaxAmount ?? 0,
+        amount_before_tax: item.amountBeforeTax ?? 0,
+        discount: item.discount ?? 0,
+        discount_type: item.discountType ?? "thb",
+        tax: form.priceType === "NO_VAT" ? 0 : Number(item.tax ?? 0),
+        tax_amount: item.taxAmount ?? 0,
+        withholding_tax_option: item.withholding_tax_option || "ไม่ระบุ",
+      };
+      console.log("=== DEBUG: Mapped item ===", mappedItem);
+      return mappedItem;
+    });
+
+    console.log("=== DEBUG: All itemsToSave ===", itemsToSave);
 
     const dataToSave: DocumentPayload = {
       id: initialData.id,
@@ -1072,6 +1078,8 @@ export const DocumentForm: FC<DocumentFormProps> = ({
       }),
     };
 
+    console.log("=== DEBUG: dataToSave ===", dataToSave);
+
     // แปลง DocumentPayload เป็น DocumentData สำหรับบันทึก localStorage
     const itemsForSave: DocumentItem[] = form.items.map((item, idx) => {
       let fixedPriceType: "EXCLUDE_VAT" | "INCLUDE_VAT" | "NO_VAT" =
@@ -1105,7 +1113,9 @@ export const DocumentForm: FC<DocumentFormProps> = ({
     documentService.save(dataForLocal);
     try {
       await onSave(dataToSave);
+      console.log("=== DEBUG: onSave สำเร็จ ===");
     } catch (error) {
+      console.log("=== DEBUG: onSave error ===", error);
       toast.error("เกิดข้อผิดพลาดในการบันทึกเอกสาร");
     } finally {
       setIsSaving(false);
