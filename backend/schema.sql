@@ -77,8 +77,16 @@ CREATE TABLE document_number_settings (
     prefix VARCHAR(10) NOT NULL,             -- รหัสนำหน้า เช่น QT, INV, RC
     pattern VARCHAR(100) NOT NULL,           -- รูปแบบเลขเอกสาร เช่น QT-YYYY-XXX
     current_number INT NOT NULL DEFAULT 0,   -- เลขรันปัจจุบัน
+    last_run_date DATE DEFAULT NULL,         -- วันที่รันล่าสุด
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
 ALTER TABLE document_number_settings
 ADD UNIQUE KEY unique_document_type (document_type);
+
+-- เพิ่มข้อมูลเริ่มต้น
+INSERT INTO document_number_settings (document_type, prefix, pattern, current_number) VALUES
+('quotation', 'QT', 'QT-YYYY-MM-XXXX', 0),
+('invoice', 'IV', 'IV-YYYY-MM-XXXX', 0),
+('receipt', 'RE', 'RE-YYYY-MM-XXXX', 0),
+('tax_invoice', 'TAX', 'TAX-YYYY-MM-XXXX', 0);

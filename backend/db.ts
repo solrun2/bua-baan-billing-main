@@ -74,9 +74,11 @@ export async function getAllDocumentNumberSettings() {
 export async function getDocumentNumberSettingByType(document_type: string) {
   const conn = await pool.getConnection();
   try {
+    // แปลงเป็นตัวพิมพ์เล็กเพื่อให้ตรงกับฐานข้อมูล
+    const normalizedType = document_type.toLowerCase();
     const rows = await conn.query(
       "SELECT * FROM document_number_settings WHERE document_type = ? LIMIT 1",
-      [document_type]
+      [normalizedType]
     );
     return Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
   } finally {
@@ -93,9 +95,11 @@ export async function updateDocumentNumberSettingWithDate(
 ) {
   const conn = await pool.getConnection();
   try {
+    // แปลงเป็นตัวพิมพ์เล็กเพื่อให้ตรงกับฐานข้อมูล
+    const normalizedType = document_type.toLowerCase();
     await conn.query(
       "UPDATE document_number_settings SET pattern = ?, current_number = ?, last_run_date = ?, updated_at = NOW() WHERE document_type = ?",
-      [pattern, current_number, last_run_date, document_type]
+      [pattern, current_number, last_run_date, normalizedType]
     );
     return true;
   } finally {

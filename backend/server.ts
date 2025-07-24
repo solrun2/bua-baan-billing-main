@@ -384,73 +384,6 @@ app.get("/api/documents", async (req: Request, res: Response) => {
   }
 });
 
-const generateDocumentNumber = async (
-  conn: any,
-  type: string,
-  issueDate: string
-): Promise<string> => {
-  const date = new Date(issueDate);
-  const year = date.getFullYear();
-  let prefix = "";
-  switch (type.toUpperCase()) {
-    case "QUOTATION":
-      prefix = "QT";
-      break;
-    case "INVOICE":
-      prefix = "IV";
-      break;
-    case "RECEIPT":
-      prefix = "RE";
-      break;
-    default:
-      prefix = "DOC";
-      break;
-  }
-
-  const searchPattern = `${prefix}-${year}-%`;
-  const rows = await conn.query(
-    "SELECT document_number FROM documents WHERE document_number LIKE ? ORDER BY document_number DESC LIMIT 1",
-    [searchPattern]
-  );
-
-  let nextNumber = 1;
-  if (Array.isArray(rows) && rows.length > 0 && rows[0].document_number) {
-    const lastNumber = rows[0].document_number;
-    const parts = lastNumber.split("-");
-    if (parts.length >= 3) {
-      const lastRunningPart = parts[2];
-      const lastNumberInt = parseInt(lastRunningPart, 10);
-      if (!isNaN(lastNumberInt)) {
-        nextNumber = lastNumberInt + 1;
-      }
-    }
-  }
-
-  const runningNumber = String(nextNumber).padStart(4, "0");
-  return `${prefix}-${year}-${runningNumber}`;
-};
-
-// API route to get the next document number
-app.get("/api/documents/next-number", async (req, res) => {
-  const { type } = req.query;
-  if (!type || typeof type !== "string") {
-    return res.status(400).json({ message: "Document type is required." });
-  }
-
-  let conn;
-  try {
-    conn = await pool.getConnection();
-    const issueDate = new Date().toISOString().slice(0, 10); // Use current date
-    const docNumber = await generateDocumentNumber(conn, type, issueDate);
-    res.json({ documentNumber: docNumber });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Failed to generate document number" });
-  } finally {
-    if (conn) conn.release();
-  }
-});
-
 function calculateDocumentSummary(
   items: any[],
   priceType = "EXCLUDE_VAT" // "INCLUDE_VAT", "EXCLUDE_VAT", "NO_VAT"
@@ -573,10 +506,56 @@ async function createDocumentFromServer(data: any, pool: any) {
     }
     conn = await pool.getConnection();
     await conn.beginTransaction();
-    const document_number = await generateDocumentNumber(
-      conn,
-      document_type,
-      issue_date
+
+    // ใช้ระบบ Document Numbering ใหม่แทน generateDocumentNumber
+    const setting = await getDocumentNumberSettingByType(document_type);
+    if (!setting) {
+      await conn.rollback();
+      throw new Error("ไม่พบการตั้งค่าเลขรันเอกสาร");
+    }
+
+    const today = new Date(issue_date || new Date());
+    let reset = false;
+    let lastRunDate = setting.last_run_date
+      ? new Date(setting.last_run_date)
+      : null;
+
+    if (setting.pattern.includes("DD")) {
+      if (
+        !lastRunDate ||
+        lastRunDate.getFullYear() !== today.getFullYear() ||
+        lastRunDate.getMonth() !== today.getMonth() ||
+        lastRunDate.getDate() !== today.getDate()
+      ) {
+        reset = true;
+      }
+    } else if (setting.pattern.includes("MM")) {
+      if (
+        !lastRunDate ||
+        lastRunDate.getFullYear() !== today.getFullYear() ||
+        lastRunDate.getMonth() !== today.getMonth()
+      ) {
+        reset = true;
+      }
+    } else if (setting.pattern.includes("YYYY")) {
+      if (!lastRunDate || lastRunDate.getFullYear() !== today.getFullYear()) {
+        reset = true;
+      }
+    }
+
+    let nextNumber = reset ? 1 : Number(setting.current_number) + 1;
+    const yyyy = today.getFullYear();
+    const yy = String(yyyy).slice(-2);
+    const MM = String(today.getMonth() + 1).padStart(2, "0");
+    const dd = String(today.getDate()).padStart(2, "0");
+
+    let document_number = setting.pattern;
+    document_number = document_number.replace(/YYYY/g, String(yyyy));
+    document_number = document_number.replace(/YY/g, yy);
+    document_number = document_number.replace(/MM/g, MM);
+    document_number = document_number.replace(/DD/g, dd);
+    document_number = document_number.replace(/X+/g, (m: string) =>
+      String(nextNumber).padStart(m.length, "0")
     );
     const docResult = await conn.query(
       `INSERT INTO documents (
@@ -697,6 +676,14 @@ async function createDocumentFromServer(data: any, pool: any) {
         params
       );
     }
+    // อัปเดต current_number และ last_run_date
+    await updateDocumentNumberSettingWithDate(
+      document_type,
+      setting.pattern,
+      nextNumber,
+      today
+    );
+
     await conn.commit();
     return documentId;
   } catch (err) {
@@ -1537,7 +1524,7 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
           phone: quotationDoc.customer_phone,
           email: quotationDoc.customer_email,
         },
-        document_type: "INVOICE",
+        document_type: "invoice",
         status: "ร่าง",
         priceType: quotationDoc.price_type,
         issue_date: new Date().toISOString().slice(0, 10),
@@ -1590,7 +1577,7 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
           phone: invoiceDoc.customer_phone,
           email: invoiceDoc.customer_email,
         },
-        document_type: "RECEIPT",
+        document_type: "receipt",
         status: "ร่าง",
         priceType: invoiceDoc.price_type,
         issue_date: new Date().toISOString().slice(0, 10),
