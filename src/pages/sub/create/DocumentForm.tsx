@@ -1211,6 +1211,13 @@ export const DocumentForm: FC<DocumentFormProps> = ({
     }
   }, [totalPaid, netTotal, documentType, form.status]);
 
+  // เปลี่ยนสถานะเป็น "รอชำระ" เมื่อเลือกวันครบกำหนดชำระในใบแจ้งหนี้
+  useEffect(() => {
+    if (documentType === "invoice" && form.dueDate && form.status === "ร่าง") {
+      setForm((prev) => ({ ...prev, status: "รอชำระ" }));
+    }
+  }, [form.dueDate, documentType, form.status]);
+
   // log debug form.priceType ทุกครั้งที่ render
   useEffect(() => {
     console.log("[DEBUG] form.priceType:", form.priceType);
@@ -1441,7 +1448,13 @@ export const DocumentForm: FC<DocumentFormProps> = ({
               <Input
                 type="date"
                 value={form.dueDate}
-                onChange={(e) => handleFormChange("dueDate", e.target.value)}
+                onChange={(e) => {
+                  handleFormChange("dueDate", e.target.value);
+                  // เปลี่ยนสถานะเป็น "รอชำระ" เมื่อเลือกวันครบกำหนดชำระ
+                  if (documentType === "invoice" && e.target.value) {
+                    handleFormChange("status", "รอชำระ");
+                  }
+                }}
               />
             </div>
           )}
