@@ -1,20 +1,21 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Building, Plus, CreditCard, RefreshCw } from "lucide-react";
+import { Building, Plus, CreditCard } from "lucide-react";
 import { bankAccountService, BankAccount } from "@/services/bankAccountService";
 import { toast } from "sonner";
 
 const BankAccounts = () => {
+  const navigate = useNavigate();
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const loadBankAccountsWithRecalculation = async () => {
+  const loadBankAccounts = async () => {
     try {
       setLoading(true);
-      // คำนวณยอดอัตโนมัติทุกครั้งที่โหลดหน้า
-      const result = await bankAccountService.recalculateBalances();
-      setAccounts(result.accounts);
+      const accounts = await bankAccountService.getBankAccounts();
+      setAccounts(accounts);
     } catch (error) {
       console.error("Failed to load bank accounts:", error);
       toast.error("ไม่สามารถโหลดข้อมูลบัญชีธนาคารได้");
@@ -23,22 +24,8 @@ const BankAccounts = () => {
     }
   };
 
-  const regenerateCashFlow = async () => {
-    try {
-      setLoading(true);
-      const result = await bankAccountService.regenerateCashFlow();
-      await loadBankAccountsWithRecalculation();
-      toast.success(`${result.message} (${result.totalEntries} entries)`);
-    } catch (error) {
-      console.error("Failed to regenerate cash flow:", error);
-      toast.error("ไม่สามารถสร้างข้อมูลใหม่ได้");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    loadBankAccountsWithRecalculation();
+    loadBankAccounts();
   }, []);
 
   const formatBalance = (balance: number) => {
@@ -74,15 +61,6 @@ const BankAccounts = () => {
           </div>
         </div>
         <div className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={regenerateCashFlow}
-            disabled={loading}
-            className="flex items-center gap-2"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-            สร้างใหม่จากข้อมูลปัจจุบัน
-          </Button>
           <Button className="flex items-center gap-2">
             <Plus className="w-4 h-4" />
             เพิ่มบัญชีธนาคาร
@@ -135,6 +113,9 @@ const BankAccounts = () => {
                       variant="outline"
                       size="sm"
                       className="flex-1 border-gray-400"
+                      onClick={() =>
+                        navigate(`/finance/bank-accounts/${account.id}`)
+                      }
                     >
                       ดูรายละเอียด
                     </Button>

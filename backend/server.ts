@@ -1777,9 +1777,29 @@ app.get(
 // GET: ดึงข้อมูลบัญชีธนาคารทั้งหมด
 app.get("/api/bank-accounts", async (req: Request, res: Response) => {
   try {
-    const rows = await pool.query(
-      "SELECT * FROM bank_accounts WHERE is_active = 1 ORDER BY bank_name ASC"
-    );
+    const rows = await pool.query(`
+      SELECT 
+        ba.id, 
+        ba.bank_name, 
+        ba.account_type, 
+        ba.account_number, 
+        ba.currency, 
+        ba.is_active, 
+        ba.created_at, 
+        ba.updated_at,
+        COALESCE(SUM(
+          CASE 
+            WHEN cf.type = 'income' THEN cf.amount 
+            WHEN cf.type = 'expense' THEN -cf.amount 
+            ELSE 0 
+          END
+        ), 0) as current_balance
+      FROM bank_accounts ba
+      LEFT JOIN cash_flow cf ON ba.id = cf.bank_account_id
+      WHERE ba.is_active = 1
+      GROUP BY ba.id, ba.bank_name, ba.account_type, ba.account_number, ba.currency, ba.is_active, ba.created_at, ba.updated_at
+      ORDER BY ba.bank_name ASC
+    `);
     res.json(rows);
   } catch (err) {
     console.error("Failed to fetch bank accounts:", err);
@@ -1855,54 +1875,6 @@ app.put(
   }
 );
 
-// POST: อัปเดตยอดบัญชีธนาคารทั้งหมดจากข้อมูลกระแสเงินสด
-app.post(
-  "/api/bank-accounts/recalculate-balances",
-  async (req: Request, res: Response) => {
-    try {
-      // อัปเดตยอดบัญชีธนาคารจากข้อมูลกระแสเงินสด
-      await pool.query(`
-      UPDATE bank_accounts ba 
-      SET current_balance = (
-        SELECT COALESCE(SUM(
-          CASE 
-            WHEN cf.type = 'income' THEN cf.amount 
-            WHEN cf.type = 'expense' THEN -cf.amount 
-            ELSE 0 
-          END
-        ), 0)
-        FROM cash_flow cf 
-        WHERE cf.bank_account_id = ba.id
-      )
-      WHERE ba.id IN (SELECT DISTINCT bank_account_id FROM cash_flow WHERE bank_account_id IS NOT NULL)
-    `);
-
-      // อัปเดตยอดบัญชีธนาคารที่ไม่มีข้อมูลใน cash_flow เป็น 0
-      await pool.query(`
-        UPDATE bank_accounts ba 
-        SET current_balance = 0.00
-        WHERE ba.id NOT IN (SELECT DISTINCT bank_account_id FROM cash_flow WHERE bank_account_id IS NOT NULL)
-      `);
-
-      // ดึงข้อมูลบัญชีธนาคารที่อัปเดตแล้ว
-      const updatedAccounts = await pool.query(
-        "SELECT * FROM bank_accounts WHERE is_active = 1 ORDER BY bank_name ASC"
-      );
-
-      res.json({
-        success: true,
-        message: "อัปเดตยอดบัญชีธนาคารเรียบร้อยแล้ว",
-        accounts: updatedAccounts,
-      });
-    } catch (err) {
-      console.error("Failed to recalculate bank account balances:", err);
-      res
-        .status(500)
-        .json({ error: "Failed to recalculate bank account balances" });
-    }
-  }
-);
-
 // ===== API สำหรับกระแสเงินสด =====
 
 // GET: ดึงข้อมูลกระแสเงินสด
@@ -1934,6 +1906,25 @@ app.get("/api/cashflow", async (req: Request, res: Response) => {
   } catch (err) {
     console.error("Failed to fetch cash flow:", err);
     res.status(500).json({ error: "Failed to fetch cash flow" });
+  }
+});
+
+// GET: ดึงข้อมูลกระแสเงินสดตามบัญชีธนาคาร
+app.get("/api/cashflow/account/:id", async (req: Request, res: Response) => {
+  const { id } = req.params;
+  try {
+    const query = `
+      SELECT cf.*, ba.bank_name, ba.account_number 
+      FROM cash_flow cf 
+      LEFT JOIN bank_accounts ba ON cf.bank_account_id = ba.id 
+      WHERE cf.bank_account_id = ?
+      ORDER BY cf.date DESC
+    `;
+    const rows = await pool.query(query, [id]);
+    res.json(rows);
+  } catch (err) {
+    console.error("Failed to fetch cash flow by account:", err);
+    res.status(500).json({ error: "Failed to fetch cash flow by account" });
   }
 });
 
@@ -2090,129 +2081,6 @@ app.post(
     }
   }
 );
-
-// API สำหรับสร้าง cash_flow ใหม่จากข้อมูลใบเสร็จที่มีอยู่
-app.post("/api/bank-accounts/regenerate-cashflow", async (req, res) => {
-  const conn = await pool.getConnection();
-
-  try {
-    await conn.beginTransaction();
-
-    console.log("🔄 เริ่มสร้าง cash_flow ใหม่จากข้อมูลใบเสร็จ");
-
-    // ลบ cash_flow เก่าทั้งหมด
-    await conn.query("DELETE FROM cash_flow");
-    console.log("🗑️ ลบ cash_flow เก่าทั้งหมดแล้ว");
-
-    // รีเซ็ตยอดบัญชีธนาคาร
-    await conn.query("UPDATE bank_accounts SET current_balance = 0");
-    console.log("🔄 รีเซ็ตยอดบัญชีธนาคารแล้ว");
-
-    // ดึงข้อมูลใบเสร็จทั้งหมด
-    const receipts = await conn.query(`
-      SELECT 
-        d.id as document_id,
-        d.document_number,
-        d.issue_date,
-        rd.payment_date,
-        rd.payment_channels,
-        rd.fees
-      FROM documents d
-      LEFT JOIN receipt_details rd ON d.id = rd.document_id
-      WHERE d.document_type = 'RECEIPT'
-      ORDER BY d.id
-    `);
-
-    console.log(`📋 พบใบเสร็จ ${receipts.length} รายการ`);
-    console.log("🔍 ข้อมูลใบเสร็จ:", receipts);
-
-    let totalCashFlowEntries = 0;
-
-    for (const receipt of receipts) {
-      console.log(
-        `🔍 ตรวจสอบใบเสร็จ ID: ${receipt.document_id}, เลขที่: ${receipt.document_number}`
-      );
-      console.log(`🔍 payment_channels:`, receipt.payment_channels);
-      console.log(`🔍 payment_channels type:`, typeof receipt.payment_channels);
-      if (receipt.payment_channels) {
-        let paymentChannels;
-
-        // Parse payment_channels
-        if (typeof receipt.payment_channels === "string") {
-          try {
-            paymentChannels = JSON.parse(receipt.payment_channels);
-          } catch (e) {
-            console.error(
-              `❌ Error parsing payment_channels for document ${receipt.document_id}:`,
-              e
-            );
-            continue;
-          }
-        } else {
-          paymentChannels = receipt.payment_channels;
-        }
-
-        // สร้าง cash_flow entry สำหรับแต่ละ payment channel
-        if (Array.isArray(paymentChannels)) {
-          for (const channel of paymentChannels) {
-            // ตรวจสอบว่ามี amount และ amount > 0 (ไม่ต้องเช็ค enabled เพราะข้อมูลเก่าไม่มี field นี้)
-            if (channel.amount && channel.amount > 0) {
-              console.log(
-                `💰 สร้าง cash_flow: ${channel.channel || channel.method} - ${channel.amount} บาท`
-              );
-
-              await conn.query(
-                `INSERT INTO cash_flow (type, amount, description, date, bank_account_id, document_id, category)
-                 VALUES (?, ?, ?, ?, ?, ?, ?)`,
-                [
-                  "income",
-                  channel.amount,
-                  `รับชำระ ${channel.channel || channel.method} - ${receipt.document_number}`,
-                  receipt.payment_date || receipt.issue_date,
-                  channel.bankAccountId || null,
-                  receipt.document_id,
-                  "รายได้จากการขาย",
-                ]
-              );
-
-              // อัปเดตยอดบัญชีธนาคาร
-              if (channel.bankAccountId) {
-                await conn.query(
-                  "UPDATE bank_accounts SET current_balance = current_balance + ? WHERE id = ?",
-                  [channel.amount, channel.bankAccountId]
-                );
-              }
-
-              totalCashFlowEntries++;
-            }
-          }
-        }
-      }
-    }
-
-    await conn.commit();
-
-    console.log(
-      `✅ สร้าง cash_flow ใหม่เสร็จแล้ว: ${totalCashFlowEntries} entries`
-    );
-
-    res.json({
-      success: true,
-      message: `สร้าง cash_flow ใหม่เสร็จแล้ว: ${totalCashFlowEntries} entries`,
-      totalEntries: totalCashFlowEntries,
-    });
-  } catch (error) {
-    await conn.rollback();
-    console.error("❌ Error regenerating cash flow:", error);
-    res.status(500).json({
-      success: false,
-      message: "เกิดข้อผิดพลาดในการสร้าง cash_flow ใหม่",
-      error: error instanceof Error ? error.message : String(error),
-    });
-  } finally {
-    conn.release();
-  }
-});
 
 app.listen(port, () => {
   console.log(`Backend server is running on http://localhost:${port}`);
