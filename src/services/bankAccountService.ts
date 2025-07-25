@@ -81,17 +81,6 @@ export const bankAccountService = {
     return response;
   },
 
-  async createCashFlowFromReceipts(): Promise<{
-    success: boolean;
-    message: string;
-    accounts: BankAccount[];
-  }> {
-    const response = await apiService.post(
-      "/bank-accounts/create-cashflow-from-receipts"
-    );
-    return response;
-  },
-
   async regenerateCashFlow(): Promise<{
     success: boolean;
     message: string;

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Building, Plus, CreditCard, FileText, RefreshCw } from "lucide-react";
+import { Building, Plus, CreditCard, RefreshCw } from "lucide-react";
 import { bankAccountService, BankAccount } from "@/services/bankAccountService";
 import { toast } from "sonner";
 
@@ -18,20 +18,6 @@ const BankAccounts = () => {
     } catch (error) {
       console.error("Failed to load bank accounts:", error);
       toast.error("ไม่สามารถโหลดข้อมูลบัญชีธนาคารได้");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const createCashFlowFromReceipts = async () => {
-    try {
-      setLoading(true);
-      const result = await bankAccountService.createCashFlowFromReceipts();
-      setAccounts(result.accounts);
-      toast.success(result.message);
-    } catch (error) {
-      console.error("Failed to create cash flow from receipts:", error);
-      toast.error("ไม่สามารถสร้างข้อมูลจากใบเสร็จเก่าได้");
     } finally {
       setLoading(false);
     }
@@ -88,15 +74,6 @@ const BankAccounts = () => {
           </div>
         </div>
         <div className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={createCashFlowFromReceipts}
-            disabled={loading}
-            className="flex items-center gap-2"
-          >
-            <FileText className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-            สร้างจากใบเสร็จเก่า
-          </Button>
           <Button
             variant="outline"
             onClick={regenerateCashFlow}
