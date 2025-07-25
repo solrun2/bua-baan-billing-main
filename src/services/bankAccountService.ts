@@ -69,6 +69,40 @@ export const bankAccountService = {
     return response;
   },
 
+  // คำนวณยอดบัญชีธนาคารใหม่จากข้อมูลกระแสเงินสด
+  async recalculateBalances(): Promise<{
+    success: boolean;
+    message: string;
+    accounts: BankAccount[];
+  }> {
+    const response = await apiService.post(
+      "/bank-accounts/recalculate-balances"
+    );
+    return response;
+  },
+
+  async createCashFlowFromReceipts(): Promise<{
+    success: boolean;
+    message: string;
+    accounts: BankAccount[];
+  }> {
+    const response = await apiService.post(
+      "/bank-accounts/create-cashflow-from-receipts"
+    );
+    return response;
+  },
+
+  async regenerateCashFlow(): Promise<{
+    success: boolean;
+    message: string;
+    totalEntries: number;
+  }> {
+    const response = await apiService.post(
+      "/bank-accounts/regenerate-cashflow"
+    );
+    return response;
+  },
+
   // ดึงข้อมูลกระแสเงินสด
   async getCashFlow(params?: {
     month?: number;

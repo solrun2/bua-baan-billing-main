@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Building, Plus, CreditCard, RefreshCw } from "lucide-react";
+import { Building, Plus, CreditCard, FileText, RefreshCw } from "lucide-react";
 import { bankAccountService, BankAccount } from "@/services/bankAccountService";
 import { toast } from "sonner";
 
@@ -9,11 +9,12 @@ const BankAccounts = () => {
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const loadBankAccounts = async () => {
+  const loadBankAccountsWithRecalculation = async () => {
     try {
       setLoading(true);
-      const data = await bankAccountService.getBankAccounts();
-      setAccounts(data);
+      // คำนวณยอดอัตโนมัติทุกครั้งที่โหลดหน้า
+      const result = await bankAccountService.recalculateBalances();
+      setAccounts(result.accounts);
     } catch (error) {
       console.error("Failed to load bank accounts:", error);
       toast.error("ไม่สามารถโหลดข้อมูลบัญชีธนาคารได้");
@@ -22,8 +23,36 @@ const BankAccounts = () => {
     }
   };
 
+  const createCashFlowFromReceipts = async () => {
+    try {
+      setLoading(true);
+      const result = await bankAccountService.createCashFlowFromReceipts();
+      setAccounts(result.accounts);
+      toast.success(result.message);
+    } catch (error) {
+      console.error("Failed to create cash flow from receipts:", error);
+      toast.error("ไม่สามารถสร้างข้อมูลจากใบเสร็จเก่าได้");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const regenerateCashFlow = async () => {
+    try {
+      setLoading(true);
+      const result = await bankAccountService.regenerateCashFlow();
+      await loadBankAccountsWithRecalculation();
+      toast.success(`${result.message} (${result.totalEntries} entries)`);
+    } catch (error) {
+      console.error("Failed to regenerate cash flow:", error);
+      toast.error("ไม่สามารถสร้างข้อมูลใหม่ได้");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    loadBankAccounts();
+    loadBankAccountsWithRecalculation();
   }, []);
 
   const formatBalance = (balance: number) => {
@@ -61,12 +90,21 @@ const BankAccounts = () => {
         <div className="flex gap-2">
           <Button
             variant="outline"
-            onClick={loadBankAccounts}
+            onClick={createCashFlowFromReceipts}
+            disabled={loading}
+            className="flex items-center gap-2"
+          >
+            <FileText className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+            สร้างจากใบเสร็จเก่า
+          </Button>
+          <Button
+            variant="outline"
+            onClick={regenerateCashFlow}
             disabled={loading}
             className="flex items-center gap-2"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-            รีเฟรช
+            สร้างใหม่จากข้อมูลปัจจุบัน
           </Button>
           <Button className="flex items-center gap-2">
             <Plus className="w-4 h-4" />
@@ -78,7 +116,7 @@ const BankAccounts = () => {
       {loading ? (
         <div className="flex items-center justify-center py-12">
           <div className="flex items-center gap-2">
-            <RefreshCw className="w-6 h-6 animate-spin" />
+            <div className="w-6 h-6 animate-spin rounded-full border-2 border-blue-600 border-t-transparent"></div>
             <span>กำลังโหลดข้อมูล...</span>
           </div>
         </div>

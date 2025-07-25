@@ -67,6 +67,14 @@ const EditDocumentPage: React.FC = () => {
           validUntil: getLocalDate(data.validUntil),
         };
 
+        console.log("🔍 [EditDocument] raw data from API:", data);
+        console.log("🔍 [EditDocument] adjusted data:", adjustedData);
+        console.log("🔍 [EditDocument] receipt_details:", data.receipt_details);
+        console.log(
+          "🔍 [EditDocument] receipt_details.payment_channels:",
+          data.receipt_details?.payment_channels
+        );
+
         setInitialData(adjustedData);
       } catch (err) {
         toast.error("เกิดข้อผิดพลาดในการโหลดข้อมูลเอกสาร");

@@ -342,18 +342,6 @@ export const DocumentForm: FC<DocumentFormProps> = ({
           )
         : "";
 
-    console.log("[DEBUG] previewNumber calculation:", {
-      editMode,
-      formDocumentNumber: form.documentNumber,
-      currentDocSetting: currentDocSetting
-        ? {
-            pattern: currentDocSetting.pattern,
-            current_number: currentDocSetting.current_number,
-          }
-        : null,
-      previewNumber: result,
-    });
-
     return result;
   }, [editMode, form.documentNumber, currentDocSetting]);
 
@@ -362,12 +350,6 @@ export const DocumentForm: FC<DocumentFormProps> = ({
     (field: string, value: any) => {
       console.log("[DocumentForm] เปลี่ยนค่า:", field, value);
       if (field === "documentNumber") {
-        console.log(
-          "[DEBUG] handleFormChange - เปลี่ยน documentNumber จาก:",
-          form.documentNumber,
-          "เป็น:",
-          value
-        );
       }
       setForm(
         (prev) =>
@@ -512,7 +494,6 @@ export const DocumentForm: FC<DocumentFormProps> = ({
   // handle เลือกสินค้า
   const handleProductSelect = (product: Product | null, itemId: string) => {
     if (product) {
-      console.log("[DEBUG] handleProductSelect", { product, itemId });
       setForm((prev) => {
         const newItems = prev.items.map((item) => {
           if (item.id === itemId) {
@@ -735,10 +716,6 @@ export const DocumentForm: FC<DocumentFormProps> = ({
 
         // โหลดข้อมูล receipt details สำหรับการแก้ไข
         if (documentType === "receipt" && initialData.receipt_details) {
-          console.log(
-            "[DEBUG] useEffect: initialData.receipt_details",
-            initialData.receipt_details
-          );
           const receiptDetails = initialData.receipt_details;
 
           // --- โหลด payment channels ---
@@ -750,10 +727,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
               paymentChannelsData = [];
             }
           }
-          console.log(
-            "[DEBUG] paymentChannelsData from backend:",
-            paymentChannelsData
-          );
+
           // ลบการ setPaymentChannels ออกจากที่นี่ เพื่อป้องกันการทำงานซ้ำซ้อน
           // จะใช้ useEffect แยกแทน
 
@@ -774,7 +748,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
               amount: f.amount || 0,
               note: f.note || "",
             }));
-            console.log("[DEBUG] setFees:", feeList);
+
             setFees(feeList);
           }
 
@@ -795,7 +769,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
               amount: d.amount || 0,
               note: d.note || "",
             }));
-            console.log("[DEBUG] setOffsetDocs:", offsetList);
+
             setOffsetDocs(offsetList);
           }
         }
@@ -913,6 +887,21 @@ export const DocumentForm: FC<DocumentFormProps> = ({
         setIsSaving(false);
         return;
       }
+
+      // ตรวจสอบว่าถ้าเป็นโอนเงินหรือบัตรเครดิตแล้วต้องเลือกบัญชีธนาคาร
+      const invalidChannels = validChannels.filter(
+        (c) =>
+          (c.method === "โอนเงิน" || c.method === "บัตรเครดิต") &&
+          !c.bankAccountId
+      );
+      if (invalidChannels.length > 0) {
+        toast.error(
+          "กรุณาเลือกบัญชีธนาคารสำหรับการชำระด้วยโอนเงินหรือบัตรเครดิต"
+        );
+        setIsSaving(false);
+        return;
+      }
+
       const totalPaymentAmount = validChannels.reduce(
         (sum, c) => sum + Number(c.amount || 0),
         0
@@ -959,11 +948,9 @@ export const DocumentForm: FC<DocumentFormProps> = ({
         tax_amount: item.taxAmount ?? 0,
         withholding_tax_option: item.withholding_tax_option || "ไม่ระบุ",
       };
-      console.log("=== DEBUG: Mapped item ===", mappedItem);
+
       return mappedItem;
     });
-
-    console.log("=== DEBUG: All itemsToSave ===", itemsToSave);
 
     const dataToSave: DocumentPayload = {
       id: initialData.id,
@@ -1027,8 +1014,6 @@ export const DocumentForm: FC<DocumentFormProps> = ({
       }),
     };
 
-    console.log("=== DEBUG: dataToSave ===", dataToSave);
-
     // แปลง DocumentPayload เป็น DocumentData สำหรับบันทึก localStorage
     const itemsForSave: DocumentItem[] = form.items.map((item, idx) => {
       let fixedPriceType: "EXCLUDE_VAT" | "INCLUDE_VAT" | "NO_VAT" =
@@ -1062,29 +1047,15 @@ export const DocumentForm: FC<DocumentFormProps> = ({
     documentService.save(dataForLocal);
     try {
       await onSave(dataToSave);
-      console.log("=== DEBUG: onSave สำเร็จ ===");
     } catch (error) {
-      console.log("=== DEBUG: onSave error ===", error);
       toast.error("เกิดข้อผิดพลาดในการบันทึกเอกสาร");
     } finally {
       setIsSaving(false);
     }
   };
 
-  console.log("form.items", form.items);
-  console.log("summary:", summary);
-  console.log("initialData.summary.total", initialData.summary?.total);
-
   // เพิ่ม state สำหรับข้อมูลเพิ่มเติม (เฉพาะใบเสร็จ)
-  const [paymentChannels, setPaymentChannels] = useState([
-    {
-      enabled: true,
-      method: "",
-      amount: 0,
-      note: "",
-      bankAccountId: null as number | null,
-    },
-  ]);
+  const [paymentChannels, setPaymentChannels] = useState<any[]>([]);
   const [fees, setFees] = useState([
     { enabled: false, type: "", account: "", amount: 0, note: "" },
   ]);
@@ -1126,6 +1097,28 @@ export const DocumentForm: FC<DocumentFormProps> = ({
       if (currentAmount > maxAllowed) {
         value = maxAllowed;
       }
+    }
+
+    // ถ้าเปลี่ยนวิธีการชำระเงิน ให้รีเซ็ตบัญชีธนาคารตามประเภท
+    if (field === "method") {
+      const newChannel = { ...paymentChannels[idx], [field]: value };
+
+      // ถ้าเป็นเงินสด ให้รีเซ็ตบัญชีธนาคารเป็น null
+      if (value === "เงินสด") {
+        newChannel.bankAccountId = null;
+      }
+      // ถ้าเป็นโอนเงินหรือบัตรเครดิต และยังไม่ได้เลือกบัญชี ให้แสดงข้อความเตือน
+      else if (
+        (value === "โอนเงิน" || value === "บัตรเครดิต") &&
+        !newChannel.bankAccountId
+      ) {
+        toast.warning("กรุณาเลือกบัญชีธนาคารสำหรับการชำระด้วย" + value);
+      }
+
+      setPaymentChannels(
+        paymentChannels.map((c, i) => (i === idx ? newChannel : c))
+      );
+      return;
     }
 
     setPaymentChannels(
@@ -1172,25 +1165,64 @@ export const DocumentForm: FC<DocumentFormProps> = ({
   };
 
   // คำนวณยอดรวม
-  const totalPayment = paymentChannels
-    .filter((c) => c.enabled)
-    .reduce((sum, c) => sum + Number(c.amount || 0), 0);
-  const totalFee = fees
-    .filter((f) => f.enabled)
-    .reduce((sum, f) => sum + Number(f.amount || 0), 0);
-  const totalOffset = offsetDocs
-    .filter((d) => d.enabled)
-    .reduce((sum, d) => sum + Number(d.amount || 0), 0);
+  const totalPayment = useMemo(
+    () =>
+      paymentChannels
+        .filter((c) => c.enabled)
+        .reduce((sum, c) => sum + Number(c.amount || 0), 0),
+    [paymentChannels]
+  );
+
+  const totalFee = useMemo(
+    () =>
+      fees
+        .filter((f) => f.enabled)
+        .reduce((sum, f) => sum + Number(f.amount || 0), 0),
+    [fees]
+  );
+
+  const totalOffset = useMemo(
+    () =>
+      offsetDocs
+        .filter((d) => d.enabled)
+        .reduce((sum, d) => sum + Number(d.amount || 0), 0),
+    [offsetDocs]
+  );
 
   // คำนวณยอดสุทธิที่รับชำระ (หัก ณ ที่จ่ายแล้ว)
-  const netTotal =
-    typeof calculatedSummary.total === "number"
-      ? calculatedSummary.total - calculatedSummary.withholdingTax
-      : 0;
+  const netTotal = useMemo(
+    () =>
+      typeof calculatedSummary.total === "number"
+        ? calculatedSummary.total - calculatedSummary.withholdingTax
+        : 0,
+    [calculatedSummary.total, calculatedSummary.withholdingTax]
+  );
 
   // คำนวณยอดที่ชำระแล้ว
   const totalPaid = totalPayment + totalOffset;
   const remainingAmount = netTotal - totalPaid;
+
+  // ตรวจสอบความถูกต้องของช่องทางการชำระ
+  const paymentValidation = paymentChannels
+    .filter((c) => c.enabled && c.method && Number(c.amount) > 0)
+    .map((channel) => {
+      const isValid =
+        channel.method === "เงินสด" ||
+        ((channel.method === "โอนเงิน" || channel.method === "บัตรเครดิต") &&
+          channel.bankAccountId);
+
+      return {
+        ...channel,
+        isValid,
+        errorMessage:
+          !isValid &&
+          (channel.method === "โอนเงิน" || channel.method === "บัตรเครดิต")
+            ? `กรุณาเลือกบัญชีธนาคารสำหรับ${channel.method}`
+            : null,
+      };
+    });
+
+  const hasPaymentErrors = paymentValidation.some((p) => !p.isValid);
 
   // อัปเดตสถานะอัตโนมัติตามยอดที่ชำระ
   useEffect(() => {
@@ -1219,9 +1251,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
   }, [form.dueDate, documentType, form.status]);
 
   // log debug form.priceType ทุกครั้งที่ render
-  useEffect(() => {
-    console.log("[DEBUG] form.priceType:", form.priceType);
-  }, [form.priceType]);
+  useEffect(() => {}, [form.priceType]);
 
   // 1. เปลี่ยนการ setState ของ priceType ให้ sync ทั้ง form.priceType และ trigger การคำนวณใหม่ทันที
   const handlePriceTypeChange = (val: PriceTypeEnum) => {
@@ -1246,58 +1276,98 @@ export const DocumentForm: FC<DocumentFormProps> = ({
 
   // เพิ่ม useEffect แยกสำหรับ paymentChannels เพื่อให้ทำงานทันที
   useEffect(() => {
-    if (editMode && documentType === "receipt" && initialData.receipt_details) {
-      const receiptDetails = initialData.receipt_details;
-      let paymentChannelsData = receiptDetails.payment_channels;
+    console.log("🔍 [PaymentChannels] useEffect triggered", {
+      editMode,
+      documentType,
+      hasReceiptDetails: !!initialData.receipt_details,
+      receiptDetails: initialData.receipt_details,
+    });
 
-      if (typeof paymentChannelsData === "string") {
-        try {
-          paymentChannelsData = JSON.parse(paymentChannelsData);
-        } catch (e) {
-          paymentChannelsData = [];
-        }
-      }
+    // ถ้าเป็น edit mode และเป็นใบเสร็จ
+    if (editMode && documentType === "receipt") {
+      // ถ้ามีข้อมูล payment_channels ให้ใช้ข้อมูลนั้น
+      if (initialData.receipt_details?.payment_channels) {
+        const receiptDetails = initialData.receipt_details;
+        let paymentChannelsData = receiptDetails.payment_channels;
 
-      console.log(
-        "[DEBUG] SEPARATE useEffect - paymentChannelsData:",
-        paymentChannelsData
-      );
-
-      if (
-        Array.isArray(paymentChannelsData) &&
-        paymentChannelsData.length > 0
-      ) {
-        const channels = paymentChannelsData.map((ch: any) => ({
-          enabled: true,
-          method: ch.channel || ch.method || "",
-          amount: ch.amount || 0,
-          note: ch.note || "",
-          bankAccountId: ch.bankAccountId || null,
-        }));
-        console.log(
-          "[DEBUG] SEPARATE useEffect - setPaymentChannels:",
-          channels
-        );
-
-        // เช็คว่าข้อมูลเปลี่ยนหรือไม่ก่อน set
-        const currentFirstChannel = paymentChannels[0];
-        const newFirstChannel = channels[0];
-
-        if (
-          !currentFirstChannel ||
-          currentFirstChannel.method !== newFirstChannel.method ||
-          currentFirstChannel.amount !== newFirstChannel.amount
-        ) {
-          console.log("[DEBUG] SEPARATE useEffect - updating paymentChannels");
-          setPaymentChannels(channels);
+        if (typeof paymentChannelsData === "string") {
+          try {
+            paymentChannelsData = JSON.parse(paymentChannelsData);
+            console.log(
+              "🔍 [PaymentChannels] Parsed from string:",
+              paymentChannelsData
+            );
+          } catch (e) {
+            console.error("❌ [PaymentChannels] Error parsing:", e);
+            paymentChannelsData = [];
+          }
         } else {
           console.log(
-            "[DEBUG] SEPARATE useEffect - skipping update (same data)"
+            "🔍 [PaymentChannels] Already parsed data:",
+            paymentChannelsData
           );
         }
+
+        if (
+          Array.isArray(paymentChannelsData) &&
+          paymentChannelsData.length > 0
+        ) {
+          const channels = paymentChannelsData.map((ch: any) => ({
+            enabled: true,
+            method: ch.channel || ch.method || "",
+            amount: ch.amount || 0,
+            note: ch.note || "",
+            bankAccountId: ch.bankAccountId || null,
+          }));
+
+          console.log("✅ [PaymentChannels] Setting channels:", channels);
+          setPaymentChannels(channels);
+        } else {
+          console.log("⚠️ [PaymentChannels] No data found, using default");
+          // ถ้าไม่มีข้อมูล ให้ใช้ default
+          setPaymentChannels([
+            {
+              enabled: true,
+              method: "",
+              amount: 0,
+              note: "",
+              bankAccountId: null,
+            },
+          ]);
+        }
+      } else {
+        // ถ้าไม่มีข้อมูล payment_channels ให้ใช้ default
+        console.log(
+          "⚠️ [PaymentChannels] No payment_channels data, using default"
+        );
+        setPaymentChannels([
+          {
+            enabled: true,
+            method: "",
+            amount: 0,
+            note: "",
+            bankAccountId: null,
+          },
+        ]);
       }
+    } else if (documentType === "receipt" && !editMode) {
+      // ถ้าเป็นใบเสร็จใหม่ ให้ใช้ default
+      console.log("🔍 [PaymentChannels] New receipt, using default");
+      setPaymentChannels([
+        {
+          enabled: true,
+          method: "",
+          amount: 0,
+          note: "",
+          bankAccountId: null,
+        },
+      ]);
     }
-  }, [editMode, documentType, initialData.receipt_details]);
+  }, [
+    editMode,
+    documentType,
+    initialData.receipt_details?.payment_channels?.length,
+  ]);
 
   return (
     <>
@@ -1385,14 +1455,6 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                 </div>
                 <div className="relative">
                   {(() => {
-                    console.log(
-                      "[DEBUG] UI render - editMode:",
-                      editMode,
-                      "previewNumber:",
-                      previewNumber,
-                      "form.documentNumber:",
-                      form.documentNumber
-                    );
                     return editMode ? (
                       <Input
                         id="documentNumber"
@@ -2018,13 +2080,31 @@ export const DocumentForm: FC<DocumentFormProps> = ({
             </CardHeader>
             <CardContent className="space-y-6">
               {/* ช่องทางการรับชำระเงิน */}
-              {(() => {
-                console.log("[DEBUG] RENDER paymentChannels:", paymentChannels);
-                return null;
-              })()}
+
+              {hasPaymentErrors && (
+                <div className="flex items-center gap-2 p-2 bg-red-50 border border-red-200 rounded-lg mb-3">
+                  <span className="text-red-500">⚠️</span>
+                  <span className="text-red-600 text-sm">
+                    กรุณาเลือกบัญชีธนาคารสำหรับการชำระด้วยโอนเงินหรือบัตรเครดิต
+                  </span>
+                </div>
+              )}
+
               {paymentChannels.map((channel, idx) => (
-                <div key={idx}>
-                  {/* <pre style={{background:'#f5f5f5', color:'#333', fontSize:'12px', marginBottom:'4px'}}>{JSON.stringify(channel, null, 2)}</pre> */}
+                <div
+                  key={idx}
+                  className={`p-4 border rounded-lg transition-colors ${
+                    channel.enabled &&
+                    channel.method &&
+                    Number(channel.amount) > 0
+                      ? (channel.method === "โอนเงิน" ||
+                          channel.method === "บัตรเครดิต") &&
+                        !channel.bankAccountId
+                        ? "border-red-200 bg-red-50"
+                        : "border-green-200 bg-green-50"
+                      : "border-gray-200 bg-gray-50"
+                  }`}
+                >
                   <label className="flex items-center gap-2 mb-2">
                     <input
                       type="checkbox"
@@ -2051,7 +2131,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                   <div className="grid grid-cols-12 gap-4 items-center bg-white p-4 rounded-lg border border-blue-100 mb-4">
                     <div className="col-span-2">
                       <Select
-                        value={channel.method}
+                        value={channel.method || ""}
                         onValueChange={(v) =>
                           updatePaymentChannel(idx, "method", v)
                         }
@@ -2078,12 +2158,35 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                             v && v !== "null" ? parseInt(v) : null
                           )
                         }
+                        disabled={channel.method === "เงินสด"}
                       >
-                        <SelectTrigger className="bg-white border-blue-100">
-                          <SelectValue placeholder="เลือกบัญชีธนาคาร" />
+                        <SelectTrigger
+                          className={`bg-white border-blue-100 ${
+                            channel.method === "เงินสด"
+                              ? "opacity-50 cursor-not-allowed bg-gray-50"
+                              : channel.method === "โอนเงิน" ||
+                                  channel.method === "บัตรเครดิต"
+                                ? "border-blue-300 bg-blue-50"
+                                : ""
+                          }`}
+                        >
+                          <SelectValue
+                            placeholder={
+                              channel.method === "เงินสด"
+                                ? "ไม่ระบุ (เงินสด)"
+                                : channel.method === "โอนเงิน" ||
+                                    channel.method === "บัตรเครดิต"
+                                  ? "เลือกบัญชีธนาคาร *"
+                                  : "เลือกบัญชีธนาคาร"
+                            }
+                          />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="null">ไม่ระบุ</SelectItem>
+                          <SelectItem value="null">
+                            {channel.method === "เงินสด"
+                              ? "ไม่ระบุ (เงินสด)"
+                              : "ไม่ระบุ"}
+                          </SelectItem>
                           {bankAccounts.map((account) => (
                             <SelectItem
                               key={account.id}
@@ -2094,26 +2197,47 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                           ))}
                         </SelectContent>
                       </Select>
+                      {channel.method === "โอนเงิน" ||
+                      channel.method === "บัตรเครดิต" ? (
+                        <div className="flex items-center gap-1 mt-1">
+                          <span className="text-blue-500 text-xs">*</span>
+                          <span className="text-blue-600 text-xs">
+                            จำเป็นต้องเลือกบัญชีธนาคาร
+                          </span>
+                        </div>
+                      ) : null}
+
+                      {/* แสดงข้อความเตือนถ้าไม่เลือกบัญชีธนาคาร */}
+                      {channel.enabled &&
+                        channel.method &&
+                        Number(channel.amount) > 0 &&
+                        (channel.method === "โอนเงิน" ||
+                          channel.method === "บัตรเครดิต") &&
+                        !channel.bankAccountId && (
+                          <div className="flex items-center gap-1 mt-1">
+                            <span className="text-red-500 text-xs">⚠️</span>
+                            <span className="text-red-600 text-xs">
+                              เลือกบัญชีธนาคาร
+                            </span>
+                          </div>
+                        )}
                     </div>
                     <div className="col-span-2">
                       <Input
                         type="number"
                         className="bg-white border-blue-100"
                         placeholder={`จำนวนเงินที่รับชำระ`}
-                        value={channel.amount}
+                        value={channel.amount || ""}
                         onChange={(e) =>
                           updatePaymentChannel(idx, "amount", e.target.value)
                         }
-                        max={netTotal}
                       />
                     </div>
-                    <div className="col-span-5">
+                    <div className="col-span-6">
                       <Input
-                        type="text"
                         className="bg-white border-blue-100"
-                        placeholder="หมายเหตุ"
-                        maxLength={20}
-                        value={channel.note}
+                        placeholder="หมายเหตุ (ไม่บังคับ)"
+                        value={channel.note || ""}
                         onChange={(e) =>
                           updatePaymentChannel(idx, "note", e.target.value)
                         }
