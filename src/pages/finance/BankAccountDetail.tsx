@@ -118,7 +118,7 @@ const BankAccountDetail = () => {
           className="flex items-center gap-2"
         >
           <ArrowLeft className="w-4 h-4" />
-          กลับ
+           
         </Button>
         <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center">
           <CreditCard className="w-6 h-6 text-blue-600" />
