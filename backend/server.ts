@@ -623,6 +623,66 @@ async function createDocumentFromServer(data: any, pool: any) {
           data.net_total_receipt || 0,
         ]
       );
+
+      // เพิ่มการจัดการ cash flow และอัปเดตยอดบัญชีธนาคารสำหรับ receipt
+      if (data.payment_channels && Array.isArray(data.payment_channels)) {
+        for (const channel of data.payment_channels) {
+          if (channel.amount > 0) {
+            // เพิ่มรายการรายได้
+            await conn.query(
+              `INSERT INTO cash_flow (type, amount, description, date, bank_account_id, document_id, category)
+               VALUES (?, ?, ?, ?, ?, ?, ?)`,
+              [
+                "income",
+                channel.amount,
+                `รับชำระ ${channel.channel} - ${document_number}`,
+                payment_date || new Date().toISOString().slice(0, 10),
+                channel.bankAccountId || null,
+                documentId,
+                "รายได้จากการขาย",
+              ]
+            );
+
+            // อัปเดตยอดบัญชีธนาคาร
+            if (channel.bankAccountId) {
+              const currentBalance = await conn.query(
+                "SELECT current_balance FROM bank_accounts WHERE id = ?",
+                [channel.bankAccountId]
+              );
+              if (Array.isArray(currentBalance) && currentBalance.length > 0) {
+                const balance = currentBalance[0].current_balance;
+                const newBalance = balance + Number(channel.amount);
+
+                await conn.query(
+                  "UPDATE bank_accounts SET current_balance = ? WHERE id = ?",
+                  [newBalance, channel.bankAccountId]
+                );
+              }
+            }
+          }
+        }
+      }
+
+      // เพิ่มรายการค่าธรรมเนียม (ถ้ามี)
+      if (data.fees && Array.isArray(data.fees)) {
+        for (const fee of data.fees) {
+          if (fee.amount > 0) {
+            await conn.query(
+              `INSERT INTO cash_flow (type, amount, description, date, bank_account_id, document_id, category)
+               VALUES (?, ?, ?, ?, ?, ?, ?)`,
+              [
+                "expense",
+                fee.amount,
+                `ค่าธรรมเนียม ${fee.type} - ${document_number}`,
+                payment_date || new Date().toISOString().slice(0, 10),
+                null, // ไม่มี bank_account_id สำหรับค่าธรรมเนียม
+                documentId,
+                fee.account || "ค่าธรรมเนียมอื่นๆ",
+              ]
+            );
+          }
+        }
+      }
     }
     // ALWAYS insert document_items for every document type
     for (const item of items as any[]) {
@@ -689,38 +749,6 @@ async function createDocumentFromServer(data: any, pool: any) {
 }
 
 app.post("/api/documents", async (req: Request, res: Response) => {
-  console.log("Received document data:", req.body);
-  console.log("[DEBUG] summary ที่รับมาจาก frontend:", req.body.summary);
-  console.log("[DEBUG] priceType ที่รับมาจาก frontend:", req.body.priceType);
-  console.log("[DEBUG] Items ที่รับมาจาก frontend:", req.body.items);
-  if (req.body.items && Array.isArray(req.body.items)) {
-    req.body.items.forEach((item: any, index: number) => {
-      console.log(`[DEBUG] Item ${index}:`, {
-        product_id: item.product_id,
-        productId: item.productId,
-        product_name: item.product_name,
-        productTitle: item.productTitle,
-        unit_price: item.unit_price,
-        unitPrice: item.unitPrice,
-        quantity: item.quantity,
-        description: item.description,
-        allKeys: Object.keys(item),
-        allValues: Object.values(item),
-      });
-    });
-  }
-
-  // Debug log สำหรับ receipt
-  if (req.body.document_type === "receipt") {
-    console.log("[DEBUG] Receipt fields ที่รับมาจาก frontend:");
-    console.log("- payment_date:", req.body.payment_date);
-    console.log("- payment_method:", req.body.payment_method);
-    console.log("- payment_channels:", req.body.payment_channels);
-    console.log("- fees:", req.body.fees);
-    console.log("- offset_docs:", req.body.offset_docs);
-    console.log("- net_total_receipt:", req.body.net_total_receipt);
-  }
-
   try {
     const {
       id,
@@ -761,16 +789,7 @@ app.post("/api/documents", async (req: Request, res: Response) => {
       missingFields.push("items");
     // ตรวจสอบ field ที่บังคับในแต่ละ item
     if (Array.isArray(items)) {
-      console.log("[DEBUG] Validating items:", items);
       items.forEach((item: any, idx: number) => {
-        console.log(`[DEBUG] Validating item ${idx}:`, {
-          product_name: item.product_name,
-          quantity: item.quantity,
-          unit_price: item.unit_price,
-          product_name_exists: !!item.product_name,
-          quantity_exists: item.quantity !== undefined && item.quantity !== null,
-          unit_price_exists: item.unit_price !== undefined && item.unit_price !== null,
-        });
         if (!item.product_name)
           missingFields.push(`items[${idx}].product_name`);
         if (item.quantity === undefined || item.quantity === null)
@@ -790,21 +809,32 @@ app.post("/api/documents", async (req: Request, res: Response) => {
     // สร้างเอกสารใหม่
     const documentId = await createDocumentFromServer(req.body, pool);
 
+    // ดึงข้อมูลเอกสารที่สร้างใหม่เพื่อให้ได้ document_number ที่ถูกต้อง
+    const createdDoc = await pool.query(
+      "SELECT * FROM documents WHERE id = ?",
+      [documentId]
+    );
+
+    const doc = Array.isArray(createdDoc) ? createdDoc[0] : null;
+    if (!doc) {
+      throw new Error("Failed to retrieve created document");
+    }
+
     // ส่งข้อมูลกลับ
     res.status(201).json({
       id: documentId,
-      document_type,
-      document_number,
-      issue_date,
-      due_date,
+      document_type: doc.document_type,
+      document_number: doc.document_number,
+      issue_date: doc.issue_date,
+      due_date: doc.due_date,
       valid_until,
-      reference,
+      reference: doc.reference,
       customer,
       items,
       summary,
-      notes,
-      priceType,
-      status,
+      notes: doc.notes,
+      priceType: doc.price_type,
+      status: doc.status,
       attachments,
       tags,
       updatedAt,
@@ -855,7 +885,6 @@ app.delete("/api/documents/:id", async (req: Request, res: Response) => {
 
 app.get("/api/documents/:id", async (req, res) => {
   const { id } = req.params;
-  console.log("[DEBUG] GET /api/documents/:id - Requested ID:", id);
   try {
     // JOIN ตาราง quotation_details ด้วย เพื่อให้ได้ valid_until
     const docRows = await pool.query(
@@ -872,12 +901,6 @@ app.get("/api/documents/:id", async (req, res) => {
       return res.status(404).json({ error: "Document not found" });
     }
 
-    console.log("[DEBUG] Document found:", {
-      id: doc.id,
-      document_number: doc.document_number,
-      document_type: doc.document_type,
-    });
-
     let invoice_details = null;
     if (doc.document_type && doc.document_type.toLowerCase() === "invoice") {
       const invoiceRows = await pool.query(
@@ -891,24 +914,13 @@ app.get("/api/documents/:id", async (req, res) => {
 
     let receipt_details = null;
     if (doc.document_type && doc.document_type.toLowerCase() === "receipt") {
-      console.log("[DEBUG] Searching receipt_details for document_id:", id);
       const receiptRows = await pool.query(
         "SELECT * FROM receipt_details WHERE document_id = ?",
         [id]
       );
-      console.log("[DEBUG] receipt_details query result:", receiptRows);
       if (Array.isArray(receiptRows) && receiptRows.length > 0) {
         receipt_details = receiptRows[0];
         if (receipt_details.payment_channels) {
-          console.log(
-            "🔍 [Backend] payment_channels type:",
-            typeof receipt_details.payment_channels
-          );
-          console.log(
-            "🔍 [Backend] payment_channels value:",
-            receipt_details.payment_channels
-          );
-
           let parsedChannels;
 
           // ถ้าเป็น string ให้ parse JSON
@@ -997,15 +1009,6 @@ app.get("/api/documents/:id", async (req, res) => {
       documentWithItems.due_date = invoice_details.due_date;
     }
 
-    // Debug log เพื่อตรวจสอบข้อมูลที่ส่งกลับ
-    console.log("[DEBUG] GET /api/documents/:id - documentWithItems:", {
-      id: documentWithItems.id,
-      document_number: documentWithItems.document_number,
-      document_type: documentWithItems.document_type,
-      customer: documentWithItems.customer,
-      receipt_details: documentWithItems.receipt_details,
-    });
-
     res.json(documentWithItems);
   } catch (err) {
     console.error("Failed to fetch document by id:", err);
@@ -1016,17 +1019,6 @@ app.get("/api/documents/:id", async (req, res) => {
 app.put("/api/documents/:id", async (req: Request, res: Response) => {
   let conn;
   const { id } = req.params;
-
-  // Debug log สำหรับ receipt
-  if (req.body.document_type === "receipt") {
-    console.log("[DEBUG] PUT Receipt fields ที่รับมาจาก frontend:");
-    console.log("- payment_date:", req.body.payment_date);
-    console.log("- payment_method:", req.body.payment_method);
-    console.log("- payment_channels:", req.body.payment_channels);
-    console.log("- fees:", req.body.fees);
-    console.log("- offset_docs:", req.body.offset_docs);
-    console.log("- net_total_receipt:", req.body.net_total_receipt);
-  }
 
   try {
     const {
@@ -1213,21 +1205,9 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
       if (!docData || !docData.document_number) {
         throw new Error("ไม่พบข้อมูลเอกสาร หรือ document_number เป็น null");
       }
-      console.log(
-        "[DEBUG] กำลังสร้างรายการกระแสเงินสดใหม่สำหรับเอกสาร:",
-        docData.document_number
-      );
       if (payment_channels && Array.isArray(payment_channels)) {
         for (const channel of payment_channels) {
-          if (channel.enabled && channel.amount > 0) {
-            console.log(
-              "[DEBUG] เพิ่มรายการรายได้:",
-              channel.method,
-              "จำนวน:",
-              channel.amount,
-              "บัญชี:",
-              channel.bankAccountId
-            );
+          if (channel.amount > 0) {
             // เพิ่มรายการรายได้
             await conn.query(
               `INSERT INTO cash_flow (type, amount, description, date, bank_account_id, document_id, category)
@@ -1235,7 +1215,7 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
               [
                 "income",
                 channel.amount,
-                `รับชำระ ${channel.method} - ${docData.document_number}`,
+                `รับชำระ ${channel.channel} - ${docData.document_number}`,
                 payment_date,
                 channel.bankAccountId || null,
                 id,
@@ -1266,7 +1246,7 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
       // เพิ่มรายการค่าธรรมเนียม (ถ้ามี)
       if (fees && Array.isArray(fees)) {
         for (const fee of fees) {
-          if (fee.enabled && fee.amount > 0) {
+          if (fee.amount > 0) {
             await conn.query(
               `INSERT INTO cash_flow (type, amount, description, date, bank_account_id, document_id, category)
                VALUES (?, ?, ?, ?, ?, ?, ?)`,
