@@ -75,34 +75,8 @@ export const createInvoice = async (
   data: DocumentData
 ): Promise<DocumentData> => {
   try {
-    console.log("[DEBUG] invoiceService.createInvoice - input data:", {
-      itemsCount: data.items?.length,
-      firstItem: data.items?.[0]
-        ? {
-            productId: data.items[0].productId,
-            productTitle: data.items[0].productTitle,
-            product_name: (data.items[0] as any).product_name,
-            unitPrice: data.items[0].unitPrice,
-            unit_price: (data.items[0] as any).unit_price,
-            description: data.items[0].description,
-          }
-        : null,
-    });
-
     // Convert to DocumentPayload for API
     const payload = convertToDocumentPayload(data);
-
-    console.log("[DEBUG] invoiceService.createInvoice - converted payload:", {
-      itemsCount: payload.items?.length,
-      firstItem: payload.items?.[0]
-        ? {
-            product_id: payload.items[0].product_id,
-            product_name: payload.items[0].product_name,
-            unit_price: payload.items[0].unit_price,
-            description: payload.items[0].description,
-          }
-        : null,
-    });
 
     // First save to API
     const invoice = await apiService.createDocument(payload);
@@ -130,31 +104,8 @@ export const updateInvoice = async (
   data: DocumentData
 ): Promise<DocumentData> => {
   try {
-    console.log("[DEBUG] invoiceService.updateInvoice - input data:", {
-      id,
-      itemsCount: data.items?.length,
-      firstItem: data.items?.[0] ? {
-        productId: data.items[0].productId,
-        productTitle: data.items[0].productTitle,
-        product_name: (data.items[0] as any).product_name,
-        unitPrice: data.items[0].unitPrice,
-        unit_price: (data.items[0] as any).unit_price,
-        description: data.items[0].description,
-      } : null
-    });
-    
     // Convert to DocumentPayload for API
     const payload = convertToDocumentPayload(data);
-    
-    console.log("[DEBUG] invoiceService.updateInvoice - converted payload:", {
-      itemsCount: payload.items?.length,
-      firstItem: payload.items?.[0] ? {
-        product_id: payload.items[0].product_id,
-        product_name: payload.items[0].product_name,
-        unit_price: payload.items[0].unit_price,
-        description: payload.items[0].description,
-      } : null
-    });
 
     // First update in API
     const updatedInvoice = await apiService.updateDocument(id, payload);

@@ -625,21 +625,7 @@ async function createDocumentFromServer(data: any, pool: any) {
       );
     }
     // ALWAYS insert document_items for every document type
-    console.log("[DEBUG] Items ที่จะ insert ลง document_items:");
     for (const item of items as any[]) {
-      console.log("[DEBUG] Raw incoming item data:", {
-        product_id: item.product_id,
-        productId: item.productId,
-        product_name: item.product_name,
-        productTitle: item.productTitle,
-        unit_price: item.unit_price,
-        unitPrice: item.unitPrice,
-        description: item.description,
-        quantity: item.quantity,
-        allKeys: Object.keys(item),
-        allValues: Object.values(item),
-      });
-
       // Fallback logic สำหรับ field สำคัญ
       let product_id = item.product_id ?? item.productId ?? null;
 
@@ -658,37 +644,6 @@ async function createDocumentFromServer(data: any, pool: any) {
       const unitPrice = Number(item.unit_price ?? item.unitPrice ?? 0);
       const amount = qty * unitPrice;
 
-      console.log("[DEBUG] Field processing details:", {
-        product_name_source: item.product_name,
-        product_name_fallback: item.productTitle,
-        product_name_final: product_name,
-        unit_price_source: item.unit_price,
-        unitPrice_source: item.unitPrice,
-        unit_price_final: unitPrice,
-        description_source: item.description,
-        description_final: description,
-        quantity_source: item.quantity,
-        quantity_final: qty,
-      });
-
-      console.log("[DEBUG] Processed item data:", {
-        product_id,
-        product_name,
-        productTitle: item.productTitle,
-        unit,
-        quantity: qty,
-        unit_price: unitPrice,
-        amount,
-        description,
-      });
-
-      console.log("[DEBUG] Raw item data:", {
-        product_id: item.product_id,
-        productId: item.productId,
-        product_id_type: typeof item.product_id,
-        productId_type: typeof item.productId,
-      });
-
       const params = [
         documentId,
         product_id,
@@ -706,17 +661,6 @@ async function createDocumentFromServer(data: any, pool: any) {
         Number(item.tax ?? 0),
         item.tax_amount ?? 0,
       ];
-      console.log("[DEBUG] Params ที่จะ insert:", params);
-      console.log("[DEBUG] Final values for database:", {
-        document_id: documentId,
-        product_id: product_id,
-        product_name: product_name,
-        unit: unit,
-        quantity: qty,
-        unit_price: unitPrice,
-        amount: amount,
-        description: description,
-      });
 
       await conn.query(
         `INSERT INTO document_items (
@@ -772,59 +716,47 @@ app.post("/api/documents", async (req: Request, res: Response) => {
     console.log("- payment_date:", req.body.payment_date);
     console.log("- payment_method:", req.body.payment_method);
     console.log("- payment_channels:", req.body.payment_channels);
-    console.log(
-      "- payment_channels detail:",
-      JSON.stringify(req.body.payment_channels, null, 2)
-    );
     console.log("- fees:", req.body.fees);
     console.log("- offset_docs:", req.body.offset_docs);
     console.log("- net_total_receipt:", req.body.net_total_receipt);
   }
-  let conn: any; // ประกาศก่อน validation
+
   try {
     const {
-      customer,
+      id,
       document_type,
-      status,
-      priceType,
+      document_number,
       issue_date,
-      notes,
-      items,
       due_date,
       valid_until,
+      reference,
+      customer,
+      items,
+      summary,
+      notes,
+      priceType,
+      status,
+      attachments,
+      tags,
+      updatedAt,
+      issueTaxInvoice,
+      // เพิ่ม fields สำหรับ receipt
       payment_date,
       payment_method,
       payment_reference,
-      related_document_id,
-      summary = {},
-      // เพิ่ม fields สำหรับ receipt
       payment_channels,
       fees,
       offset_docs,
       net_total_receipt,
     } = req.body;
 
-    // เพิ่ม validation สำหรับ priceType
-    const allowedPriceTypes = ["EXCLUDE_VAT", "INCLUDE_VAT", "NO_VAT"];
-    if (!allowedPriceTypes.includes(priceType)) {
-      return res.status(400).json({ error: "Invalid priceType" });
-    }
-
-    // ใช้ค่าจาก destructuring ด้านบนแล้ว
-
-    // ใช้ค่าจาก frontend โดยตรง
-    const subtotal = summary.subtotal ?? 0;
-    const tax_amount = summary.tax ?? 0;
-    const total_amount = summary.total ?? 0;
-
-    // Validation เฉพาะ field ที่บังคับ (NOT NULL) ตาม schema
-    const missingFields = [];
-    if (!customer || !customer.id) missingFields.push("customer.id");
-    if (!customer || !customer.name) missingFields.push("customer.name");
+    // ตรวจสอบ field ที่บังคับ
+    const missingFields: string[] = [];
     if (!document_type) missingFields.push("document_type");
-    if (!status) missingFields.push("status");
-    if (!priceType) missingFields.push("priceType");
+    if (!document_number) missingFields.push("document_number");
     if (!issue_date) missingFields.push("issue_date");
+    if (!customer) missingFields.push("customer");
+    if (!customer.name) missingFields.push("customer.name");
     if (!items || !Array.isArray(items) || items.length === 0)
       missingFields.push("items");
     // ตรวจสอบ field ที่บังคับในแต่ละ item
@@ -836,10 +768,8 @@ app.post("/api/documents", async (req: Request, res: Response) => {
           quantity: item.quantity,
           unit_price: item.unit_price,
           product_name_exists: !!item.product_name,
-          quantity_exists:
-            item.quantity !== undefined && item.quantity !== null,
-          unit_price_exists:
-            item.unit_price !== undefined && item.unit_price !== null,
+          quantity_exists: item.quantity !== undefined && item.quantity !== null,
+          unit_price_exists: item.unit_price !== undefined && item.unit_price !== null,
         });
         if (!item.product_name)
           missingFields.push(`items[${idx}].product_name`);
@@ -849,296 +779,48 @@ app.post("/api/documents", async (req: Request, res: Response) => {
           missingFields.push(`items[${idx}].unit_price`);
       });
     }
+
     if (missingFields.length > 0) {
-      return res
-        .status(400)
-        .json({ error: "Missing required fields", missing: missingFields });
+      return res.status(400).json({
+        error: "Missing required fields",
+        missingFields,
+      });
     }
 
-    conn = await pool.getConnection();
+    // สร้างเอกสารใหม่
+    const documentId = await createDocumentFromServer(req.body, pool);
 
-    if (
-      related_document_id &&
-      document_type &&
-      document_type.toLowerCase() === "invoice"
-    ) {
-      const [existing] = await conn.query(
-        `SELECT id FROM documents WHERE related_document_id = ? AND document_type = 'INVOICE'`,
-        [related_document_id]
-      );
-      if (Array.isArray(existing) && existing.length > 0) {
-        await conn.rollback();
-        return res
-          .status(400)
-          .json({ error: "มี Invoice ที่อ้างอิง Quotation นี้อยู่แล้ว" });
-      }
-    }
-
-    // --- generate document number ตาม pattern+current_number ---
-    const setting = await getDocumentNumberSettingByType(document_type);
-    if (!setting) {
-      await conn.rollback();
-      return res.status(400).json({ error: "ไม่พบการตั้งค่าเลขรันเอกสาร" });
-    }
-    const today = new Date(issue_date || new Date());
-    let reset = false;
-    let lastRunDate = setting.last_run_date
-      ? new Date(setting.last_run_date)
-      : null;
-    if (setting.pattern.includes("DD")) {
-      if (
-        !lastRunDate ||
-        lastRunDate.getFullYear() !== today.getFullYear() ||
-        lastRunDate.getMonth() !== today.getMonth() ||
-        lastRunDate.getDate() !== today.getDate()
-      )
-        reset = true;
-    } else if (setting.pattern.includes("MM")) {
-      if (
-        !lastRunDate ||
-        lastRunDate.getFullYear() !== today.getFullYear() ||
-        lastRunDate.getMonth() !== today.getMonth()
-      )
-        reset = true;
-    } else if (setting.pattern.includes("YYYY")) {
-      if (!lastRunDate || lastRunDate.getFullYear() !== today.getFullYear())
-        reset = true;
-    }
-    let nextNumber = reset ? 1 : Number(setting.current_number) + 1;
-    const yyyy = today.getFullYear();
-    const yy = String(yyyy).slice(-2);
-    const MM = String(today.getMonth() + 1).padStart(2, "0");
-    const dd = String(today.getDate()).padStart(2, "0");
-    let docNumber = setting.pattern;
-    docNumber = docNumber.replace(/YYYY/g, String(yyyy));
-    docNumber = docNumber.replace(/YY/g, yy);
-    docNumber = docNumber.replace(/MM/g, MM);
-    docNumber = docNumber.replace(/DD/g, dd);
-    docNumber = docNumber.replace(/X+/g, (m: string) =>
-      String(nextNumber).padStart(m.length, "0")
-    );
-    // ... insert document ...
-    const docResult = await conn.query(
-      `INSERT INTO documents (
-        customer_id, customer_name, document_number, document_type, status, price_type, issue_date,
-        subtotal, tax_amount, total_amount, notes,
-        customer_address, customer_phone, customer_email
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        customer.id,
-        customer.name,
-        docNumber,
-        document_type,
-        status,
-        priceType,
-        issue_date,
-        subtotal,
-        tax_amount,
-        total_amount,
-        notes,
-        customer.address || "",
-        customer.phone || "",
-        customer.email || "",
-      ]
-    );
-    // --- update current_number และ last_run_date ---
-    await updateDocumentNumberSettingWithDate(
+    // ส่งข้อมูลกลับ
+    res.status(201).json({
+      id: documentId,
       document_type,
-      setting.pattern,
-      nextNumber,
-      today
-    );
-
-    const documentId = Number((docResult as any).insertId);
-    if (!documentId) {
-      await conn.rollback();
-      return res
-        .status(500)
-        .json({ error: "Failed to create document and get ID." });
-    }
-
-    if (document_type.toLowerCase() === "quotation" && valid_until) {
-      await conn.query(
-        "INSERT INTO quotation_details (document_id, valid_until) VALUES (?, ?)",
-        [documentId, valid_until]
-      );
-    } else if (document_type.toLowerCase() === "invoice" && due_date) {
-      await conn.query(
-        "INSERT INTO invoice_details (document_id, due_date) VALUES (?, ?)",
-        [documentId, due_date]
-      );
-    } else if (document_type.toLowerCase() === "receipt") {
-      // หา bank_account_id จาก payment_channels
-      let bankAccountId = null;
-      if (
-        payment_channels &&
-        Array.isArray(payment_channels) &&
-        payment_channels.length > 0
-      ) {
-        const firstChannel = payment_channels[0];
-        if (firstChannel.bankAccountId) {
-          bankAccountId = firstChannel.bankAccountId;
-        }
-      }
-
-      console.log(
-        "[DEBUG] กำลังบันทึก receipt_details ด้วย bankAccountId:",
-        bankAccountId
-      );
-      await conn.query(
-        `INSERT INTO receipt_details (document_id, payment_date, payment_method, payment_reference, payment_channels, fees, offset_docs, net_total_receipt, bank_account_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          documentId,
-          payment_date || issue_date, // ใช้วันที่เอกสารถ้าไม่มีวันที่ชำระ
-          payment_method || "เงินสด", // ใช้เงินสดเป็นค่าเริ่มต้น
-          payment_reference || "",
-          JSON.stringify(payment_channels || []),
-          JSON.stringify(fees || []),
-          JSON.stringify(offset_docs || []),
-          net_total_receipt || total_amount, // ใช้ยอดรวมถ้าไม่มี net_total_receipt
-          bankAccountId,
-        ]
-      );
-
-      // สร้างรายการในกระแสเงินสด
-      console.log(
-        "[DEBUG] กำลังสร้างรายการกระแสเงินสดสำหรับเอกสารใหม่:",
-        docNumber
-      );
-      if (payment_channels && Array.isArray(payment_channels)) {
-        for (const channel of payment_channels) {
-          if (channel.enabled && channel.amount > 0) {
-            console.log(
-              "[DEBUG] เพิ่มรายการรายได้:",
-              channel.method,
-              "จำนวน:",
-              channel.amount,
-              "บัญชี:",
-              channel.bankAccountId
-            );
-            // เพิ่มรายการรายได้
-            await conn.query(
-              `INSERT INTO cash_flow (type, amount, description, date, bank_account_id, document_id, category)
-               VALUES (?, ?, ?, ?, ?, ?, ?)`,
-              [
-                "income",
-                channel.amount,
-                `รับชำระ ${channel.method} - ${docNumber}`,
-                payment_date || issue_date,
-                channel.bankAccountId || null,
-                documentId,
-                "รายได้จากการขาย",
-              ]
-            );
-
-            // อัปเดตยอดบัญชีธนาคาร
-            if (channel.bankAccountId) {
-              const currentBalance = await conn.query(
-                "SELECT current_balance FROM bank_accounts WHERE id = ?",
-                [channel.bankAccountId]
-              );
-              if (Array.isArray(currentBalance) && currentBalance.length > 0) {
-                const balance = currentBalance[0].current_balance;
-                const newBalance = balance + Number(channel.amount);
-
-                await conn.query(
-                  "UPDATE bank_accounts SET current_balance = ? WHERE id = ?",
-                  [newBalance, channel.bankAccountId]
-                );
-              }
-            }
-          }
-        }
-      }
-
-      // เพิ่มรายการค่าธรรมเนียม (ถ้ามี)
-      if (fees && Array.isArray(fees)) {
-        for (const fee of fees) {
-          if (fee.enabled && fee.amount > 0) {
-            await conn.query(
-              `INSERT INTO cash_flow (type, amount, description, date, bank_account_id, document_id, category)
-               VALUES (?, ?, ?, ?, ?, ?, ?)`,
-              [
-                "expense",
-                fee.amount,
-                `ค่าธรรมเนียม ${fee.type} - ${docNumber}`,
-                payment_date,
-                bankAccountId,
-                documentId,
-                fee.account || "ค่าธรรมเนียมอื่นๆ",
-              ]
-            );
-          }
-        }
-      }
-    }
-
-    if (
-      !related_document_id ||
-      (document_type.toLowerCase() !== "invoice" &&
-        document_type.toLowerCase() !== "receipt")
-    ) {
-      for (const item of items) {
-        const qty = Number(item.quantity ?? 1);
-        const unitPrice = Number(item.unit_price ?? 0);
-        const taxRate = Number(item.tax ?? 0) / 100;
-        let amount = unitPrice * qty;
-        let amount_before_tax = amount;
-        if (priceType === "INCLUDE_VAT" && taxRate > 0) {
-          amount_before_tax = amount / (1 + taxRate);
-        } else if (priceType === "EXCLUDE_VAT" || priceType === "NO_VAT") {
-          amount_before_tax = amount;
-        }
-        const params = [
-          documentId,
-          item.product_id ?? null,
-          item.productTitle ?? item.product_name ?? "",
-          item.unit ?? "",
-          qty,
-          unitPrice,
-          amount,
-          item.description ?? "",
-          item.withholding_tax_amount ?? 0,
-          item.withholding_tax_option ?? -1,
-          amount_before_tax,
-          item.discount ?? 0,
-          item.discount_type ?? item.discountType ?? "thb",
-          Number(item.tax ?? 0),
-          item.tax_amount ?? 0,
-        ];
-        await conn.query(
-          `INSERT INTO document_items (
-            document_id, product_id, product_name, unit, quantity, unit_price, amount, description, withholding_tax_amount, withholding_tax_option, amount_before_tax, discount, discount_type, tax, tax_amount
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          params
-        );
-      }
-    }
-
-    await conn.commit();
-
-    const newDocumentRows = await conn.query(
-      "SELECT * FROM documents WHERE id = ?",
-      [documentId]
-    );
-
-    if (Array.isArray(newDocumentRows) && newDocumentRows.length > 0) {
-      res.status(201).json(newDocumentRows[0]);
-    } else {
-      res
-        .status(404)
-        .json({ error: "Failed to retrieve the document after creation." });
-    }
-  } catch (err) {
-    if (conn) await conn.rollback();
-    console.error("Failed to create document:", err);
-    res.status(500).json({
-      error: "Failed to create document",
-      details: (err as Error).message,
+      document_number,
+      issue_date,
+      due_date,
+      valid_until,
+      reference,
+      customer,
+      items,
+      summary,
+      notes,
+      priceType,
+      status,
+      attachments,
+      tags,
+      updatedAt,
+      issueTaxInvoice,
+      // เพิ่ม fields สำหรับ receipt
+      payment_date,
+      payment_method,
+      payment_reference,
+      payment_channels,
+      fees,
+      offset_docs,
+      net_total_receipt,
     });
-  } finally {
-    if (conn) conn.release();
+  } catch (error) {
+    console.error("Error creating document:", error);
+    res.status(500).json({ error: "Failed to create document" });
   }
 });
 

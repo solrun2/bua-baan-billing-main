@@ -494,30 +494,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
 
   // handle เลือกสินค้า
   const handleProductSelect = (product: Product | null, itemId: string) => {
-    console.log("[DEBUG] handleProductSelect called:", {
-      product,
-      itemId,
-      productId: product?.id,
-      productTitle: product?.title || product?.name,
-      productPrice: product?.price,
-      productVatRate: product?.vat_rate,
-      productUnit: product?.unit,
-      productDescription: product?.description,
-      productKeys: product ? Object.keys(product) : [],
-      productValues: product ? Object.values(product) : [],
-    });
-
     if (product) {
-      console.log(
-        "[DEBUG] Before setForm - current form items:",
-        form.items.map((item) => ({
-          id: item.id,
-          productId: item.productId,
-          productTitle: item.productTitle,
-          unitPrice: item.unitPrice,
-        }))
-      );
-
       // ใช้ setForm เพื่อ update state ครั้งเดียว
       setForm((prev) => {
         const newItems = prev.items.map((item) => {
@@ -533,32 +510,10 @@ export const DocumentForm: FC<DocumentFormProps> = ({
               isEditing: false,
             };
 
-            console.log("[DEBUG] Updated item in setForm:", {
-              itemId: item.id,
-              productId: updatedItem.productId,
-              productTitle: updatedItem.productTitle,
-              unitPrice: updatedItem.unitPrice,
-              description: updatedItem.description,
-              originalProductPrice: product.price,
-              originalProductTitle: product.title,
-              originalProductName: product.name,
-              originalProductDescription: product.description,
-            });
-
             return updatedItem;
           }
           return item;
         });
-
-        console.log(
-          "[DEBUG] After setForm - new items:",
-          newItems.map((item) => ({
-            id: item.id,
-            productId: item.productId,
-            productTitle: item.productTitle,
-            unitPrice: item.unitPrice,
-          }))
-        );
 
         return {
           ...prev,
@@ -590,20 +545,6 @@ export const DocumentForm: FC<DocumentFormProps> = ({
     setSummary(newSummary);
   }, [form.items]);
 
-  // เพิ่ม useEffect สำหรับ monitor form state changes
-  useEffect(() => {
-    console.log(
-      "[DEBUG] Form items changed:",
-      form.items.map((item) => ({
-        id: item.id,
-        productId: item.productId,
-        productTitle: item.productTitle,
-        unitPrice: item.unitPrice,
-        description: item.description,
-      }))
-    );
-  }, [form.items]);
-
   // เพิ่ม useEffect สำหรับดึงเลขเอกสารใหม่จาก backend (เฉพาะกรณีสร้างใหม่)
   useEffect(() => {
     if (!editMode && !form.documentNumber) {
@@ -631,12 +572,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
       };
       fetchNextNumber();
     } else {
-      console.log(
-        "[DEBUG] ไม่ fetch เลขเอกสารใหม่ - editMode:",
-        editMode,
-        "มีเลขเอกสารแล้ว:",
-        !!form.documentNumber
-      );
+      // ไม่ต้อง fetch เลขเอกสารใหม่
     }
     // eslint-disable-next-line
   }, [documentType, editMode]);
@@ -990,19 +926,6 @@ export const DocumentForm: FC<DocumentFormProps> = ({
 
     // map items ให้ field ตรงกับ schema database
     const itemsToSave: DocumentItemPayload[] = form.items.map((item) => {
-      console.log("[DEBUG] Mapping item for backend:", {
-        itemId: item.id,
-        productId: item.productId,
-        productTitle: item.productTitle,
-        productIdType: typeof item.productId,
-        hasProductId: !!item.productId,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-        description: item.description,
-        tax: item.tax,
-        taxAmount: item.taxAmount,
-      });
-
       // คำนวณ taxAmount ก่อนส่งไป backend
       const calculatedItem = updateItemWithCalculations({
         ...item,
@@ -1028,10 +951,8 @@ export const DocumentForm: FC<DocumentFormProps> = ({
         tax_amount: calculatedItem.taxAmount ?? 0, // ใช้ค่าที่คำนวณแล้ว
         withholding_tax_option: item.withholding_tax_option || "ไม่ระบุ",
       };
-      console.log("[DEBUG] Mapped item:", mappedItem); // Changed log format
       return mappedItem;
     });
-    console.log("[DEBUG] itemsToSave ก่อนส่ง backend:", itemsToSave); // Added
     const dataToSave: DocumentPayload = {
       id: initialData.id,
       documentType: documentType,
@@ -1093,7 +1014,6 @@ export const DocumentForm: FC<DocumentFormProps> = ({
         net_total_receipt: netTotal,
       }),
     };
-    console.log("[DEBUG] dataToSave ก่อน fetch:", dataToSave); // Added
     try {
       await onSave(dataToSave);
     } catch (error) {

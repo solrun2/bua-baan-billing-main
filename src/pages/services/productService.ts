@@ -25,24 +25,7 @@ export async function searchProducts(query = "", page = 1, limit = 100) {
   });
   if (!res.ok) throw new Error("Failed to fetch products");
   const data = await res.json();
-  
-  console.log("[DEBUG] API response:", {
-    query,
-    page,
-    limit,
-    dataLength: data.data?.length,
-    firstProduct: data.data?.[0] ? {
-      id: data.data[0].id,
-      title: data.data[0].title,
-      name: data.data[0].name,
-      price: data.data[0].price,
-      description: data.data[0].description,
-      unit: data.data[0].unit,
-      vat_rate: data.data[0].vat_rate,
-      allKeys: Object.keys(data.data[0])
-    } : null
-  });
-  
+
   return data.data;
 }
 

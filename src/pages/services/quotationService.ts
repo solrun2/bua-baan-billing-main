@@ -55,33 +55,7 @@ function convertToDocumentPayload(data: DocumentData): DocumentPayload {
 }
 
 const createQuotation = async (data: DocumentData): Promise<DocumentData> => {
-  console.log("[DEBUG] quotationService.createQuotation - input data:", {
-    itemsCount: data.items?.length,
-    firstItem: data.items?.[0]
-      ? {
-          productId: data.items[0].productId,
-          productTitle: data.items[0].productTitle,
-          product_name: (data.items[0] as any).product_name,
-          unitPrice: data.items[0].unitPrice,
-          unit_price: (data.items[0] as any).unit_price,
-          description: data.items[0].description,
-        }
-      : null,
-  });
-
   const payload = convertToDocumentPayload(data);
-
-  console.log("[DEBUG] quotationService.createQuotation - converted payload:", {
-    itemsCount: payload.items?.length,
-    firstItem: payload.items?.[0]
-      ? {
-          product_id: payload.items[0].product_id,
-          product_name: payload.items[0].product_name,
-          unit_price: payload.items[0].unit_price,
-          description: payload.items[0].description,
-        }
-      : null,
-  });
 
   const result = await apiService.createDocument({
     ...payload,
@@ -95,31 +69,8 @@ const updateQuotation = async (
   id: string,
   data: DocumentData
 ): Promise<DocumentData> => {
-  console.log("[DEBUG] quotationService.updateQuotation - input data:", {
-    id,
-    itemsCount: data.items?.length,
-    firstItem: data.items?.[0] ? {
-      productId: data.items[0].productId,
-      productTitle: data.items[0].productTitle,
-      product_name: (data.items[0] as any).product_name,
-      unitPrice: data.items[0].unitPrice,
-      unit_price: (data.items[0] as any).unit_price,
-      description: data.items[0].description,
-    } : null
-  });
-  
   const payload = convertToDocumentPayload(data);
-  
-  console.log("[DEBUG] quotationService.updateQuotation - converted payload:", {
-    itemsCount: payload.items?.length,
-    firstItem: payload.items?.[0] ? {
-      product_id: payload.items[0].product_id,
-      product_name: payload.items[0].product_name,
-      unit_price: payload.items[0].unit_price,
-      description: payload.items[0].description,
-    } : null
-  });
-  
+
   const result = await apiService.updateDocument(id, payload);
   // ลบการ syncDocumentsToLocalStorage
   return result;
