@@ -1875,6 +1875,57 @@ app.put(
   }
 );
 
+// PUT: อัปเดตข้อมูลบัญชีธนาคาร
+app.put("/api/bank-accounts/:id", async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { bank_name, account_type, account_number, current_balance } = req.body;
+
+  if (!bank_name || !account_type || !account_number) {
+    return res.status(400).json({
+      error: "Bank name, account type, and account number are required",
+    });
+  }
+
+  try {
+    await pool.query(
+      "UPDATE bank_accounts SET bank_name = ?, account_type = ?, account_number = ?, current_balance = ?, updated_at = NOW() WHERE id = ?",
+      [bank_name, account_type, account_number, current_balance || 0, id]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Failed to update bank account:", err);
+    res.status(500).json({ error: "Failed to update bank account" });
+  }
+});
+
+// DELETE: ลบบัญชีธนาคาร
+app.delete("/api/bank-accounts/:id", async (req: Request, res: Response) => {
+  const { id } = req.params;
+
+  try {
+    // ตรวจสอบว่าบัญชีธนาคารมีอยู่หรือไม่
+    const account = await pool.query(
+      "SELECT * FROM bank_accounts WHERE id = ? AND is_active = 1",
+      [id]
+    );
+
+    if (!Array.isArray(account) || account.length === 0) {
+      return res.status(404).json({ error: "Bank account not found" });
+    }
+
+    // Soft delete โดยการตั้งค่า is_active = 0
+    await pool.query(
+      "UPDATE bank_accounts SET is_active = 0, updated_at = NOW() WHERE id = ?",
+      [id]
+    );
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Failed to delete bank account:", err);
+    res.status(500).json({ error: "Failed to delete bank account" });
+  }
+});
+
 // ===== API สำหรับกระแสเงินสด =====
 
 // GET: ดึงข้อมูลกระแสเงินสด

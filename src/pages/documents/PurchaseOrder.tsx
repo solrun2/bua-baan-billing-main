@@ -319,8 +319,8 @@ const PurchaseOrder = () => {
                               ดู
                             </Button>
                             <Button
-                              variant="outline"
                               size="sm"
+                              className="bg-blue-500 hover:bg-blue-600 text-white border-blue-500"
                               onClick={() => handleEditClick(item.id)}
                             >
                               แก้ไข

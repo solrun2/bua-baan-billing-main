@@ -69,6 +69,26 @@ export const bankAccountService = {
     return response;
   },
 
+  // อัปเดตข้อมูลบัญชีธนาคาร
+  async updateBankAccount(
+    id: number,
+    data: {
+      bank_name: string;
+      account_type: string;
+      account_number: string;
+      current_balance?: number;
+    }
+  ): Promise<{ success: boolean }> {
+    const response = await apiService.put(`/bank-accounts/${id}`, data);
+    return response;
+  },
+
+  // ลบบัญชีธนาคาร
+  async deleteBankAccount(id: number): Promise<{ success: boolean }> {
+    const response = await apiService.delete(`/bank-accounts/${id}`);
+    return response;
+  },
+
   // ดึงข้อมูลกระแสเงินสด
   async getCashFlow(params?: {
     month?: number;

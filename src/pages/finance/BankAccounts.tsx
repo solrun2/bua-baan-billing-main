@@ -2,14 +2,24 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Building, Plus, CreditCard } from "lucide-react";
+import { Building, Plus, CreditCard, Edit, Trash2 } from "lucide-react";
 import { bankAccountService, BankAccount } from "@/services/bankAccountService";
 import { toast } from "sonner";
+import BankAccountModal from "@/pages/sub/bank-account/BankAccountModal";
+import DeleteBankAccountDialog from "@/pages/sub/bank-account/DeleteBankAccountDialog";
 
 const BankAccounts = () => {
   const navigate = useNavigate();
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingAccount, setEditingAccount] = useState<BankAccount | null>(
+    null
+  );
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState<BankAccount | null>(
+    null
+  );
 
   const loadBankAccounts = async () => {
     try {
@@ -48,6 +58,31 @@ const BankAccounts = () => {
     }
   };
 
+  const handleCreateAccount = () => {
+    setEditingAccount(null);
+    setIsModalOpen(true);
+  };
+
+  const handleEditAccount = (account: BankAccount) => {
+    setEditingAccount(account);
+    setIsModalOpen(true);
+  };
+
+  const handleDeleteAccount = (account: BankAccount) => {
+    setDeletingAccount(account);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleModalClose = () => {
+    setIsModalOpen(false);
+    setEditingAccount(null);
+  };
+
+  const handleDeleteDialogClose = () => {
+    setIsDeleteDialogOpen(false);
+    setDeletingAccount(null);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -61,7 +96,10 @@ const BankAccounts = () => {
           </div>
         </div>
         <div className="flex gap-2">
-          <Button className="flex items-center gap-2">
+          <Button
+            className="flex items-center gap-2"
+            onClick={handleCreateAccount}
+          >
             <Plus className="w-4 h-4" />
             เพิ่มบัญชีธนาคาร
           </Button>
@@ -120,11 +158,20 @@ const BankAccounts = () => {
                       ดูรายละเอียด
                     </Button>
                     <Button
-                      variant="outline"
                       size="sm"
-                      className="flex-1 border-gray-400"
+                      className="flex-1 bg-blue-500 hover:bg-blue-600 text-white border-blue-500"
+                      onClick={() => handleEditAccount(account)}
                     >
+                      <Edit className="w-4 h-4 mr-1" />
                       แก้ไข
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="text-red-500 hover:text-red-700"
+                      onClick={() => handleDeleteAccount(account)}
+                    >
+                      <Trash2 className="w-4 h-4" />
                     </Button>
                   </div>
                 </div>
@@ -143,12 +190,32 @@ const BankAccounts = () => {
           <p className="text-gray-500 mb-4">
             เริ่มต้นโดยการเพิ่มบัญชีธนาคารใหม่
           </p>
-          <Button className="flex items-center gap-2">
+          <Button
+            className="flex items-center gap-2"
+            onClick={handleCreateAccount}
+          >
             <Plus className="w-4 h-4" />
             เพิ่มบัญชีธนาคาร
           </Button>
         </div>
       )}
+
+      {/* Modal สำหรับสร้างและแก้ไขบัญชีธนาคาร */}
+      <BankAccountModal
+        isOpen={isModalOpen}
+        onClose={handleModalClose}
+        account={editingAccount}
+        onSuccess={loadBankAccounts}
+      />
+
+      {/* Dialog สำหรับยืนยันการลบบัญชีธนาคาร */}
+      <DeleteBankAccountDialog
+        isOpen={isDeleteDialogOpen}
+        onClose={handleDeleteDialogClose}
+        accountId={deletingAccount?.id || 0}
+        accountName={deletingAccount?.bank_name || ""}
+        onSuccess={loadBankAccounts}
+      />
     </div>
   );
 };
