@@ -627,8 +627,27 @@ async function createDocumentFromServer(data: any, pool: any) {
     // ALWAYS insert document_items for every document type
     console.log("[DEBUG] Items ที่จะ insert ลง document_items:");
     for (const item of items as any[]) {
+      console.log("[DEBUG] Raw incoming item data:", {
+        product_id: item.product_id,
+        productId: item.productId,
+        product_name: item.product_name,
+        productTitle: item.productTitle,
+        unit_price: item.unit_price,
+        unitPrice: item.unitPrice,
+        description: item.description,
+        quantity: item.quantity,
+        allKeys: Object.keys(item),
+        allValues: Object.values(item),
+      });
+
       // Fallback logic สำหรับ field สำคัญ
-      const product_id = item.product_id ?? item.productId ?? null;
+      let product_id = item.product_id ?? item.productId ?? null;
+
+      // ตรวจสอบว่า product_id มีค่าที่ถูกต้องหรือไม่
+      if (product_id === "" || product_id === undefined) {
+        product_id = null;
+      }
+
       const product_name =
         item.product_name && item.product_name !== "-"
           ? item.product_name
@@ -639,7 +658,20 @@ async function createDocumentFromServer(data: any, pool: any) {
       const unitPrice = Number(item.unit_price ?? item.unitPrice ?? 0);
       const amount = qty * unitPrice;
 
-      console.log("[DEBUG] Item:", {
+      console.log("[DEBUG] Field processing details:", {
+        product_name_source: item.product_name,
+        product_name_fallback: item.productTitle,
+        product_name_final: product_name,
+        unit_price_source: item.unit_price,
+        unitPrice_source: item.unitPrice,
+        unit_price_final: unitPrice,
+        description_source: item.description,
+        description_final: description,
+        quantity_source: item.quantity,
+        quantity_final: qty,
+      });
+
+      console.log("[DEBUG] Processed item data:", {
         product_id,
         product_name,
         productTitle: item.productTitle,
@@ -648,6 +680,13 @@ async function createDocumentFromServer(data: any, pool: any) {
         unit_price: unitPrice,
         amount,
         description,
+      });
+
+      console.log("[DEBUG] Raw item data:", {
+        product_id: item.product_id,
+        productId: item.productId,
+        product_id_type: typeof item.product_id,
+        productId_type: typeof item.productId,
       });
 
       const params = [
@@ -668,6 +707,16 @@ async function createDocumentFromServer(data: any, pool: any) {
         item.tax_amount ?? 0,
       ];
       console.log("[DEBUG] Params ที่จะ insert:", params);
+      console.log("[DEBUG] Final values for database:", {
+        document_id: documentId,
+        product_id: product_id,
+        product_name: product_name,
+        unit: unit,
+        quantity: qty,
+        unit_price: unitPrice,
+        amount: amount,
+        description: description,
+      });
 
       await conn.query(
         `INSERT INTO document_items (
@@ -699,6 +748,23 @@ app.post("/api/documents", async (req: Request, res: Response) => {
   console.log("Received document data:", req.body);
   console.log("[DEBUG] summary ที่รับมาจาก frontend:", req.body.summary);
   console.log("[DEBUG] priceType ที่รับมาจาก frontend:", req.body.priceType);
+  console.log("[DEBUG] Items ที่รับมาจาก frontend:", req.body.items);
+  if (req.body.items && Array.isArray(req.body.items)) {
+    req.body.items.forEach((item: any, index: number) => {
+      console.log(`[DEBUG] Item ${index}:`, {
+        product_id: item.product_id,
+        productId: item.productId,
+        product_name: item.product_name,
+        productTitle: item.productTitle,
+        unit_price: item.unit_price,
+        unitPrice: item.unitPrice,
+        quantity: item.quantity,
+        description: item.description,
+        allKeys: Object.keys(item),
+        allValues: Object.values(item),
+      });
+    });
+  }
 
   // Debug log สำหรับ receipt
   if (req.body.document_type === "receipt") {
@@ -763,7 +829,18 @@ app.post("/api/documents", async (req: Request, res: Response) => {
       missingFields.push("items");
     // ตรวจสอบ field ที่บังคับในแต่ละ item
     if (Array.isArray(items)) {
-      items.forEach((item, idx) => {
+      console.log("[DEBUG] Validating items:", items);
+      items.forEach((item: any, idx: number) => {
+        console.log(`[DEBUG] Validating item ${idx}:`, {
+          product_name: item.product_name,
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+          product_name_exists: !!item.product_name,
+          quantity_exists:
+            item.quantity !== undefined && item.quantity !== null,
+          unit_price_exists:
+            item.unit_price !== undefined && item.unit_price !== null,
+        });
         if (!item.product_name)
           missingFields.push(`items[${idx}].product_name`);
         if (item.quantity === undefined || item.quantity === null)

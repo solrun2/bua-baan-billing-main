@@ -209,6 +209,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
   function createDefaultItem(): DocumentItem {
     return {
       id: `item-${Date.now()}`,
+      productId: undefined, // เปลี่ยนจาก "" เป็น undefined
       productTitle: "",
       description: "",
       unit: "",
@@ -493,29 +494,72 @@ export const DocumentForm: FC<DocumentFormProps> = ({
 
   // handle เลือกสินค้า
   const handleProductSelect = (product: Product | null, itemId: string) => {
+    console.log("[DEBUG] handleProductSelect called:", {
+      product,
+      itemId,
+      productId: product?.id,
+      productTitle: product?.title || product?.name,
+      productPrice: product?.price,
+      productVatRate: product?.vat_rate,
+      productUnit: product?.unit,
+      productDescription: product?.description,
+      productKeys: product ? Object.keys(product) : [],
+      productValues: product ? Object.values(product) : [],
+    });
+
     if (product) {
+      console.log(
+        "[DEBUG] Before setForm - current form items:",
+        form.items.map((item) => ({
+          id: item.id,
+          productId: item.productId,
+          productTitle: item.productTitle,
+          unitPrice: item.unitPrice,
+        }))
+      );
+
+      // ใช้ setForm เพื่อ update state ครั้งเดียว
       setForm((prev) => {
         const newItems = prev.items.map((item) => {
           if (item.id === itemId) {
-            // map ข้อมูล product ให้ถูกต้องเสมอ
-            return {
+            const updatedItem = {
               ...item,
-              productId: product.id ? product.id.toString() : "",
+              productId: product.id ? product.id.toString() : null,
               productTitle: product.title || product.name || "-",
               unit: product.unit || "",
               description: product.description || "",
               unitPrice: typeof product.price === "number" ? product.price : 0,
               tax: typeof product.vat_rate === "number" ? product.vat_rate : 7,
-              // field อื่นๆ ตาม logic เดิม
-              discount: item.discount ?? 0,
-              discountType: item.discountType ?? "thb",
-              withholding_tax_option: item.withholding_tax_option ?? "ไม่ระบุ",
-              customWithholdingTaxAmount: item.customWithholdingTaxAmount ?? 0,
               isEditing: false,
             };
+
+            console.log("[DEBUG] Updated item in setForm:", {
+              itemId: item.id,
+              productId: updatedItem.productId,
+              productTitle: updatedItem.productTitle,
+              unitPrice: updatedItem.unitPrice,
+              description: updatedItem.description,
+              originalProductPrice: product.price,
+              originalProductTitle: product.title,
+              originalProductName: product.name,
+              originalProductDescription: product.description,
+            });
+
+            return updatedItem;
           }
           return item;
         });
+
+        console.log(
+          "[DEBUG] After setForm - new items:",
+          newItems.map((item) => ({
+            id: item.id,
+            productId: item.productId,
+            productTitle: item.productTitle,
+            unitPrice: item.unitPrice,
+          }))
+        );
+
         return {
           ...prev,
           items: newItems,
@@ -544,6 +588,20 @@ export const DocumentForm: FC<DocumentFormProps> = ({
     const newSummary = calculateDocumentSummary(mappedItems);
     newSummary.netTotalAmount = newSummary.total - newSummary.withholdingTax;
     setSummary(newSummary);
+  }, [form.items]);
+
+  // เพิ่ม useEffect สำหรับ monitor form state changes
+  useEffect(() => {
+    console.log(
+      "[DEBUG] Form items changed:",
+      form.items.map((item) => ({
+        id: item.id,
+        productId: item.productId,
+        productTitle: item.productTitle,
+        unitPrice: item.unitPrice,
+        description: item.description,
+      }))
+    );
   }, [form.items]);
 
   // เพิ่ม useEffect สำหรับดึงเลขเอกสารใหม่จาก backend (เฉพาะกรณีสร้างใหม่)
@@ -932,26 +990,48 @@ export const DocumentForm: FC<DocumentFormProps> = ({
 
     // map items ให้ field ตรงกับ schema database
     const itemsToSave: DocumentItemPayload[] = form.items.map((item) => {
+      console.log("[DEBUG] Mapping item for backend:", {
+        itemId: item.id,
+        productId: item.productId,
+        productTitle: item.productTitle,
+        productIdType: typeof item.productId,
+        hasProductId: !!item.productId,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        description: item.description,
+        tax: item.tax,
+        taxAmount: item.taxAmount,
+      });
+
+      // คำนวณ taxAmount ก่อนส่งไป backend
+      const calculatedItem = updateItemWithCalculations({
+        ...item,
+        priceType: mapPriceTypeToBaseItem(form.priceType),
+      });
+
+      const productId =
+        item.productId && item.productId !== "" ? item.productId : null;
       const mappedItem = {
-        product_id: item.productId ?? null,
+        product_id: productId, // เดิม
+        productId: productId, // เพิ่มบรรทัดนี้
         product_name: item.productTitle || item.description || "-", // fallback
         unit: item.unit ?? "",
         quantity: item.quantity ?? 1,
-        unit_price: item.unitPrice ?? item.amount ?? 0, // fallback
-        amount: item.amount ?? 0,
+        unit_price: item.unitPrice ?? 0, // Changed fallback
+        amount: calculatedItem.amount ?? 0, // ใช้ค่าที่คำนวณแล้ว
         description: item.description ?? "",
-        withholding_tax_amount: item.withholdingTaxAmount ?? 0,
-        amount_before_tax: item.amountBeforeTax ?? 0,
+        withholding_tax_amount: calculatedItem.withholdingTaxAmount ?? 0, // ใช้ค่าที่คำนวณแล้ว
+        amount_before_tax: calculatedItem.amountBeforeTax ?? 0, // ใช้ค่าที่คำนวณแล้ว
         discount: item.discount ?? 0,
         discount_type: item.discountType ?? "thb",
         tax: form.priceType === "NO_VAT" ? 0 : Number(item.tax ?? 0),
-        tax_amount: item.taxAmount ?? 0,
+        tax_amount: calculatedItem.taxAmount ?? 0, // ใช้ค่าที่คำนวณแล้ว
         withholding_tax_option: item.withholding_tax_option || "ไม่ระบุ",
       };
-
+      console.log("[DEBUG] Mapped item:", mappedItem); // Changed log format
       return mappedItem;
     });
-
+    console.log("[DEBUG] itemsToSave ก่อนส่ง backend:", itemsToSave); // Added
     const dataToSave: DocumentPayload = {
       id: initialData.id,
       documentType: documentType,
@@ -1013,38 +1093,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
         net_total_receipt: netTotal,
       }),
     };
-
-    // แปลง DocumentPayload เป็น DocumentData สำหรับบันทึก localStorage
-    const itemsForSave: DocumentItem[] = form.items.map((item, idx) => {
-      let fixedPriceType: "EXCLUDE_VAT" | "INCLUDE_VAT" | "NO_VAT" =
-        "EXCLUDE_VAT";
-      if (item.priceType === "INCLUDE_VAT") fixedPriceType = "INCLUDE_VAT";
-      else if (item.priceType === "NO_VAT") fixedPriceType = "NO_VAT";
-      // ถ้าเป็น 'exclusive' หรืออื่นๆ ให้ fallback เป็น EXCLUDE_VAT
-      return {
-        ...item,
-        id: item.id ?? `item-${idx}-${Date.now()}`,
-        productTitle: item.productTitle ?? "",
-        unitPrice: item.unitPrice ?? 0,
-        priceType: fixedPriceType,
-        discountType: item.discountType ?? "thb",
-        withholding_tax_option: item.withholding_tax_option ?? "ไม่ระบุ",
-        withholdingTax: item.withholdingTax ?? 0,
-        customWithholdingTaxAmount: item.customWithholdingTaxAmount ?? 0,
-        amount: item.amount ?? 0,
-        amountBeforeTax: item.amountBeforeTax ?? 0,
-        taxAmount: item.taxAmount ?? 0,
-        withholdingTaxAmount: item.withholdingTaxAmount ?? 0,
-        isEditing: false,
-      };
-    });
-    const dataForLocal: DocumentData = {
-      ...dataToSave,
-      id: initialData.id,
-      items: itemsForSave,
-      summary: summary,
-    };
-    documentService.save(dataForLocal);
+    console.log("[DEBUG] dataToSave ก่อน fetch:", dataToSave); // Added
     try {
       await onSave(dataToSave);
     } catch (error) {
@@ -1753,6 +1802,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                           const newId = `new-${Date.now()}`;
                           const newItem: DocumentItem = {
                             id: newId,
+                            productId: undefined, // เปลี่ยนจาก "" เป็น undefined
                             isNew: true,
                             productTitle: "",
                             quantity: 1,
@@ -1770,6 +1820,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                             withholding_tax_option: "ไม่ระบุ",
                           };
                           handleItemChange(newId, "isNew", true);
+                          handleItemChange(newId, "productId", undefined); // เพิ่มการตั้งค่า productId
                           handleItemChange(newId, "productTitle", "");
                           handleItemChange(newId, "quantity", 1);
                           handleItemChange(newId, "unitPrice", 0);
@@ -2637,7 +2688,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                               handleItemChange(
                                 form.items[form.items.length - 1].id,
                                 "productId",
-                                ""
+                                undefined
                               );
                               handleItemChange(
                                 form.items[form.items.length - 1].id,
