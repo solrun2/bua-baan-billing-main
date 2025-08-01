@@ -17,7 +17,7 @@ The `customerService.ts` module handles all customer-related operations with the
 
 ### Features
 
-- **Smart Query Validation**: Only sends API requests for valid search patterns (id, phone, email)
+- **Smart Query Validation**: Only sends API requests for valid search patterns (id, phone, email, name)
 - **Error Handling**: Gracefully handles "Customer not found" responses as empty results
 - **Type Safety**: Full TypeScript support with proper interfaces
 - **Logging**: Comprehensive logging for debugging
@@ -36,6 +36,7 @@ import {
 const customers = await searchCustomers("0812345678"); // Phone search
 const customers = await searchCustomers("12345"); // ID search
 const customers = await searchCustomers("user@example.com"); // Email search
+const customers = await searchCustomers("John Doe"); // Name search
 
 // Get specific customer
 const customer = await getCustomerById("12345");
@@ -45,11 +46,14 @@ const customer = await getCustomerByEmail("user@example.com");
 
 ### Search Types
 
-The service supports three search types:
+The service supports four search types:
 
 1. **ID Search**: Any numeric string (e.g., "12345")
 2. **Phone Search**: 10-digit phone numbers (e.g., "0812345678")
 3. **Email Search**: Strings containing "@" (e.g., "user@example.com")
+4. **Name Search**: Any non-numeric string that doesn't contain "@" with minimum 1 character (e.g., "John Doe", "สมชาย")
+
+**Note**: Name searches require at least 1 character to be considered valid.
 
 ### Error Handling
 

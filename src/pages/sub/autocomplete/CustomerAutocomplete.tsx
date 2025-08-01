@@ -46,7 +46,7 @@ export const CustomerAutocomplete: React.FC<CustomerAutocompleteProps> = ({
     if (!open) return;
     setCustomers([]);
     setPage(1);
-    setHasMore(true);
+    setHasMore(false); // Reset to false initially
   }, [searchQuery, open]);
 
   useEffect(() => {
@@ -55,8 +55,25 @@ export const CustomerAutocomplete: React.FC<CustomerAutocompleteProps> = ({
       setIsLoading(true);
       try {
         const result = await searchCustomers(searchQuery, page, limit);
-        setCustomers((prev) => (page === 1 ? result : [...prev, ...result]));
-        setHasMore(result.length === limit);
+
+        // Deduplicate customers based on ID
+        const newCustomers = page === 1 ? result : [...customers, ...result];
+        const uniqueCustomers = newCustomers.filter(
+          (customer, index, self) =>
+            index === self.findIndex((c) => c.id === customer.id)
+        );
+
+        setCustomers(uniqueCustomers);
+
+        // Only show "Load More" if we got full results AND there are new unique customers
+        // Also check if we actually got new results (not just duplicates)
+        const hasNewResults = result.length > 0;
+        const hasFullResults = result.length === limit;
+        const hasNewUniqueCustomers = uniqueCustomers.length > customers.length;
+
+        const hasMoreData =
+          hasFullResults && hasNewUniqueCustomers && hasNewResults;
+        setHasMore(hasMoreData);
       } catch (error) {
         setCustomers([]);
         setHasMore(false);
@@ -68,7 +85,9 @@ export const CustomerAutocomplete: React.FC<CustomerAutocompleteProps> = ({
   }, [page, searchQuery, open]);
 
   const handleLoadMore = () => {
-    if (hasMore && !isLoading) setPage((p) => p + 1);
+    if (hasMore && !isLoading) {
+      setPage((p) => p + 1);
+    }
   };
 
   return (
@@ -110,26 +129,26 @@ export const CustomerAutocomplete: React.FC<CustomerAutocompleteProps> = ({
                   </div>
                 )}
               </CommandEmpty>
-              <CommandGroup>
-                {customers
-                  .filter((customer) => {
-                    const idNum = Number(customer.id);
-                    return !isNaN(idNum) && idNum >= 370 && idNum <= 70000;
-                  })
-                  .map((customer) => (
-                    <CommandItem
-                      key={customer.id}
-                      value={`${customer.name}_${customer.id}`}
-                      onSelect={() => {
-                        onCustomerSelect(customer);
-                        setOpen(false);
-                      }}
-                    >
-                      {`${customer.name || ""}${customer.lastname ? " " + customer.lastname : ""}${customer.tel ? " (" + customer.tel + ")" : ""}`}
-                    </CommandItem>
-                  ))}
+              <CommandGroup
+                key={`customer-list-${hasMore}-${customers.length}`}
+              >
+                {customers.map((customer) => (
+                  <CommandItem
+                    key={customer.id}
+                    value={`${customer.name}_${customer.id}`}
+                    onSelect={() => {
+                      onCustomerSelect(customer);
+                      setOpen(false);
+                    }}
+                  >
+                    {`${customer.name || ""}${customer.lastname ? " " + customer.lastname : ""}${customer.tel ? " (" + customer.tel + ")" : ""}`}
+                  </CommandItem>
+                ))}
                 {hasMore && (
-                  <div className="flex justify-center p-2">
+                  <div
+                    className="flex justify-center p-2"
+                    key={`load-more-${hasMore}`}
+                  >
                     <Button
                       onClick={handleLoadMore}
                       disabled={isLoading}

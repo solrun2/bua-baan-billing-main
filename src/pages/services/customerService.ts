@@ -5,7 +5,7 @@ const API_TOKEN =
   "eyJhbGciOiJFZERTQSIsImtpZCI6IjAxOTc2Nzg5LWNkODktNzYyZS1iMTM5LTFkZjIzZTUyYzQ3YiJ9.eyJjbGllbnRfaWQiOiIwMTk3Njc4OS1jZDg5LTc2MmUtYjEzOS0xZGYyM2U1MmM0N2IiLCJrZXRfd2ViX2lkIjoxMzE3LCJzY29wZXMiOlsiYWxsIl0sIm5hbWUiOiJJbnRlcm5zaGlwIiwiZG9tYWluIjoidWF0LmtldHNob3B0ZXN0LmNvbSIsInN1YiI6IjAxOTc2NzhiLTQ3YmUtNzA4YS04MTFkLWEwZWNiMDg1OTdiMCIsImlhdCI6MTc0OTc4ODg3MH0.OSbUayE_yS9IqOKLFrgsAGPJepiW7Otn3vzvE1SL9ijTpJmsGydGAP1_4AZA75cTmlXy583iS81EZxZszeYaBg";
 
 export interface CustomerSearchParams {
-  type: "id" | "phone" | "email";
+  type: "id" | "phone" | "email" | "name";
   value: string;
 }
 
@@ -23,7 +23,7 @@ export interface CustomerSearchResponse {
 
 /**
  * Check if the query is valid for customer search
- * Only id, phone, or email are supported by the API
+ * Supports id, phone, email, and name searches
  */
 export function isValidCustomerQuery(query: string): boolean {
   if (!query || query.trim().length === 0) return false;
@@ -39,13 +39,24 @@ export function isValidCustomerQuery(query: string): boolean {
   // Email: contains @ symbol
   if (trimmedQuery.includes("@")) return true;
 
+  // Name: any non-empty string that's not just digits and doesn't contain @
+  // Also require minimum length of 1 character for name searches
+  if (
+    trimmedQuery.length >= 1 &&
+    !/^\d+$/.test(trimmedQuery) &&
+    !trimmedQuery.includes("@")
+  )
+    return true;
+
   return false;
 }
 
 /**
  * Determine the search type based on the query
  */
-export function getSearchType(query: string): "id" | "phone" | "email" | null {
+export function getSearchType(
+  query: string
+): "id" | "phone" | "email" | "name" | null {
   if (!query || query.trim().length === 0) return null;
 
   const trimmedQuery = query.trim();
@@ -53,6 +64,13 @@ export function getSearchType(query: string): "id" | "phone" | "email" | null {
   if (/^\d+$/.test(trimmedQuery)) return "id";
   if (/^\d{10}$/.test(trimmedQuery)) return "phone";
   if (trimmedQuery.includes("@")) return "email";
+
+  if (
+    trimmedQuery.length >= 1 &&
+    !/^\d+$/.test(trimmedQuery) &&
+    !trimmedQuery.includes("@")
+  )
+    return "name";
 
   return null;
 }
@@ -128,7 +146,13 @@ export async function searchCustomers(
       tel: customer.tel || "",
     }));
 
-    return customers;
+    // Remove duplicates based on ID
+    const uniqueCustomers = customers.filter(
+      (customer, index, self) =>
+        index === self.findIndex((c) => c.id === customer.id)
+    );
+
+    return uniqueCustomers;
   } catch (error) {
     throw new Error("Failed to search customers");
   }
