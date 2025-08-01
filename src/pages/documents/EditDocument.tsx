@@ -38,27 +38,18 @@ const EditDocumentPage: React.FC = () => {
           return;
         }
 
-        // --- จุดที่แก้ไข ---
-        // ฟังก์ชันสำหรับปรับวันที่ให้ถูกต้องตามโซนเวลาของผู้ใช้ (ฉบับสมบูรณ์)
         const getLocalDate = (dateString: string | undefined): string => {
           if (!dateString) return "";
 
-          // 1. สร้าง Date object จากข้อมูลที่ได้จาก API
-          // (เช่น '2025-07-13T17:00:00.000Z')
           const date = new Date(dateString);
 
-          // 2. ดึงค่า ปี, เดือน, วัน ตามโซนเวลาของเบราว์เซอร์โดยตรง
-          //    ซึ่งจะได้วันที่ที่ถูกต้องตามปฏิทินของผู้ใช้
           const year = date.getFullYear();
           const month = date.getMonth() + 1; // getMonth() เริ่มจาก 0
           const day = date.getDate();
-
-          // 3. นำมาประกอบกลับเป็นรูปแบบ 'YYYY-MM-DD' ที่ input ต้องการ
           return `${year}-${String(month).padStart(2, "0")}-${String(
             day
           ).padStart(2, "0")}`;
         };
-        // --- จบส่วนที่แก้ไข ---
 
         const adjustedData = {
           ...data,
@@ -115,11 +106,10 @@ const EditDocumentPage: React.FC = () => {
     if (!id) return;
     try {
       await apiService.updateDocument(id, data);
-      // suppressToastSuccess จะถูกส่งมาจาก dashboard ถ้าไม่ต้องการ toast
       if (!location.state || !location.state.suppressToastSuccess) {
         toast.success("บันทึกเอกสารสำเร็จ");
       }
-      navigate(-1); // กลับไปหน้าก่อนหน้า
+      navigate(-1); 
     } catch (e) {
       toast.error("บันทึกเอกสารไม่สำเร็จ");
     }

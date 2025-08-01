@@ -81,12 +81,34 @@ CREATE TABLE document_number_settings (
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
-ALTER TABLE document_number_settings
-ADD UNIQUE KEY unique_document_type (document_type);
+CREATE TABLE `cash_flow` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `type` enum('income','expense') NOT NULL,
+  `amount` decimal(15,2) NOT NULL,
+  `description` varchar(255) NOT NULL,
+  `date` date NOT NULL,
+  `bank_account_id` int(11) DEFAULT NULL,
+  `document_id` int(11) DEFAULT NULL,
+  `category` varchar(100) DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `bank_account_id` (`bank_account_id`),
+  KEY `document_id` (`document_id`),
+  KEY `date` (`date`),
+  CONSTRAINT `cash_flow_ibfk_1` FOREIGN KEY (`bank_account_id`) REFERENCES `bank_accounts` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `cash_flow_ibfk_2` FOREIGN KEY (`document_id`) REFERENCES `documents` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB AUTO_INCREMENT=87 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci
 
--- เพิ่มข้อมูลเริ่มต้น
-INSERT INTO document_number_settings (document_type, prefix, pattern, current_number) VALUES
-('quotation', 'QT', 'QT-YYYY-MM-XXXX', 0),
-('invoice', 'IV', 'IV-YYYY-MM-XXXX', 0),
-('receipt', 'RE', 'RE-YYYY-MM-XXXX', 0),
-('tax_invoice', 'TAX', 'TAX-YYYY-MM-XXXX', 0);
+CREATE TABLE `bank_accounts` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `bank_name` varchar(255) NOT NULL,
+  `account_type` enum('ออมทรัพย์','กระแสรายวัน','ประจำ') NOT NULL,
+  `account_number` varchar(50) NOT NULL,
+  `current_balance` decimal(15,2) NOT NULL DEFAULT 0.00,
+  `currency` varchar(10) DEFAULT 'THB',
+  `is_active` tinyint(1) DEFAULT 1,
+  `created_at` timestamp NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `account_number` (`account_number`)
+) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci
