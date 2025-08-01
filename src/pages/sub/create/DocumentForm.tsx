@@ -97,10 +97,23 @@ function mapPriceTypeToDocumentItem(
 // Helper สำหรับคำนวณ Net (มูลค่าก่อนภาษี) ของแต่ละแถว
 function getNetUnitPrice(item: DocumentItem, priceType: string) {
   const taxRate = (item.tax ?? 7) / 100;
-  if (priceType === "INCLUDE_VAT") {
-    return (item.unitPrice ?? 0) / (1 + taxRate);
+  let basePrice = item.unitPrice ?? 0;
+
+  // หักส่วนลดก่อน
+  if (item.discount && item.discount > 0) {
+    if (item.discountType === "percentage") {
+      basePrice = basePrice * (1 - item.discount / 100);
+    } else {
+      // ถ้าเป็น thb ให้หักจากราคาต่อหน่วย
+      basePrice = Math.max(0, basePrice - item.discount);
+    }
   }
-  return item.unitPrice ?? 0;
+
+  // คำนวณราคาก่อนภาษี
+  if (priceType === "INCLUDE_VAT") {
+    return basePrice / (1 + taxRate);
+  }
+  return basePrice;
 }
 
 // เพิ่มฟังก์ชัน mapPriceTypeToEnum
