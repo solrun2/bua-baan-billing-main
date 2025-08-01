@@ -469,12 +469,6 @@ function calculateDocumentSummary(
 // ฟังก์ชัน reusable สำหรับสร้างเอกสารใหม่ใน backend (ใช้ใน auto-create invoice/receipt)
 async function createDocumentFromServer(data: any, pool: any) {
   let conn;
-  console.log(
-    "🔍 [Backend] createDocumentFromServer - Starting document creation"
-  );
-  console.log("🔍 [Backend] Document type:", data.document_type);
-  console.log("🔍 [Backend] Payment channels:", data.payment_channels);
-
   try {
     const {
       customer,
@@ -604,11 +598,6 @@ async function createDocumentFromServer(data: any, pool: any) {
         [documentId, due_date]
       );
     } else if (document_type.toLowerCase() === "receipt") {
-      console.log(
-        "🔍 [Backend] Creating receipt with payment_channels:",
-        data.payment_channels
-      );
-
       // บันทึกข้อมูล receipt_details พร้อมข้อมูลเพิ่มเติม
       const payment_channels_json = data.payment_channels
         ? JSON.stringify(data.payment_channels)
@@ -638,12 +627,7 @@ async function createDocumentFromServer(data: any, pool: any) {
       // เพิ่มการจัดการ cash flow และอัปเดตยอดบัญชีธนาคารสำหรับ receipt
       if (data.payment_channels && Array.isArray(data.payment_channels)) {
         for (const channel of data.payment_channels) {
-          console.log("🔍 [Backend] Processing channel in create:", channel);
           if (channel.amount > 0) {
-            console.log(
-              "🔍 [Backend] Creating cash flow entry in create for channel:",
-              channel
-            );
             // เพิ่มรายการรายได้
             await conn.query(
               `INSERT INTO cash_flow (type, amount, description, date, bank_account_id, document_id, category)
@@ -668,15 +652,6 @@ async function createDocumentFromServer(data: any, pool: any) {
               if (Array.isArray(currentBalance) && currentBalance.length > 0) {
                 const balance = Number(currentBalance[0].current_balance);
                 const newBalance = balance + Number(channel.amount);
-                console.log(
-                  "🔍 [Backend] Creating bank account balance update:",
-                  {
-                    oldBalance: balance,
-                    amount: channel.amount,
-                    newBalance: newBalance,
-                    bankAccountId: channel.bankAccountId,
-                  }
-                );
 
                 await conn.query(
                   "UPDATE bank_accounts SET current_balance = ? WHERE id = ?",
@@ -972,8 +947,6 @@ app.get("/api/documents/:id", async (req, res) => {
             parsedChannels = [];
           }
 
-          console.log("🔍 [Backend] Parsed channels:", parsedChannels);
-
           // แปลงข้อมูลให้ตรงกับ format ที่ frontend ต้องการ
           receipt_details.payment_channels = Array.isArray(parsedChannels)
             ? parsedChannels.map((ch: any) => ({
@@ -984,10 +957,6 @@ app.get("/api/documents/:id", async (req, res) => {
                 bankAccountId: ch.bankAccountId || null,
               }))
             : [];
-          console.log(
-            "✅ [Backend] Converted payment_channels:",
-            receipt_details.payment_channels
-          );
         } else {
           console.log(
             "⚠️ [Backend] No payment_channels found in receipt_details"
@@ -1044,12 +1013,6 @@ app.get("/api/documents/:id", async (req, res) => {
 app.put("/api/documents/:id", async (req: Request, res: Response) => {
   let conn;
   const { id } = req.params;
-
-  console.log(
-    "🔍 [Backend] PUT /api/documents/:id - Starting update for document:",
-    id
-  );
-  console.log("🔍 [Backend] Request body:", req.body);
 
   try {
     const {
@@ -1175,9 +1138,6 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
         );
       }
     } else if (document_type.toLowerCase() === "receipt") {
-      console.log("🔍 [Backend] Processing receipt update for document:", id);
-      console.log("🔍 [Backend] Payment channels received:", payment_channels);
-
       // หา bank_account_id จาก payment_channels
       let bankAccountId = null;
       if (
@@ -1192,26 +1152,16 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
       }
 
       // ลบรายการกระแสเงินสดเก่าและหักยอดบัญชีธนาคาร
-      console.log(
-        "🔍 [Backend] Deleting old cash flow entries for document:",
-        id
-      );
       const [oldCashFlowRows] = await conn.query(
         "SELECT * FROM cash_flow WHERE document_id = ?",
         [id]
       );
-      console.log("🔍 [Backend] Found old cash flow entries:", oldCashFlowRows);
       await conn.query("DELETE FROM cash_flow WHERE document_id = ?", [id]);
 
       // หักยอดบัญชีธนาคารจากรายการเก่า
       if (Array.isArray(oldCashFlowRows)) {
         for (const oldEntry of oldCashFlowRows) {
-          console.log("🔍 [Backend] Processing old cash flow entry:", oldEntry);
           if (oldEntry.bank_account_id && oldEntry.amount > 0) {
-            console.log(
-              "🔍 [Backend] Reversing bank account balance for old entry:",
-              oldEntry
-            );
             const currentBalance = await conn.query(
               "SELECT current_balance FROM bank_accounts WHERE id = ?",
               [oldEntry.bank_account_id]
@@ -1219,11 +1169,6 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
             if (Array.isArray(currentBalance) && currentBalance.length > 0) {
               const balance = currentBalance[0].current_balance;
               const newBalance = balance - Number(oldEntry.amount);
-              console.log("🔍 [Backend] Reversing bank account balance:", {
-                oldBalance: balance,
-                amount: oldEntry.amount,
-                newBalance,
-              });
 
               await conn.query(
                 "UPDATE bank_accounts SET current_balance = ? WHERE id = ?",
@@ -1235,18 +1180,6 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
       }
 
       // อัปเดต receipt_details
-      console.log("🔍 [Backend] Updating receipt_details with data:", {
-        payment_date: payment_date || issue_date,
-        payment_method: payment_method || "เงินสด",
-        payment_reference: payment_reference || "",
-        payment_channels: JSON.stringify(payment_channels || []),
-        fees: JSON.stringify(fees || []),
-        offset_docs: JSON.stringify(offset_docs || []),
-        net_total_receipt: net_total_receipt || total_amount,
-        bankAccountId,
-        id,
-      });
-
       await conn.query(
         `UPDATE receipt_details SET payment_date = ?, payment_method = ?, payment_reference = ?, payment_channels = ?, fees = ?, offset_docs = ?, net_total_receipt = ?, bank_account_id = ? WHERE document_id = ?`,
         [
@@ -1267,22 +1200,9 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
         throw new Error("ไม่พบข้อมูลเอกสาร หรือ document_number เป็น null");
       }
 
-      // เพิ่ม debug log
-      console.log(
-        "🔍 [Backend] Processing payment_channels:",
-        payment_channels
-      );
-      console.log("🔍 [Backend] Document number:", docData.document_number);
-      console.log("🔍 [Backend] Payment date:", payment_date);
-
       if (payment_channels && Array.isArray(payment_channels)) {
         for (const channel of payment_channels) {
-          console.log("🔍 [Backend] Processing channel:", channel);
           if (channel.amount > 0) {
-            console.log(
-              "🔍 [Backend] Creating cash flow entry for channel:",
-              channel
-            );
             // เพิ่มรายการรายได้
             await conn.query(
               `INSERT INTO cash_flow (type, amount, description, date, bank_account_id, document_id, category)
@@ -1307,12 +1227,6 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
               if (Array.isArray(currentBalance) && currentBalance.length > 0) {
                 const balance = Number(currentBalance[0].current_balance);
                 const newBalance = balance + Number(channel.amount);
-                console.log("🔍 [Backend] Updating bank account balance:", {
-                  oldBalance: balance,
-                  amount: channel.amount,
-                  newBalance: newBalance,
-                  bankAccountId: channel.bankAccountId,
-                });
 
                 await conn.query(
                   "UPDATE bank_accounts SET current_balance = ? WHERE id = ?",
@@ -1373,12 +1287,7 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
       );
     }
 
-    console.log("🔍 [Backend] Committing transaction for document update:", id);
     await conn.commit();
-    console.log(
-      "🔍 [Backend] Transaction committed successfully for document:",
-      id
-    );
 
     if (
       document_type.toLowerCase() === "quotation" &&
