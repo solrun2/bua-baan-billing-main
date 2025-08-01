@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Customer } from "@/types/customer";
 import {
   searchCustomers,
@@ -40,7 +40,7 @@ export const CustomerAutocomplete: React.FC<CustomerAutocompleteProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
-  const limit = 10; // ปรับจำนวนต่อ page ตามต้องการ
+  const limit = 7; // ปรับจำนวนต่อ page ตามต้องการ
 
   useEffect(() => {
     if (!open) return;
@@ -56,6 +56,10 @@ export const CustomerAutocomplete: React.FC<CustomerAutocompleteProps> = ({
       try {
         const result = await searchCustomers(searchQuery, page, limit);
 
+        console.log("🔍 Debug - Requested Limit:", limit);
+        console.log("🔍 Debug - API Result Length:", result.length);
+        console.log("🔍 Debug - Current Page:", page);
+
         // Deduplicate customers based on ID
         const newCustomers = page === 1 ? result : [...customers, ...result];
         const uniqueCustomers = newCustomers.filter(
@@ -63,16 +67,16 @@ export const CustomerAutocomplete: React.FC<CustomerAutocompleteProps> = ({
             index === self.findIndex((c) => c.id === customer.id)
         );
 
+        // Store previous customers length before updating state
+        const previousCustomersLength = customers.length;
+
         setCustomers(uniqueCustomers);
 
-        // Only show "Load More" if we got full results AND there are new unique customers
-        // Also check if we actually got new results (not just duplicates)
-        const hasNewResults = result.length > 0;
+        // Improved hasMore logic: show button only if we got full results AND there are new unique customers
         const hasFullResults = result.length === limit;
-        const hasNewUniqueCustomers = uniqueCustomers.length > customers.length;
-
-        const hasMoreData =
-          hasFullResults && hasNewUniqueCustomers && hasNewResults;
+        const hasNewUniqueCustomers =
+          uniqueCustomers.length > previousCustomersLength;
+        const hasMoreData = hasFullResults && hasNewUniqueCustomers;
         setHasMore(hasMoreData);
       } catch (error) {
         setCustomers([]);
@@ -84,11 +88,11 @@ export const CustomerAutocomplete: React.FC<CustomerAutocompleteProps> = ({
     fetchCustomers();
   }, [page, searchQuery, open]);
 
-  const handleLoadMore = () => {
+  const handleLoadMore = useCallback(() => {
     if (hasMore && !isLoading) {
       setPage((p) => p + 1);
     }
-  };
+  }, [hasMore, isLoading]);
 
   return (
     <div className={cn("flex w-full", className)}>
@@ -129,9 +133,7 @@ export const CustomerAutocomplete: React.FC<CustomerAutocompleteProps> = ({
                   </div>
                 )}
               </CommandEmpty>
-              <CommandGroup
-                key={`customer-list-${hasMore}-${customers.length}`}
-              >
+              <CommandGroup key={`customer-list-${hasMore}`}>
                 {customers.map((customer) => (
                   <CommandItem
                     key={customer.id}
@@ -145,10 +147,7 @@ export const CustomerAutocomplete: React.FC<CustomerAutocompleteProps> = ({
                   </CommandItem>
                 ))}
                 {hasMore && (
-                  <div
-                    className="flex justify-center p-2"
-                    key={`load-more-${hasMore}`}
-                  >
+                  <div className="flex justify-center p-2">
                     <Button
                       onClick={handleLoadMore}
                       disabled={isLoading}

@@ -94,12 +94,76 @@ export async function searchCustomers(
       return [];
     }
 
+    // Handle full name search (e.g., "test guest")
+    if (searchType === "name" && query.trim().includes(" ")) {
+      const nameParts = query
+        .trim()
+        .split(" ")
+        .filter((part) => part.length > 0);
+      const allResults: Customer[] = [];
+
+      // Search for each part of the name
+      for (const part of nameParts) {
+        const requestBody: any = {
+          type: "name",
+          value: part.trim(),
+          page,
+          limit,
+        };
+
+        console.log("🔍 Debug - Searching for part:", part);
+
+        const response = await fetch(`${API_BASE_URL}/customer/search`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${API_TOKEN}`,
+          },
+          body: JSON.stringify(requestBody),
+        });
+
+        if (response.ok) {
+          const apiResponse = await response.json();
+          const data: CustomerSearchResponse[] = apiResponse.data || [];
+
+          // Transform API response to Customer type
+          const customers: Customer[] = data.map((customer, idx) => ({
+            id: customer._id || customer.id || customer.tel || String(idx),
+            name:
+              customer.name || customer.username || customer.firstname || "",
+            lastname: customer.lastname || "",
+            phone: customer.tel || "",
+            email: customer.email || "",
+            address:
+              Array.isArray(customer.address) && customer.address.length > 0
+                ? customer.address[0].address1
+                : "",
+            tax_id: "",
+            tel: customer.tel || "",
+          }));
+
+          allResults.push(...customers);
+        }
+      }
+
+      // Remove duplicates based on ID
+      const uniqueCustomers = allResults.filter(
+        (customer, index, self) =>
+          index === self.findIndex((c) => c.id === customer.id)
+      );
+
+      return uniqueCustomers;
+    }
+
+    // Original search logic for single word searches
     const requestBody: any = {
       type: searchType,
       value: query.trim(),
       page,
       limit,
     };
+
+    console.log("🔍 Debug - Request Body:", requestBody);
 
     const response = await fetch(`${API_BASE_URL}/customer/search`, {
       method: "POST",
