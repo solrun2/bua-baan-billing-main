@@ -108,15 +108,23 @@ const Invoice = () => {
   const handleEditClick = (id: string) =>
     navigate(`/documents/invoice/edit/${id}`);
 
-  const handleDeleteClick = async (id: string) => {
-    if (window.confirm("คุณต้องการลบใบแจ้งหนี้นี้ใช่หรือไม่?")) {
-      toast.promise(apiService.deleteDocument(id), {
-        loading: "กำลังลบ...",
-        success: () => {
+  const handleCancelClick = async (id: string) => {
+    if (
+      window.confirm(
+        "คุณต้องการยกเลิกใบแจ้งหนี้นี้ใช่หรือไม่?\n\nหมายเหตุ: การยกเลิกเอกสารลูกจะทำให้เอกสารแม่ถูกยกเลิกอัตโนมัติ"
+      )
+    ) {
+      toast.promise(apiService.cancelDocument(id), {
+        loading: "กำลังยกเลิก...",
+        success: (result) => {
           refresh(); // Refresh data after deletion
-          return "ลบใบแจ้งหนี้เรียบร้อยแล้ว";
+          let message = "ยกเลิกใบแจ้งหนี้เรียบร้อยแล้ว";
+          if (result.relatedDocumentsCancelled > 0) {
+            message += ` (เอกสารที่เกี่ยวข้องถูกยกเลิก ${result.relatedDocumentsCancelled} รายการ)`;
+          }
+          return message;
         },
-        error: "เกิดข้อผิดพลาดในการลบ",
+        error: "เกิดข้อผิดพลาดในการยกเลิก",
       });
     }
   };
@@ -143,6 +151,8 @@ const Invoice = () => {
         return "bg-red-100 text-red-700";
       case "รอชำระ":
         return "bg-yellow-100 text-yellow-700";
+      case "ยกเลิก":
+        return "bg-red-100 text-red-700";
       default:
         return "bg-gray-100 text-gray-700";
     }
@@ -309,7 +319,7 @@ const Invoice = () => {
                               variant="ghost"
                               size="icon"
                               className="text-red-500 hover:text-red-700"
-                              onClick={() => handleDeleteClick(item.id)}
+                              onClick={() => handleCancelClick(item.id)}
                             >
                               <Trash2 className="w-4 h-4" />
                             </Button>

@@ -59,7 +59,7 @@ const CreditNote = () => {
     totalPages,
     totalCount,
     setPage,
-    refresh
+    refresh,
   } = usePagination<any>("CREDIT_NOTE", filters, searchText);
 
   // แปลงข้อมูล creditNotes เป็น CreditNoteItem format
@@ -86,7 +86,11 @@ const CreditNote = () => {
 
   // Sort the credit note items
   const sortedCreditNoteItems = useMemo(() => {
-    return sortData(creditNoteItems, sortColumn as keyof CreditNoteItem, sortDirection);
+    return sortData(
+      creditNoteItems,
+      sortColumn as keyof CreditNoteItem,
+      sortDirection
+    );
   }, [creditNoteItems, sortColumn, sortDirection]);
 
   const handleSort = (column: string) => {
@@ -101,15 +105,23 @@ const CreditNote = () => {
   const handleEditClick = (id: string) =>
     navigate(`/documents/credit-note/edit/${id}`);
 
-  const handleDeleteClick = async (id: string) => {
-    if (window.confirm("คุณต้องการลบใบลดหนี้นี้ใช่หรือไม่?")) {
-      toast.promise(apiService.deleteDocument(id), {
-        loading: "กำลังลบ...",
-        success: () => {
+  const handleCancelClick = async (id: string) => {
+    if (
+      window.confirm(
+        "คุณต้องการยกเลิกใบลดหนี้นี้ใช่หรือไม่?\n\nหมายเหตุ: การยกเลิกเอกสารลูกจะทำให้เอกสารแม่ถูกยกเลิกอัตโนมัติ"
+      )
+    ) {
+      toast.promise(apiService.cancelDocument(id), {
+        loading: "กำลังยกเลิก...",
+        success: (result) => {
           refresh(); // Refresh data after deletion
-          return "ลบใบลดหนี้เรียบร้อยแล้ว";
+          let message = "ยกเลิกใบลดหนี้เรียบร้อยแล้ว";
+          if (result.relatedDocumentsCancelled > 0) {
+            message += ` (เอกสารที่เกี่ยวข้องถูกยกเลิก ${result.relatedDocumentsCancelled} รายการ)`;
+          }
+          return message;
         },
-        error: "เกิดข้อผิดพลาดในการลบ",
+        error: "เกิดข้อผิดพลาดในการยกเลิก",
       });
     }
   };

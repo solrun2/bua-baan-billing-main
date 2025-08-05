@@ -105,15 +105,23 @@ const TaxInvoice = () => {
   const handleEditClick = (id: string) =>
     navigate(`/documents/tax-invoice/edit/${id}`);
 
-  const handleDeleteClick = async (id: string) => {
-    if (window.confirm("คุณต้องการลบใบกำกับภาษีนี้ใช่หรือไม่?")) {
-      toast.promise(apiService.deleteDocument(id), {
-        loading: "กำลังลบ...",
-        success: () => {
+  const handleCancelClick = async (id: string) => {
+    if (
+      window.confirm(
+        "คุณต้องการยกเลิกใบกำกับภาษีนี้ใช่หรือไม่?\n\nหมายเหตุ: การยกเลิกเอกสารลูกจะทำให้เอกสารแม่ถูกยกเลิกอัตโนมัติ"
+      )
+    ) {
+      toast.promise(apiService.cancelDocument(id), {
+        loading: "กำลังยกเลิก...",
+        success: (result) => {
           refresh(); // Refresh data after deletion
-          return "ลบใบกำกับภาษีเรียบร้อยแล้ว";
+          let message = "ยกเลิกใบกำกับภาษีเรียบร้อยแล้ว";
+          if (result.relatedDocumentsCancelled > 0) {
+            message += ` (เอกสารที่เกี่ยวข้องถูกยกเลิก ${result.relatedDocumentsCancelled} รายการ)`;
+          }
+          return message;
         },
-        error: "เกิดข้อผิดพลาดในการลบ",
+        error: "เกิดข้อผิดพลาดในการยกเลิก",
       });
     }
   };
@@ -298,7 +306,7 @@ const TaxInvoice = () => {
                               variant="ghost"
                               size="icon"
                               className="text-red-500 hover:text-red-700"
-                              onClick={() => handleDeleteClick(item.id)}
+                              onClick={() => handleCancelClick(item.id)}
                             >
                               <Trash2 className="w-4 h-4" />
                             </Button>

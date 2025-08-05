@@ -154,17 +154,24 @@ const updateDocument = async (
   }
 };
 
-const deleteDocument = async (id: string): Promise<void> => {
+const cancelDocument = async (
+  id: string
+): Promise<{
+  message: string;
+  cancelledDocument: any;
+  relatedDocumentsCancelled: number;
+}> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/documents/${id}`, {
-      method: "DELETE",
+    const response = await fetch(`${API_BASE_URL}/documents/${id}/cancel`, {
+      method: "PUT",
     });
     if (!response.ok) {
       const errorData = await response.json();
-      throw new Error(errorData.message || "Failed to delete document");
+      throw new Error(errorData.message || "Failed to cancel document");
     }
+    return await response.json();
   } catch (error) {
-    console.error(`Error deleting document with id ${id}:`, error);
+    console.error(`Error cancelling document with id ${id}:`, error);
     throw error;
   }
 };
@@ -409,7 +416,7 @@ export const apiService = {
   getDocuments,
   createDocument,
   updateDocument,
-  deleteDocument,
+  cancelDocument,
   getDocumentNumbers,
   createCustomer,
   uploadImage,

@@ -301,11 +301,24 @@ app.put("/api/products/:id", async (req: Request, res: Response) => {
       ]
     );
 
-    const [updatedProduct] = await conn.query(
+    const updatedProduct = await conn.query(
       "SELECT * FROM products WHERE id = ?",
       [id]
     );
-    res.status(200).json(updatedProduct[0]);
+
+    // Handle mariadb query result structure
+    let product = null;
+    if (Array.isArray(updatedProduct) && updatedProduct.length > 0) {
+      product = updatedProduct[0];
+    } else if (
+      updatedProduct &&
+      typeof updatedProduct === "object" &&
+      updatedProduct.id
+    ) {
+      product = updatedProduct;
+    }
+
+    res.status(200).json(product);
   } catch (err) {
     console.error(`Failed to update product ${id}:`, err);
     res.status(500).json({ error: "Failed to update product" });
@@ -372,7 +385,15 @@ app.get("/api/documents", async (req: Request, res: Response) => {
       ${whereClause}
     `;
     const countResult = await pool.query(countQuery, params);
-    const totalCount = Number(countResult[0].total);
+    console.log(`[DEBUG] Count result:`, countResult);
+
+    // Handle mariadb query result structure - it might return object directly or array
+    let totalCount = 0;
+    if (Array.isArray(countResult)) {
+      totalCount = Number(countResult[0]?.total || 0);
+    } else if (countResult && typeof countResult === "object") {
+      totalCount = Number(countResult.total || 0);
+    }
 
     // Get paginated data
     const query = `
@@ -926,34 +947,179 @@ app.post("/api/documents", async (req: Request, res: Response) => {
   }
 });
 
-// API route to delete a document
-app.delete("/api/documents/:id", async (req: Request, res: Response) => {
+// API route to cancel a document
+app.put("/api/documents/:id/cancel", async (req: Request, res: Response) => {
   let conn;
   const { id } = req.params;
+  console.log(`[DEBUG] Cancel request received for document ID: ${id}`);
+
   try {
     conn = await pool.getConnection();
     await conn.beginTransaction();
 
-    const deleteResult = await conn.query(
-      "DELETE FROM documents WHERE id = ?",
-      [id]
+    // 1. หาเอกสารที่ต้องการยกเลิก
+    console.log(`[DEBUG] Querying document with ID: ${id}`);
+    const docResult = await conn.query("SELECT * FROM documents WHERE id = ?", [
+      id,
+    ]);
+    console.log(`[DEBUG] Query result for ID ${id}:`, docResult);
+    console.log(`[DEBUG] docResult type:`, typeof docResult);
+    console.log(`[DEBUG] docResult is array:`, Array.isArray(docResult));
+    console.log(
+      `[DEBUG] docResult length:`,
+      docResult ? docResult.length : "undefined"
     );
 
-    if (Number(deleteResult.affectedRows) === 0) {
-      await conn.rollback();
-      return res.status(404).json({ error: "Document not found." });
+    // Handle mariadb query result structure
+    let document = null;
+    if (Array.isArray(docResult) && docResult.length > 0) {
+      document = docResult[0];
+    } else if (docResult && typeof docResult === "object" && docResult.id) {
+      document = docResult;
     }
 
+    console.log(`[DEBUG] Extracted document:`, document);
+    if (!document) {
+      await conn.rollback();
+      console.log(`[DEBUG] Document is null/undefined: ${id}`);
+      return res.status(404).json({ error: "Document not found." });
+    }
+    console.log(`[DEBUG] Found document:`, {
+      id: document.id,
+      document_type: document.document_type,
+      related_document_id: document.related_document_id,
+      status: document.status,
+    });
+
+    // 2. ใช้ฟังก์ชัน recursive cancellation
+    const { cancelledIds, totalCancelled } = await cancelDocumentRecursive(
+      conn,
+      Number(id)
+    );
+
+    console.log(`[DEBUG] Cancellation completed. Cancelled IDs:`, cancelledIds);
+    console.log(`[DEBUG] Total cancelled: ${totalCancelled}`);
+
     await conn.commit();
-    res.status(200).json({ message: "Document deleted successfully." });
+    res.status(200).json({
+      message: "Document cancelled successfully.",
+      cancelledDocument: document,
+      relatedDocumentsCancelled: totalCancelled - 1, // ลบ 1 เพราะไม่นับเอกสารหลัก
+    });
   } catch (err) {
     if (conn) await conn.rollback();
-    console.error(`Failed to delete document ${id}:`, err);
-    res.status(500).json({ error: "Failed to delete document" });
+    console.error(`Failed to cancel document ${id}:`, err);
+    res.status(500).json({ error: "Failed to cancel document" });
   } finally {
     if (conn) conn.release();
   }
 });
+
+// ฟังก์ชัน recursive cancellation
+async function cancelDocumentRecursive(
+  conn: any,
+  documentId: number
+): Promise<{ cancelledIds: number[]; totalCancelled: number }> {
+  const cancelledIds: number[] = [];
+  const processedIds = new Set<number>();
+
+  async function cancelRecursive(id: number): Promise<void> {
+    // ป้องกัน infinite loop
+    if (processedIds.has(id)) {
+      console.log(`[DEBUG] Skipping already processed document ID: ${id}`);
+      return;
+    }
+    processedIds.add(id);
+
+    console.log(`[DEBUG] Processing document ID: ${id}`);
+
+    // ยกเลิกเอกสารปัจจุบัน
+    await conn.query("UPDATE documents SET status = 'ยกเลิก' WHERE id = ?", [
+      id,
+    ]);
+    cancelledIds.push(id);
+    console.log(`[DEBUG] Cancelled document ID: ${id}`);
+
+    // หาเอกสารแม่ (parent) และยกเลิก
+    const parentResult = await conn.query(
+      "SELECT related_document_id FROM documents WHERE id = ? AND related_document_id IS NOT NULL",
+      [id]
+    );
+
+    console.log(`[DEBUG] Parent query for ID ${id}:`, parentResult);
+
+    // Handle mariadb query result structure for parent
+    let parentId = null;
+    if (
+      Array.isArray(parentResult) &&
+      parentResult.length > 0 &&
+      parentResult[0]?.related_document_id
+    ) {
+      parentId = parentResult[0].related_document_id;
+    } else if (
+      parentResult &&
+      typeof parentResult === "object" &&
+      parentResult.related_document_id
+    ) {
+      parentId = parentResult.related_document_id;
+    }
+
+    if (parentId) {
+      console.log(
+        `[DEBUG] Found parent ID: ${parentId}, cancelling recursively`
+      );
+      await cancelRecursive(parentId);
+    } else {
+      console.log(`[DEBUG] No parent found for document ID: ${id}`);
+    }
+
+    // หาเอกสารลูก (children) และยกเลิก
+    const childrenResult = await conn.query(
+      "SELECT id FROM documents WHERE related_document_id = ?",
+      [id]
+    );
+
+    console.log(`[DEBUG] Children query for ID ${id}:`, childrenResult);
+
+    // Handle mariadb query result structure for children
+    let children = [];
+    if (Array.isArray(childrenResult)) {
+      children = childrenResult;
+    } else if (childrenResult && typeof childrenResult === "object") {
+      // If it's a single object, wrap it in an array
+      children = [childrenResult];
+    }
+
+    if (children.length > 0) {
+      console.log(
+        `[DEBUG] Found ${children.length} children for document ID: ${id}`
+      );
+      for (const child of children) {
+        if (child && typeof child === "object" && child.id) {
+          console.log(`[DEBUG] Cancelling child ID: ${child.id}`);
+          await cancelRecursive(child.id);
+        } else {
+          console.log(`[DEBUG] Skipping invalid child:`, child);
+        }
+      }
+    } else {
+      console.log(`[DEBUG] No children found for document ID: ${id}`);
+    }
+  }
+
+  console.log(
+    `[DEBUG] Starting recursive cancellation for document ID: ${documentId}`
+  );
+  await cancelRecursive(documentId);
+  console.log(
+    `[DEBUG] Recursive cancellation completed. Total cancelled: ${cancelledIds.length}`
+  );
+
+  return {
+    cancelledIds,
+    totalCancelled: cancelledIds.length,
+  };
+}
 
 app.get("/api/documents/:id", async (req, res) => {
   const { id } = req.params;
@@ -1156,11 +1322,20 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
       docData.document_type &&
       docData.document_type.toLowerCase() === "quotation"
     ) {
-      const [existing] = await conn.query(
+      const existing = await conn.query(
         `SELECT id FROM documents WHERE related_document_id = ? AND document_type = 'INVOICE'`,
         [id]
       );
+
+      // Handle mariadb query result structure
+      let hasExisting = false;
       if (Array.isArray(existing) && existing.length > 0) {
+        hasExisting = true;
+      } else if (existing && typeof existing === "object" && existing.id) {
+        hasExisting = true;
+      }
+
+      if (hasExisting) {
         await conn.rollback();
         return res.status(400).json({
           error:
@@ -1224,29 +1399,47 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
       }
 
       // ลบรายการกระแสเงินสดเก่าและหักยอดบัญชีธนาคาร
-      const [oldCashFlowRows] = await conn.query(
+      const oldCashFlowRows = await conn.query(
         "SELECT * FROM cash_flow WHERE document_id = ?",
         [id]
       );
       await conn.query("DELETE FROM cash_flow WHERE document_id = ?", [id]);
 
-      // หักยอดบัญชีธนาคารจากรายการเก่า
+      // Handle mariadb query result structure for oldCashFlowRows
+      let cashFlowRows = [];
       if (Array.isArray(oldCashFlowRows)) {
-        for (const oldEntry of oldCashFlowRows) {
+        cashFlowRows = oldCashFlowRows;
+      } else if (oldCashFlowRows && typeof oldCashFlowRows === "object") {
+        // If it's a single object, wrap it in an array
+        cashFlowRows = [oldCashFlowRows];
+      }
+
+      // หักยอดบัญชีธนาคารจากรายการเก่า
+      if (cashFlowRows.length > 0) {
+        for (const oldEntry of cashFlowRows) {
           if (oldEntry.bank_account_id && oldEntry.amount > 0) {
             const currentBalance = await conn.query(
               "SELECT current_balance FROM bank_accounts WHERE id = ?",
               [oldEntry.bank_account_id]
             );
-            if (Array.isArray(currentBalance) && currentBalance.length > 0) {
-              const balance = currentBalance[0].current_balance;
-              const newBalance = balance - Number(oldEntry.amount);
 
-              await conn.query(
-                "UPDATE bank_accounts SET current_balance = ? WHERE id = ?",
-                [newBalance, oldEntry.bank_account_id]
-              );
+            // Handle mariadb query result structure
+            let balance = 0;
+            if (Array.isArray(currentBalance) && currentBalance.length > 0) {
+              balance = Number(currentBalance[0].current_balance);
+            } else if (
+              currentBalance &&
+              typeof currentBalance === "object" &&
+              currentBalance.current_balance
+            ) {
+              balance = Number(currentBalance.current_balance);
             }
+            const newBalance = balance - Number(oldEntry.amount);
+
+            await conn.query(
+              "UPDATE bank_accounts SET current_balance = ? WHERE id = ?",
+              [newBalance, oldEntry.bank_account_id]
+            );
           }
         }
       }
@@ -1296,15 +1489,24 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
                 "SELECT current_balance FROM bank_accounts WHERE id = ?",
                 [channel.bankAccountId]
               );
-              if (Array.isArray(currentBalance) && currentBalance.length > 0) {
-                const balance = Number(currentBalance[0].current_balance);
-                const newBalance = balance + Number(channel.amount);
 
-                await conn.query(
-                  "UPDATE bank_accounts SET current_balance = ? WHERE id = ?",
-                  [newBalance, channel.bankAccountId]
-                );
+              // Handle mariadb query result structure
+              let balance = 0;
+              if (Array.isArray(currentBalance) && currentBalance.length > 0) {
+                balance = Number(currentBalance[0].current_balance);
+              } else if (
+                currentBalance &&
+                typeof currentBalance === "object" &&
+                currentBalance.current_balance
+              ) {
+                balance = Number(currentBalance.current_balance);
               }
+              const newBalance = balance + Number(channel.amount);
+
+              await conn.query(
+                "UPDATE bank_accounts SET current_balance = ? WHERE id = ?",
+                [newBalance, channel.bankAccountId]
+              );
             }
           }
         }

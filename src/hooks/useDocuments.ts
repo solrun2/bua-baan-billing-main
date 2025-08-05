@@ -62,7 +62,7 @@ export const useDocuments = (documentType: string) => {
         setLoading(true);
         setError(null);
         const data = await apiService.getDocuments();
-        const filteredData = data.filter(
+        const filteredData = data.documents.filter(
           (doc: any) => doc.document_type === documentType
         );
         setRawDocuments(filteredData);
@@ -89,18 +89,30 @@ export const useDocuments = (documentType: string) => {
     setFilters(newFilters);
   };
 
-  const handleDelete = async (id: string) => {
+  const handleCancel = async (id: string) => {
     // id ที่รับเข้ามาเป็น string
-    if (window.confirm("คุณต้องการลบเอกสารนี้ใช่หรือไม่?")) {
-      toast.promise(apiService.deleteDocument(id), {
-        loading: "กำลังลบ...",
-        success: () => {
+    if (
+      window.confirm(
+        "คุณต้องการยกเลิกเอกสารนี้ใช่หรือไม่?\n\nหมายเหตุ: การยกเลิกเอกสารลูกจะทำให้เอกสารแม่ถูกยกเลิกอัตโนมัติ"
+      )
+    ) {
+      toast.promise(apiService.cancelDocument(id), {
+        loading: "กำลังยกเลิก...",
+        success: (result) => {
+          // อัปเดตสถานะเอกสารใน state
           setRawDocuments((prev) =>
-            prev.filter((doc) => doc.id.toString() !== id)
+            prev.map((doc) =>
+              doc.id.toString() === id ? { ...doc, status: "ยกเลิก" } : doc
+            )
           );
-          return "ลบเอกสารเรียบร้อยแล้ว";
+
+          let message = "ยกเลิกเอกสารเรียบร้อยแล้ว";
+          if (result.relatedDocumentsCancelled > 0) {
+            message += ` (เอกสารที่เกี่ยวข้องถูกยกเลิก ${result.relatedDocumentsCancelled} รายการ)`;
+          }
+          return message;
         },
-        error: "เกิดข้อผิดพลาดในการลบ",
+        error: "เกิดข้อผิดพลาดในการยกเลิก",
       });
     }
   };
@@ -171,6 +183,6 @@ export const useDocuments = (documentType: string) => {
     handleSort,
     sortColumn,
     sortDirection,
-    handleDelete,
+    handleCancel,
   };
 };
