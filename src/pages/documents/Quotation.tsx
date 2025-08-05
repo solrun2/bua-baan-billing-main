@@ -152,7 +152,7 @@ const Quotation = () => {
       case "พ้นกำหนด":
         return "bg-red-100 text-yellow-700";
       case "ยกเลิก":
-        return "bg-gray-100 text-red-700";
+        return "bg-red-100 text-red-700";
       default:
         return "bg-gray-200 text-gray-800";
     }
