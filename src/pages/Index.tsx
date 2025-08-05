@@ -54,17 +54,14 @@ const Index = () => {
   useEffect(() => {
     const fetchRecentDocuments = async () => {
       try {
-        const docs = await apiService.getDocuments();
-        // เรียงตามวันที่สร้างใหม่ล่าสุด (issue_date หรือ updated_at ถ้ามี)
-        const sorted = docs
-          .sort((a: any, b: any) => {
-            const dateA = new Date(a.created_at).getTime();
-            const dateB = new Date(b.created_at).getTime();
-            return dateB - dateA;
-          })
-          .slice(0, 4);
+        const response = await apiService.getDocuments({
+          page: 1,
+          limit: 4,
+        });
+        const sorted = response.documents.slice(0, 4);
         setRecentDocuments(sorted);
       } catch (e) {
+        console.error("Error fetching recent documents:", e);
         setRecentDocuments([]);
       }
     };

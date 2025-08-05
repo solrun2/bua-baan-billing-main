@@ -82,7 +82,7 @@ const EditDocumentPage: React.FC = () => {
     if (!id) return;
     const checkRelated = async () => {
       const data = await apiService.getDocuments();
-      const relatedDocs = data.filter(
+      const relatedDocs = data.documents.filter(
         (doc: any) => String(doc.related_document_id) === String(id)
       );
       if (relatedDocs.length > 0) {
@@ -109,7 +109,7 @@ const EditDocumentPage: React.FC = () => {
       if (!location.state || !location.state.suppressToastSuccess) {
         toast.success("บันทึกเอกสารสำเร็จ");
       }
-      navigate(-1); 
+      navigate(-1);
     } catch (e) {
       toast.error("บันทึกเอกสารไม่สำเร็จ");
     }

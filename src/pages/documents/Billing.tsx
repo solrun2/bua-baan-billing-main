@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,12 +16,11 @@ import { toast } from "sonner";
 import BillingModal from "@/pages/sub/billing/BillingModal";
 import { formatCurrency } from "../../lib/utils";
 import DocumentFilter from "../../components/DocumentFilter";
-import { sortData } from "@/utils/sortUtils";
-import { searchData } from "@/utils/searchUtils";
-import { format, subDays } from "date-fns";
+import { format } from "date-fns";
 import { th } from "date-fns/locale";
 import { Skeleton } from "@/components/ui/skeleton";
-import { DOCUMENT_PAGE_SIZE } from "@/constants/documentPageSize";
+import { usePagination } from "@/hooks/usePagination";
+import { Pagination } from "@/components/ui/pagination";
 
 interface BillingItem {
   id: string;
@@ -36,9 +35,6 @@ interface BillingItem {
 
 const Billing = () => {
   const navigate = useNavigate();
-  const [billings, setBillings] = useState<BillingItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [selectedBilling, setSelectedBilling] = useState<any | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [filters, setFilters] = useState<{
@@ -50,75 +46,37 @@ const Billing = () => {
   const [sortColumn, setSortColumn] = useState<string>("dateValue");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
 
-  // 1. useMemo ก่อน
-  const filteredAndSortedBillings = useMemo(() => {
-    let result = searchData(billings, searchText, ["number", "customer"]);
-    result = result.filter((item) => {
-      const isStatusMatch =
-        !filters.status ||
-        filters.status === "all" ||
-        item.status === filters.status;
-      if (!isStatusMatch) return false;
-      const docDate = item.documentDate;
-      let adjustedDateFrom = filters.dateFrom;
-      if (filters.dateFrom) {
-        const fromDate = new Date(filters.dateFrom);
-        const prevDay = subDays(fromDate, 1);
-        adjustedDateFrom = format(prevDay, "yyyy-MM-dd");
-      }
-      const isAfterFrom =
-        !adjustedDateFrom || !docDate || docDate > adjustedDateFrom;
-      const isBeforeTo =
-        !filters.dateTo || !docDate || docDate <= filters.dateTo;
-      return isAfterFrom && isBeforeTo;
-    });
-    return sortData(result, sortColumn as keyof BillingItem, sortDirection);
-  }, [billings, searchText, filters, sortColumn, sortDirection]);
+  // Use pagination hook
+  const {
+    data: billings,
+    loading,
+    error,
+    page,
+    totalPages,
+    totalCount,
+    setPage,
+    refresh,
+  } = usePagination<any>("BILLING", filters, searchText);
 
-  // 2. pagination
-  const [page, setPage] = useState(1);
-  const pageSize = DOCUMENT_PAGE_SIZE;
-  const totalPages = Math.ceil(filteredAndSortedBillings.length / pageSize);
-  const pagedData = useMemo(() => {
-    const start = (page - 1) * pageSize;
-    return filteredAndSortedBillings.slice(start, start + pageSize);
-  }, [filteredAndSortedBillings, page]);
-
-  useEffect(() => {
-    const loadBillings = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const data = await apiService.getDocuments();
-        const billingData = data
-          .filter((doc: any) => doc.document_type === "BILLING")
-          .map((doc: any): BillingItem => {
-            const issueDate = new Date(doc.issue_date);
-            // คำนวณยอดสุทธิหลังหัก ณ ที่จ่าย
-            const netTotal =
-              doc.summary && typeof doc.summary.total === "number"
-                ? doc.summary.total - (doc.summary.withholdingTax ?? 0)
-                : (doc.total_amount ?? 0);
-            return {
-              id: doc.id,
-              number: doc.document_number,
-              customer: doc.customer_name,
-              date: format(issueDate, "d MMM yy", { locale: th }),
-              dateValue: issueDate.getTime(),
-              netTotal,
-              status: doc.status,
-              documentDate: format(issueDate, "yyyy-MM-dd"),
-            };
-          });
-        setBillings(billingData);
-      } catch (err) {
-        setError("ไม่สามารถโหลดข้อมูลได้");
-      } finally {
-        setLoading(false);
-      }
+  // Transform data to BillingItem format
+  const billingItems: BillingItem[] = billings.map((doc: any): BillingItem => {
+    const issueDate = new Date(doc.issue_date);
+    // คำนวณยอดสุทธิหลังหัก ณ ที่จ่าย
+    const netTotal =
+      doc.summary && typeof doc.summary.total === "number"
+        ? doc.summary.total - (doc.summary.withholdingTax ?? 0)
+        : (doc.total_amount ?? 0);
+    return {
+      id: doc.id,
+      number: doc.document_number,
+      customer: doc.customer_name,
+      date: format(issueDate, "d MMM yy", { locale: th }),
+      dateValue: issueDate.getTime(),
+      netTotal,
+      status: doc.status,
+      documentDate: format(issueDate, "yyyy-MM-dd"),
     };
-    loadBillings();
-  }, []);
+  });
 
   const handleSort = (column: string) => {
     if (sortColumn === column)
@@ -137,7 +95,7 @@ const Billing = () => {
       toast.promise(apiService.deleteDocument(id), {
         loading: "กำลังลบ...",
         success: () => {
-          setBillings((prev) => prev.filter((item) => item.id !== id));
+          refresh();
           return "ลบใบวางบิลเรียบร้อยแล้ว";
         },
         error: "เกิดข้อผิดพลาดในการลบ",
@@ -226,8 +184,8 @@ const Billing = () => {
               filters.dateFrom ||
               filters.dateTo ||
               searchText
-                ? `พบ ${filteredAndSortedBillings.length} ฉบับ จากทั้งหมด ${billings.length} ฉบับ`
-                : `${billings.length} ฉบับ`}
+                ? `พบ ${totalCount} ฉบับ`
+                : `${totalCount} ฉบับ`}
             </div>
           </div>
         </CardHeader>
@@ -270,7 +228,7 @@ const Billing = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {pagedData.length === 0 ? (
+                  {billingItems.length === 0 ? (
                     <tr>
                       <td
                         colSpan={6}
@@ -284,7 +242,7 @@ const Billing = () => {
                       </td>
                     </tr>
                   ) : (
-                    pagedData.map((item) => (
+                    billingItems.map((item) => (
                       <tr
                         key={item.id}
                         className="border-b border-border/40 hover:bg-muted/30 transition-colors"
@@ -352,33 +310,12 @@ const Billing = () => {
         />
       )}
 
-      <div className="flex justify-center mt-4 gap-1">
-        <button
-          onClick={() => setPage(page - 1)}
-          disabled={page === 1}
-          className="px-2"
-        >
-          ก่อนหน้า
-        </button>
-        {Array.from({ length: totalPages }, (_, i) => i + 1)
-          .filter((i) => i === 1 || i === totalPages || Math.abs(i - page) <= 2)
-          .map((i) => (
-            <button
-              key={i}
-              onClick={() => setPage(i)}
-              className={`px-2 ${page === i ? "font-bold underline" : ""}`}
-            >
-              {i}
-            </button>
-          ))}
-        <button
-          onClick={() => setPage(page + 1)}
-          disabled={page === totalPages}
-          className="px-2"
-        >
-          ถัดไป
-        </button>
-      </div>
+      <Pagination
+        page={page}
+        totalPages={totalPages}
+        onPageChange={setPage}
+        className="mt-4"
+      />
     </div>
   );
 };

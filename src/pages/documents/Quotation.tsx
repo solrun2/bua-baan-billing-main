@@ -20,7 +20,8 @@ import { searchData } from "@/utils/searchUtils";
 import { format } from "date-fns";
 import { th } from "date-fns/locale";
 import { Skeleton } from "@/components/ui/skeleton";
-import { DOCUMENT_PAGE_SIZE } from "@/constants/documentPageSize";
+import { usePagination } from "@/hooks/usePagination";
+import { Pagination } from "@/components/ui/pagination";
 
 interface QuotationItem {
   id: string;
@@ -37,9 +38,6 @@ interface QuotationItem {
 
 const Quotation = () => {
   const navigate = useNavigate();
-  const [quotations, setQuotations] = useState<QuotationItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [selectedQuotation, setSelectedQuotation] = useState<any | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [filters, setFilters] = useState<{
@@ -51,75 +49,52 @@ const Quotation = () => {
   const [sortColumn, setSortColumn] = useState<string>("dateValue");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
 
-  // 1. useMemo ก่อน
-  const filteredAndSortedQuotations = useMemo(() => {
-    let result = searchData(quotations, searchText, ["number", "customer"]);
-    result = result.filter((q) => {
-      const isStatusMatch =
-        !filters.status ||
-        filters.status === "all" ||
-        q.status === filters.status;
-      if (!isStatusMatch) return false;
-      const docDate = q.documentDate;
-      const isAfterFrom =
-        !filters.dateFrom || !docDate || docDate >= filters.dateFrom;
-      const isBeforeTo =
-        !filters.dateTo || !docDate || docDate <= filters.dateTo;
-      return isAfterFrom && isBeforeTo;
+  // ใช้ usePagination hook สำหรับ server-side pagination
+  const {
+    data: quotations,
+    loading,
+    error,
+    page,
+    totalPages,
+    totalCount,
+    setPage,
+    refresh,
+  } = usePagination<any>("QUOTATION", filters, searchText);
+
+  // แปลงข้อมูล quotations เป็น QuotationItem format
+  const quotationItems = useMemo(() => {
+    return quotations.map((doc: any): QuotationItem => {
+      const issueDate = new Date(doc.issue_date);
+      const validUntilDate = doc.valid_until ? new Date(doc.valid_until) : null;
+      const netTotal =
+        doc.summary && typeof doc.summary.netTotalAmount === "number"
+          ? doc.summary.netTotalAmount
+          : (doc.total_amount ?? 0);
+      return {
+        id: doc.id,
+        number: doc.document_number,
+        customer: doc.customer_name,
+        date: format(issueDate, "d MMM yy", { locale: th }),
+        dateValue: issueDate.getTime(),
+        validUntil: validUntilDate
+          ? format(validUntilDate, "d MMM yy", { locale: th })
+          : "-",
+        validUntilValue: validUntilDate?.getTime() || 0,
+        netTotal,
+        status: doc.status,
+        documentDate: format(issueDate, "yyyy-MM-dd"),
+      };
     });
-    return sortData(result, sortColumn as keyof QuotationItem, sortDirection);
-  }, [quotations, searchText, filters, sortColumn, sortDirection]);
+  }, [quotations]);
 
-  // 2. pagination
-  const [page, setPage] = useState(1);
-  const pageSize = DOCUMENT_PAGE_SIZE;
-  const totalPages = Math.ceil(filteredAndSortedQuotations.length / pageSize);
-  const pagedData = useMemo(() => {
-    const start = (page - 1) * pageSize;
-    return filteredAndSortedQuotations.slice(start, start + pageSize);
-  }, [filteredAndSortedQuotations, page]);
-
-  useEffect(() => {
-    const loadQuotations = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const data = await apiService.getDocuments();
-        const quotationsData = data
-          .filter((doc) => doc.document_type === "QUOTATION")
-          .map((doc: any): QuotationItem => {
-            const issueDate = new Date(doc.issue_date);
-            const validUntilDate = doc.valid_until
-              ? new Date(doc.valid_until)
-              : null;
-            const netTotal =
-              doc.summary && typeof doc.summary.netTotalAmount === "number"
-                ? doc.summary.netTotalAmount
-                : (doc.total_amount ?? 0);
-            return {
-              id: doc.id,
-              number: doc.document_number,
-              customer: doc.customer_name,
-              date: format(issueDate, "d MMM yy", { locale: th }),
-              dateValue: issueDate.getTime(),
-              validUntil: validUntilDate
-                ? format(validUntilDate, "d MMM yy", { locale: th })
-                : "-",
-              validUntilValue: validUntilDate?.getTime() || 0,
-              netTotal,
-              status: doc.status,
-              documentDate: format(issueDate, "yyyy-MM-dd"),
-            };
-          });
-        setQuotations(quotationsData);
-      } catch (err) {
-        setError("ไม่สามารถโหลดข้อมูลได้");
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadQuotations();
-  }, []);
+  // Sort the quotation items
+  const sortedQuotationItems = useMemo(() => {
+    return sortData(
+      quotationItems,
+      sortColumn as keyof QuotationItem,
+      sortDirection
+    );
+  }, [quotationItems, sortColumn, sortDirection]);
 
   const handleSort = (column: string) => {
     if (sortColumn === column)
@@ -138,7 +113,7 @@ const Quotation = () => {
       toast.promise(apiService.deleteDocument(id), {
         loading: "กำลังลบ...",
         success: () => {
-          setQuotations((prev) => prev.filter((q) => q.id !== id));
+          refresh(); // Refresh data after deletion
           return "ลบใบเสนอราคาเรียบร้อยแล้ว";
         },
         error: "เกิดข้อผิดพลาดในการลบ",
@@ -233,8 +208,8 @@ const Quotation = () => {
               filters.dateFrom ||
               filters.dateTo ||
               searchText
-                ? `พบ ${filteredAndSortedQuotations.length} ฉบับ จากทั้งหมด ${quotations.length} ฉบับ`
-                : `${quotations.length} ฉบับ`}
+                ? `พบ ${sortedQuotationItems.length} ฉบับ จากทั้งหมด ${totalCount} ฉบับ`
+                : `${totalCount} ฉบับ`}
             </div>
           </div>
         </CardHeader>
@@ -278,7 +253,7 @@ const Quotation = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {pagedData.length === 0 ? (
+                  {sortedQuotationItems.length === 0 ? (
                     <tr>
                       <td
                         colSpan={7}
@@ -292,7 +267,7 @@ const Quotation = () => {
                       </td>
                     </tr>
                   ) : (
-                    pagedData.map((q) => (
+                    sortedQuotationItems.map((q) => (
                       <tr
                         key={q.id}
                         className="border-b border-border/40 hover:bg-muted/30 transition-colors"
@@ -356,35 +331,6 @@ const Quotation = () => {
         </CardContent>
       </Card>
 
-      {/* เพิ่ม Pagination UI ด้านล่างตาราง */}
-      <div className="flex justify-center mt-4 gap-1">
-        <button
-          onClick={() => setPage(page - 1)}
-          disabled={page === 1}
-          className="px-2"
-        >
-          ก่อนหน้า
-        </button>
-        {Array.from({ length: totalPages }, (_, i) => i + 1)
-          .filter((i) => i === 1 || i === totalPages || Math.abs(i - page) <= 2)
-          .map((i) => (
-            <button
-              key={i}
-              onClick={() => setPage(i)}
-              className={`px-2 ${page === i ? "font-bold underline" : ""}`}
-            >
-              {i}
-            </button>
-          ))}
-        <button
-          onClick={() => setPage(page + 1)}
-          disabled={page === totalPages}
-          className="px-2"
-        >
-          ถัดไป
-        </button>
-      </div>
-
       {isModalOpen && selectedQuotation && (
         <QuotationModal
           open={isModalOpen}
@@ -392,6 +338,13 @@ const Quotation = () => {
           quotation={selectedQuotation}
         />
       )}
+
+      <Pagination
+        page={page}
+        totalPages={totalPages}
+        onPageChange={setPage}
+        className="mt-4"
+      />
     </div>
   );
 };

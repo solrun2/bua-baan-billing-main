@@ -21,7 +21,8 @@ import { searchData } from "@/utils/searchUtils";
 import { format, subDays } from "date-fns";
 import { th } from "date-fns/locale";
 import { Skeleton } from "@/components/ui/skeleton";
-import { DOCUMENT_PAGE_SIZE } from "@/constants/documentPageSize";
+import { usePagination } from "@/hooks/usePagination";
+import { Pagination } from "@/components/ui/pagination";
 
 interface ReceiptItem {
   id: string;
@@ -36,9 +37,6 @@ interface ReceiptItem {
 
 const Receipt = () => {
   const navigate = useNavigate();
-  const [receipts, setReceipts] = useState<ReceiptItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [selectedReceipt, setSelectedReceipt] = useState<any | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [filters, setFilters] = useState<{
@@ -50,84 +48,48 @@ const Receipt = () => {
   const [sortColumn, setSortColumn] = useState<string>("dateValue");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
 
-  // 1. useMemo ก่อน
-  const filteredAndSortedReceipts = useMemo(() => {
-    let result = searchData(receipts, searchText, ["number", "customer"]);
-    result = result.filter((item) => {
-      const isStatusMatch =
-        !filters.status ||
-        filters.status === "all" ||
-        item.status === filters.status;
-      if (!isStatusMatch) return false;
-      const docDate = item.documentDate;
-      let adjustedDateFrom = filters.dateFrom;
-      if (filters.dateFrom) {
-        const fromDate = new Date(filters.dateFrom);
-        const prevDay = subDays(fromDate, 1);
-        adjustedDateFrom = format(prevDay, "yyyy-MM-dd");
-      }
-      const isAfterFrom =
-        !adjustedDateFrom || !docDate || docDate > adjustedDateFrom;
-      const isBeforeTo =
-        !filters.dateTo || !docDate || docDate <= filters.dateTo;
-      return isAfterFrom && isBeforeTo;
+  // ใช้ usePagination hook สำหรับ server-side pagination
+  const {
+    data: receipts,
+    loading,
+    error,
+    page,
+    totalPages,
+    totalCount,
+    setPage,
+    refresh,
+  } = usePagination<any>("RECEIPT", filters, searchText);
+
+  // แปลงข้อมูล receipts เป็น ReceiptItem format
+  const receiptItems = useMemo(() => {
+    return receipts.map((doc: any): ReceiptItem => {
+      const issueDate = new Date(doc.issue_date);
+      // คำนวณยอดสุทธิหลังหัก ณ ที่จ่าย
+      const netTotal =
+        doc.summary && typeof doc.summary.total === "number"
+          ? doc.summary.total - (doc.summary.withholdingTax ?? 0)
+          : (doc.total_amount ?? 0);
+      return {
+        id: doc.id,
+        number: doc.document_number,
+        customer: doc.customer_name,
+        date: format(issueDate, "d MMM yy", { locale: th }),
+        dateValue: issueDate.getTime(),
+        netTotal,
+        status: doc.status,
+        documentDate: format(issueDate, "yyyy-MM-dd"),
+      };
     });
-    return sortData(result, sortColumn as keyof ReceiptItem, sortDirection);
-  }, [receipts, searchText, filters, sortColumn, sortDirection]);
+  }, [receipts]);
 
-  // 2. pagination
-  const [page, setPage] = useState(1);
-  const pageSize = DOCUMENT_PAGE_SIZE;
-  const totalPages = Math.ceil(filteredAndSortedReceipts.length / pageSize);
-  const pagedData = useMemo(() => {
-    const start = (page - 1) * pageSize;
-    return filteredAndSortedReceipts.slice(start, start + pageSize);
-  }, [filteredAndSortedReceipts, page]);
-
-  useEffect(() => {
-    const loadReceipts = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const data = await apiService.getDocuments();
-        console.log(
-          "[DEBUG] loadReceipts - all documents:",
-          data.map((doc) => ({
-            id: doc.id,
-            document_number: doc.document_number,
-            document_type: doc.document_type,
-          }))
-        );
-
-        const receiptsData = data
-          .filter((doc) => doc.document_type === "RECEIPT")
-          .map((doc: any): ReceiptItem => {
-            const issueDate = new Date(doc.issue_date);
-            // คำนวณยอดสุทธิหลังหัก ณ ที่จ่าย
-            const netTotal =
-              doc.summary && typeof doc.summary.total === "number"
-                ? doc.summary.total - (doc.summary.withholdingTax ?? 0)
-                : (doc.total_amount ?? 0);
-            return {
-              id: doc.id,
-              number: doc.document_number,
-              customer: doc.customer_name,
-              date: format(issueDate, "d MMM yy", { locale: th }),
-              dateValue: issueDate.getTime(),
-              netTotal,
-              status: doc.status,
-              documentDate: format(issueDate, "yyyy-MM-dd"),
-            };
-          });
-        setReceipts(receiptsData);
-      } catch (err) {
-        setError("ไม่สามารถโหลดข้อมูลได้");
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadReceipts();
-  }, []);
+  // Sort the receipt items
+  const sortedReceiptItems = useMemo(() => {
+    return sortData(
+      receiptItems,
+      sortColumn as keyof ReceiptItem,
+      sortDirection
+    );
+  }, [receiptItems, sortColumn, sortDirection]);
 
   const handleSort = (column: string) => {
     if (sortColumn === column)
@@ -151,7 +113,7 @@ const Receipt = () => {
       toast.promise(apiService.deleteDocument(id), {
         loading: "กำลังลบ...",
         success: () => {
-          setReceipts((prev) => prev.filter((item) => item.id !== id));
+          refresh(); // Refresh data after deletion
           return "ลบใบเสร็จรับเงินเรียบร้อยแล้ว";
         },
         error: "เกิดข้อผิดพลาดในการลบ",
@@ -250,8 +212,8 @@ const Receipt = () => {
               filters.dateFrom ||
               filters.dateTo ||
               searchText
-                ? `พบ ${filteredAndSortedReceipts.length} ฉบับ จากทั้งหมด ${receipts.length} ฉบับ`
-                : `${receipts.length} ฉบับ`}
+                ? `พบ ${sortedReceiptItems.length} ฉบับ จากทั้งหมด ${totalCount} ฉบับ`
+                : `${totalCount} ฉบับ`}
             </div>
           </div>
         </CardHeader>
@@ -294,7 +256,7 @@ const Receipt = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {pagedData.length === 0 ? (
+                  {sortedReceiptItems.length === 0 ? (
                     <tr>
                       <td
                         colSpan={6}
@@ -308,7 +270,7 @@ const Receipt = () => {
                       </td>
                     </tr>
                   ) : (
-                    pagedData.map((item) => (
+                    sortedReceiptItems.map((item) => (
                       <tr
                         key={item.id}
                         className="border-b border-border/40 hover:bg-muted/30 transition-colors"
@@ -376,33 +338,12 @@ const Receipt = () => {
         />
       )}
 
-      <div className="flex justify-center mt-4 gap-1">
-        <button
-          onClick={() => setPage(page - 1)}
-          disabled={page === 1}
-          className="px-2"
-        >
-          ก่อนหน้า
-        </button>
-        {Array.from({ length: totalPages }, (_, i) => i + 1)
-          .filter((i) => i === 1 || i === totalPages || Math.abs(i - page) <= 2)
-          .map((i) => (
-            <button
-              key={i}
-              onClick={() => setPage(i)}
-              className={`px-2 ${page === i ? "font-bold underline" : ""}`}
-            >
-              {i}
-            </button>
-          ))}
-        <button
-          onClick={() => setPage(page + 1)}
-          disabled={page === totalPages}
-          className="px-2"
-        >
-          ถัดไป
-        </button>
-      </div>
+      <Pagination
+        page={page}
+        totalPages={totalPages}
+        onPageChange={setPage}
+        className="mt-4"
+      />
     </div>
   );
 };

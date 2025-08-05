@@ -21,7 +21,8 @@ import { searchData } from "@/utils/searchUtils";
 import { format, subDays } from "date-fns";
 import { th } from "date-fns/locale";
 import { Skeleton } from "@/components/ui/skeleton";
-import { DOCUMENT_PAGE_SIZE } from "@/constants/documentPageSize";
+import { usePagination } from "@/hooks/usePagination";
+import { Pagination } from "@/components/ui/pagination";
 
 interface PurchaseOrderItem {
   id: string;
@@ -36,9 +37,6 @@ interface PurchaseOrderItem {
 
 const PurchaseOrder = () => {
   const navigate = useNavigate();
-  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrderItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [selectedPO, setSelectedPO] = useState<any | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [filters, setFilters] = useState<{
@@ -49,77 +47,44 @@ const PurchaseOrder = () => {
   const [searchText, setSearchText] = useState("");
   const [sortColumn, setSortColumn] = useState<string>("dateValue");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
-  const filteredAndSortedPOs = useMemo(() => {
-    let result = searchData(purchaseOrders, searchText, ["number", "vendor"]);
 
-    result = result.filter((item) => {
-      const isStatusMatch =
-        !filters.status ||
-        filters.status === "all" ||
-        item.status === filters.status;
-      if (!isStatusMatch) return false;
+  // ใช้ usePagination hook สำหรับ server-side pagination
+  const {
+    data: purchaseOrders,
+    loading,
+    error,
+    page,
+    totalPages,
+    totalCount,
+    setPage,
+    refresh,
+  } = usePagination<any>("PURCHASE_ORDER", filters, searchText);
 
-      const docDate = item.documentDate;
-
-      let adjustedDateFrom = filters.dateFrom;
-      if (filters.dateFrom) {
-        const fromDate = new Date(filters.dateFrom);
-        const prevDay = subDays(fromDate, 1);
-        adjustedDateFrom = format(prevDay, "yyyy-MM-dd");
-      }
-
-      const isAfterFrom =
-        !adjustedDateFrom || !docDate || docDate > adjustedDateFrom;
-      const isBeforeTo =
-        !filters.dateTo || !docDate || docDate <= filters.dateTo;
-      return isAfterFrom && isBeforeTo;
+  // แปลงข้อมูล purchaseOrders เป็น PurchaseOrderItem format
+  const purchaseOrderItems = useMemo(() => {
+    return purchaseOrders.map((doc: any): PurchaseOrderItem => {
+      const issueDate = new Date(doc.issue_date);
+      return {
+        id: doc.id,
+        number: doc.document_number,
+        vendor: doc.vendor_name, // Changed property
+        date: format(issueDate, "d MMM yy", { locale: th }),
+        dateValue: issueDate.getTime(),
+        netTotal: doc.summary?.netTotalAmount ?? Number(doc.total_amount ?? 0),
+        status: doc.status,
+        documentDate: format(issueDate, "yyyy-MM-dd"),
+      };
     });
+  }, [purchaseOrders]);
 
+  // Sort the purchase order items
+  const sortedPurchaseOrderItems = useMemo(() => {
     return sortData(
-      result,
+      purchaseOrderItems,
       sortColumn as keyof PurchaseOrderItem,
       sortDirection
     );
-  }, [purchaseOrders, searchText, filters, sortColumn, sortDirection]);
-  const [page, setPage] = useState(1);
-  const pageSize = DOCUMENT_PAGE_SIZE;
-  const totalPages = Math.ceil(filteredAndSortedPOs.length / pageSize);
-  const pagedData = useMemo(() => {
-    const start = (page - 1) * pageSize;
-    return filteredAndSortedPOs.slice(start, start + pageSize);
-  }, [filteredAndSortedPOs, page]);
-
-  useEffect(() => {
-    const loadPurchaseOrders = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const data = await apiService.getDocuments();
-        const poData = data
-          .filter((doc: any) => doc.document_type === "PURCHASE_ORDER")
-          .map((doc: any): PurchaseOrderItem => {
-            const issueDate = new Date(doc.issue_date);
-            return {
-              id: doc.id,
-              number: doc.document_number,
-              vendor: doc.vendor_name, // Changed property
-              date: format(issueDate, "d MMM yy", { locale: th }),
-              dateValue: issueDate.getTime(),
-              netTotal:
-                doc.summary?.netTotalAmount ?? Number(doc.total_amount ?? 0),
-              status: doc.status,
-              documentDate: format(issueDate, "yyyy-MM-dd"),
-            };
-          });
-        setPurchaseOrders(poData);
-      } catch (err) {
-        setError("ไม่สามารถโหลดข้อมูลได้");
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadPurchaseOrders();
-  }, []);
+  }, [purchaseOrderItems, sortColumn, sortDirection]);
 
   const handleSort = (column: string) => {
     if (sortColumn === column)
@@ -138,7 +103,7 @@ const PurchaseOrder = () => {
       toast.promise(apiService.deleteDocument(id), {
         loading: "กำลังลบ...",
         success: () => {
-          setPurchaseOrders((prev) => prev.filter((item) => item.id !== id));
+          refresh(); // Refresh data after deletion
           return "ลบใบสั่งซื้อเรียบร้อยแล้ว";
         },
         error: "เกิดข้อผิดพลาดในการลบ",
@@ -227,8 +192,8 @@ const PurchaseOrder = () => {
               filters.dateFrom ||
               filters.dateTo ||
               searchText
-                ? `พบ ${filteredAndSortedPOs.length} ฉบับ จากทั้งหมด ${purchaseOrders.length} ฉบับ`
-                : `${purchaseOrders.length} ฉบับ`}
+                ? `พบ ${sortedPurchaseOrderItems.length} ฉบับ จากทั้งหมด ${totalCount} ฉบับ`
+                : `${totalCount} ฉบับ`}
             </div>
           </div>
         </CardHeader>
@@ -271,7 +236,7 @@ const PurchaseOrder = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {pagedData.length === 0 ? (
+                  {sortedPurchaseOrderItems.length === 0 ? (
                     <tr>
                       <td
                         colSpan={6}
@@ -285,7 +250,7 @@ const PurchaseOrder = () => {
                       </td>
                     </tr>
                   ) : (
-                    pagedData.map((item) => (
+                    sortedPurchaseOrderItems.map((item) => (
                       <tr
                         key={item.id}
                         className="border-b border-border/40 hover:bg-muted/30 transition-colors"
@@ -353,33 +318,12 @@ const PurchaseOrder = () => {
         />
       )}
 
-      <div className="flex justify-center mt-4 gap-1">
-        <button
-          onClick={() => setPage(page - 1)}
-          disabled={page === 1}
-          className="px-2"
-        >
-          ก่อนหน้า
-        </button>
-        {Array.from({ length: totalPages }, (_, i) => i + 1)
-          .filter((i) => i === 1 || i === totalPages || Math.abs(i - page) <= 2)
-          .map((i) => (
-            <button
-              key={i}
-              onClick={() => setPage(i)}
-              className={`px-2 ${page === i ? "font-bold underline" : ""}`}
-            >
-              {i}
-            </button>
-          ))}
-        <button
-          onClick={() => setPage(page + 1)}
-          disabled={page === totalPages}
-          className="px-2"
-        >
-          ถัดไป
-        </button>
-      </div>
+      <Pagination
+        page={page}
+        totalPages={totalPages}
+        onPageChange={setPage}
+        className="mt-4"
+      />
     </div>
   );
 };

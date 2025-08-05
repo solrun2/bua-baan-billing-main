@@ -6,15 +6,51 @@ const API_BASE_URL = "http://localhost:3001/api";
 
 // ... (โค้ดส่วนอื่นๆ ของไฟล์ apiService.ts ยังคงเหมือนเดิม)
 
-const getDocuments = async (): Promise<Document[]> => {
+interface PaginationParams {
+  page?: number;
+  limit?: number;
+  document_type?: string;
+  status?: string;
+  search?: string;
+  dateFrom?: string;
+  dateTo?: string;
+}
+
+interface PaginationResponse {
+  documents: Document[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+const getDocuments = async (
+  params?: PaginationParams
+): Promise<PaginationResponse> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/documents`);
+    const queryParams = new URLSearchParams();
+    if (params) {
+      if (params.page) queryParams.append("page", params.page.toString());
+      if (params.limit) queryParams.append("limit", params.limit.toString());
+      if (params.document_type)
+        queryParams.append("document_type", params.document_type);
+      if (params.status) queryParams.append("status", params.status);
+      if (params.search) queryParams.append("search", params.search);
+      if (params.dateFrom) queryParams.append("dateFrom", params.dateFrom);
+      if (params.dateTo) queryParams.append("dateTo", params.dateTo);
+    }
+
+    const url = `${API_BASE_URL}/documents${queryParams.toString() ? `?${queryParams.toString()}` : ""}`;
+    const response = await fetch(url);
     if (!response.ok) {
       throw new Error("Failed to fetch documents");
     }
     const data = await response.json();
-    if (!Array.isArray(data)) {
-      console.error("API response for documents is not an array:", data);
+
+    if (!data.documents || !Array.isArray(data.documents)) {
+      console.error("API response for documents is invalid:", data);
       throw new Error("Received invalid data format for documents.");
     }
     return data;

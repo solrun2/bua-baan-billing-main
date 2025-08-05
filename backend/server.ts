@@ -314,9 +314,67 @@ app.put("/api/products/:id", async (req: Request, res: Response) => {
   }
 });
 
-// Endpoint to get all documents
+// Endpoint to get all documents with pagination
 app.get("/api/documents", async (req: Request, res: Response) => {
   try {
+    const {
+      page = 1,
+      limit = 7,
+      document_type,
+      status,
+      search,
+      dateFrom,
+      dateTo,
+    } = req.query;
+    const offset = (Number(page) - 1) * Number(limit);
+
+    // Build WHERE clause for filtering
+    let whereConditions = [];
+    let params: any[] = [];
+
+    if (document_type && document_type !== "all") {
+      whereConditions.push("d.document_type = ?");
+      params.push(document_type);
+    }
+
+    if (status && status !== "all") {
+      whereConditions.push("d.status = ?");
+      params.push(status);
+    }
+
+    if (search) {
+      whereConditions.push(
+        "(d.document_number LIKE ? OR d.customer_name LIKE ?)"
+      );
+      params.push(`%${search}%`, `%${search}%`);
+    }
+
+    // Add date range filtering
+    if (dateFrom) {
+      whereConditions.push("d.issue_date >= ?");
+      params.push(dateFrom);
+    }
+
+    if (dateTo) {
+      whereConditions.push("d.issue_date <= ?");
+      params.push(dateTo);
+    }
+
+    const whereClause =
+      whereConditions.length > 0
+        ? `WHERE ${whereConditions.join(" AND ")}`
+        : "";
+
+    // Get total count for pagination
+    const countQuery = `
+      SELECT COUNT(*) as total
+      FROM documents d
+      ${whereClause}
+    `;
+    const countResult = await pool.query(countQuery, params);
+    const totalCount = Number(countResult[0].total);
+
+    // Get paginated data
     const query = `
       SELECT 
         d.*,
@@ -332,9 +390,14 @@ app.get("/api/documents", async (req: Request, res: Response) => {
       LEFT JOIN quotation_details qd ON d.id = qd.document_id
       LEFT JOIN invoice_details id ON d.id = id.document_id
       LEFT JOIN receipt_details rd ON d.id = rd.document_id
-      ORDER BY d.issue_date DESC, d.id DESC
+      ${whereClause}
+      ORDER BY d.created_at DESC, d.id DESC
+      LIMIT ? OFFSET ?
     `;
-    const rows = await pool.query(query);
+
+    const queryParams = [...params, Number(limit), offset];
+    const rows = await pool.query(query, queryParams);
+
     const docIds = Array.isArray(rows) ? rows.map((doc: any) => doc.id) : [];
     let itemsByDoc: Record<number, any[]> = {};
     if (docIds.length > 0) {
@@ -377,7 +440,16 @@ app.get("/api/documents", async (req: Request, res: Response) => {
         receipt_details,
       };
     });
-    res.json(docsWithItems);
+
+    res.json({
+      documents: docsWithItems,
+      pagination: {
+        page: Number(page),
+        limit: Number(limit),
+        total: totalCount,
+        totalPages: Math.ceil(totalCount / Number(limit)),
+      },
+    });
   } catch (err) {
     console.error("Failed to fetch documents:", err);
     res.status(500).json({ error: "Failed to fetch documents" });
@@ -867,7 +939,7 @@ app.delete("/api/documents/:id", async (req: Request, res: Response) => {
       [id]
     );
 
-    if (deleteResult.affectedRows === 0) {
+    if (Number(deleteResult.affectedRows) === 0) {
       await conn.rollback();
       return res.status(404).json({ error: "Document not found." });
     }
@@ -1131,7 +1203,7 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
         "UPDATE invoice_details SET due_date = ? WHERE document_id = ?",
         [due_date, id]
       );
-      if (result.affectedRows === 0) {
+      if (Number(result.affectedRows) === 0) {
         await conn.query(
           "INSERT INTO invoice_details (document_id, due_date) VALUES (?, ?)",
           [id, due_date]

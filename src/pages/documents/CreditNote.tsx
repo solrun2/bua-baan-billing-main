@@ -21,7 +21,8 @@ import { searchData } from "@/utils/searchUtils";
 import { format, subDays } from "date-fns"; // ✨ import subDays
 import { th } from "date-fns/locale";
 import { Skeleton } from "@/components/ui/skeleton";
-import { DOCUMENT_PAGE_SIZE } from "@/constants/documentPageSize";
+import { usePagination } from "@/hooks/usePagination";
+import { Pagination } from "@/components/ui/pagination";
 
 interface CreditNoteItem {
   id: string;
@@ -36,9 +37,6 @@ interface CreditNoteItem {
 
 const CreditNote = () => {
   const navigate = useNavigate();
-  const [creditNotes, setCreditNotes] = useState<CreditNoteItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [selectedCreditNote, setSelectedCreditNote] = useState<any | null>(
     null
   );
@@ -52,79 +50,44 @@ const CreditNote = () => {
   const [sortColumn, setSortColumn] = useState<string>("dateValue");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
 
-  // ย้าย useMemo ขึ้นก่อน
-  const filteredAndSortedCreditNotes = useMemo(() => {
-    let result = searchData(creditNotes, searchText, ["number", "customer"]);
+  // ใช้ usePagination hook สำหรับ server-side pagination
+  const {
+    data: creditNotes,
+    loading,
+    error,
+    page,
+    totalPages,
+    totalCount,
+    setPage,
+    refresh
+  } = usePagination<any>("CREDIT_NOTE", filters, searchText);
 
-    result = result.filter((item) => {
-      const isStatusMatch =
-        !filters.status ||
-        filters.status === "all" ||
-        item.status === filters.status;
-      if (!isStatusMatch) return false;
-
-      const docDate = item.documentDate;
-
-      let adjustedDateFrom = filters.dateFrom;
-      if (filters.dateFrom) {
-        const fromDate = new Date(filters.dateFrom);
-        const prevDay = subDays(fromDate, 1);
-        adjustedDateFrom = format(prevDay, "yyyy-MM-dd");
-      }
-
-      const isAfterFrom =
-        !adjustedDateFrom || !docDate || docDate > adjustedDateFrom;
-      const isBeforeTo =
-        !filters.dateTo || !docDate || docDate <= filters.dateTo;
-      return isAfterFrom && isBeforeTo;
+  // แปลงข้อมูล creditNotes เป็น CreditNoteItem format
+  const creditNoteItems = useMemo(() => {
+    return creditNotes.map((doc: any): CreditNoteItem => {
+      const issueDate = new Date(doc.issue_date);
+      // คำนวณยอดสุทธิหลังหัก ณ ที่จ่าย
+      const netTotal =
+        doc.summary && typeof doc.summary.total === "number"
+          ? doc.summary.total - (doc.summary.withholdingTax ?? 0)
+          : Number(doc.total_amount ?? 0);
+      return {
+        id: doc.id,
+        number: doc.document_number,
+        customer: doc.customer_name,
+        date: format(issueDate, "d MMM yy", { locale: th }),
+        dateValue: issueDate.getTime(),
+        netTotal,
+        status: doc.status,
+        documentDate: format(issueDate, "yyyy-MM-dd"),
+      };
     });
+  }, [creditNotes]);
 
-    return sortData(result, sortColumn as keyof CreditNoteItem, sortDirection);
-  }, [creditNotes, searchText, filters, sortColumn, sortDirection]);
-
-  const [page, setPage] = useState(1);
-  const pageSize = DOCUMENT_PAGE_SIZE;
-  const totalPages = Math.ceil(filteredAndSortedCreditNotes.length / pageSize);
-  const pagedData = useMemo(() => {
-    const start = (page - 1) * pageSize;
-    return filteredAndSortedCreditNotes.slice(start, start + pageSize);
-  }, [filteredAndSortedCreditNotes, page]);
-
-  useEffect(() => {
-    const loadCreditNotes = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const data = await apiService.getDocuments();
-        const creditNotesData = data
-          .filter((doc: any) => doc.document_type === "CREDIT_NOTE")
-          .map((doc: any): CreditNoteItem => {
-            const issueDate = new Date(doc.issue_date);
-            // คำนวณยอดสุทธิหลังหัก ณ ที่จ่าย
-            const netTotal =
-              doc.summary && typeof doc.summary.total === "number"
-                ? doc.summary.total - (doc.summary.withholdingTax ?? 0)
-                : Number(doc.total_amount ?? 0);
-            return {
-              id: doc.id,
-              number: doc.document_number,
-              customer: doc.customer_name,
-              date: format(issueDate, "d MMM yy", { locale: th }),
-              dateValue: issueDate.getTime(),
-              netTotal,
-              status: doc.status,
-              documentDate: format(issueDate, "yyyy-MM-dd"),
-            };
-          });
-        setCreditNotes(creditNotesData);
-      } catch (err) {
-        setError("ไม่สามารถโหลดข้อมูลได้");
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadCreditNotes();
-  }, []);
+  // Sort the credit note items
+  const sortedCreditNoteItems = useMemo(() => {
+    return sortData(creditNoteItems, sortColumn as keyof CreditNoteItem, sortDirection);
+  }, [creditNoteItems, sortColumn, sortDirection]);
 
   const handleSort = (column: string) => {
     if (sortColumn === column)
@@ -143,7 +106,7 @@ const CreditNote = () => {
       toast.promise(apiService.deleteDocument(id), {
         loading: "กำลังลบ...",
         success: () => {
-          setCreditNotes((prev) => prev.filter((item) => item.id !== id));
+          refresh(); // Refresh data after deletion
           return "ลบใบลดหนี้เรียบร้อยแล้ว";
         },
         error: "เกิดข้อผิดพลาดในการลบ",
@@ -232,8 +195,8 @@ const CreditNote = () => {
               filters.dateFrom ||
               filters.dateTo ||
               searchText
-                ? `พบ ${filteredAndSortedCreditNotes.length} ฉบับ จากทั้งหมด ${creditNotes.length} ฉบับ`
-                : `${creditNotes.length} ฉบับ`}
+                ? `พบ ${sortedCreditNoteItems.length} ฉบับ จากทั้งหมด ${totalCount} ฉบับ`
+                : `${totalCount} ฉบับ`}
             </div>
           </div>
         </CardHeader>
@@ -276,7 +239,7 @@ const CreditNote = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {pagedData.length === 0 ? (
+                  {sortedCreditNoteItems.length === 0 ? (
                     <tr>
                       <td
                         colSpan={6}
@@ -290,7 +253,7 @@ const CreditNote = () => {
                       </td>
                     </tr>
                   ) : (
-                    pagedData.map((item) => (
+                    sortedCreditNoteItems.map((item) => (
                       <tr
                         key={item.id}
                         className="border-b border-border/40 hover:bg-muted/30 transition-colors"
@@ -358,33 +321,12 @@ const CreditNote = () => {
         />
       )}
 
-      <div className="flex justify-center mt-4 gap-1">
-        <button
-          onClick={() => setPage(page - 1)}
-          disabled={page === 1}
-          className="px-2"
-        >
-          ก่อนหน้า
-        </button>
-        {Array.from({ length: totalPages }, (_, i) => i + 1)
-          .filter((i) => i === 1 || i === totalPages || Math.abs(i - page) <= 2)
-          .map((i) => (
-            <button
-              key={i}
-              onClick={() => setPage(i)}
-              className={`px-2 ${page === i ? "font-bold underline" : ""}`}
-            >
-              {i}
-            </button>
-          ))}
-        <button
-          onClick={() => setPage(page + 1)}
-          disabled={page === totalPages}
-          className="px-2"
-        >
-          ถัดไป
-        </button>
-      </div>
+      <Pagination
+        page={page}
+        totalPages={totalPages}
+        onPageChange={setPage}
+        className="mt-4"
+      />
     </div>
   );
 };

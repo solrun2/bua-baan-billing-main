@@ -21,7 +21,8 @@ import { searchData } from "@/utils/searchUtils";
 import { format, subDays } from "date-fns";
 import { th } from "date-fns/locale";
 import { Skeleton } from "@/components/ui/skeleton";
-import { DOCUMENT_PAGE_SIZE } from "@/constants/documentPageSize";
+import { usePagination } from "@/hooks/usePagination";
+import { Pagination } from "@/components/ui/pagination";
 
 interface TaxInvoiceItem {
   id: string;
@@ -36,9 +37,6 @@ interface TaxInvoiceItem {
 
 const TaxInvoice = () => {
   const navigate = useNavigate();
-  const [taxInvoices, setTaxInvoices] = useState<TaxInvoiceItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [selectedTaxInvoice, setSelectedTaxInvoice] = useState<any | null>(
     null
   );
@@ -52,79 +50,48 @@ const TaxInvoice = () => {
   const [sortColumn, setSortColumn] = useState<string>("dateValue");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
 
-  // ย้าย useMemo ขึ้นก่อน
-  const filteredAndSortedTaxInvoices = useMemo(() => {
-    let result = searchData(taxInvoices, searchText, ["number", "customer"]);
+  // ใช้ usePagination hook สำหรับ server-side pagination
+  const {
+    data: taxInvoices,
+    loading,
+    error,
+    page,
+    totalPages,
+    totalCount,
+    setPage,
+    refresh,
+  } = usePagination<any>("TAX_INVOICE", filters, searchText);
 
-    result = result.filter((item) => {
-      const isStatusMatch =
-        !filters.status ||
-        filters.status === "all" ||
-        item.status === filters.status;
-      if (!isStatusMatch) return false;
-
-      const docDate = item.documentDate;
-
-      let adjustedDateFrom = filters.dateFrom;
-      if (filters.dateFrom) {
-        const fromDate = new Date(filters.dateFrom);
-        const prevDay = subDays(fromDate, 1);
-        adjustedDateFrom = format(prevDay, "yyyy-MM-dd");
-      }
-
-      const isAfterFrom =
-        !adjustedDateFrom || !docDate || docDate > adjustedDateFrom;
-      const isBeforeTo =
-        !filters.dateTo || !docDate || docDate <= filters.dateTo;
-      return isAfterFrom && isBeforeTo;
+  // แปลงข้อมูล taxInvoices เป็น TaxInvoiceItem format
+  const taxInvoiceItems = useMemo(() => {
+    return taxInvoices.map((doc: any): TaxInvoiceItem => {
+      const issueDate = new Date(doc.issue_date);
+      // คำนวณยอดสุทธิหลังหัก ณ ที่จ่าย
+      const netTotal =
+        doc.summary && typeof doc.summary.total === "number"
+          ? doc.summary.total - (doc.summary.withholdingTax ?? 0)
+          : Number(doc.total_amount ?? 0);
+      return {
+        id: doc.id,
+        number: doc.document_number,
+        customer: doc.customer_name,
+        date: format(issueDate, "d MMM yy", { locale: th }),
+        dateValue: issueDate.getTime(),
+        netTotal,
+        status: doc.status,
+        documentDate: format(issueDate, "yyyy-MM-dd"),
+      };
     });
+  }, [taxInvoices]);
 
-    return sortData(result, sortColumn as keyof TaxInvoiceItem, sortDirection);
-  }, [taxInvoices, searchText, filters, sortColumn, sortDirection]);
-
-  const [page, setPage] = useState(1);
-  const pageSize = DOCUMENT_PAGE_SIZE;
-  const totalPages = Math.ceil(filteredAndSortedTaxInvoices.length / pageSize);
-  const pagedData = useMemo(() => {
-    const start = (page - 1) * pageSize;
-    return filteredAndSortedTaxInvoices.slice(start, start + pageSize);
-  }, [filteredAndSortedTaxInvoices, page]);
-
-  useEffect(() => {
-    const loadTaxInvoices = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const data = await apiService.getDocuments();
-        const taxInvoicesData = data
-          .filter((doc: any) => doc.document_type === "TAX_INVOICE")
-          .map((doc: any): TaxInvoiceItem => {
-            const issueDate = new Date(doc.issue_date);
-            // คำนวณยอดสุทธิหลังหัก ณ ที่จ่าย
-            const netTotal =
-              doc.summary && typeof doc.summary.total === "number"
-                ? doc.summary.total - (doc.summary.withholdingTax ?? 0)
-                : Number(doc.total_amount ?? 0);
-            return {
-              id: doc.id,
-              number: doc.document_number,
-              customer: doc.customer_name,
-              date: format(issueDate, "d MMM yy", { locale: th }),
-              dateValue: issueDate.getTime(),
-              netTotal,
-              status: doc.status,
-              documentDate: format(issueDate, "yyyy-MM-dd"),
-            };
-          });
-        setTaxInvoices(taxInvoicesData);
-      } catch (err) {
-        setError("ไม่สามารถโหลดข้อมูลได้");
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadTaxInvoices();
-  }, []);
+  // Sort the tax invoice items
+  const sortedTaxInvoiceItems = useMemo(() => {
+    return sortData(
+      taxInvoiceItems,
+      sortColumn as keyof TaxInvoiceItem,
+      sortDirection
+    );
+  }, [taxInvoiceItems, sortColumn, sortDirection]);
 
   const handleSort = (column: string) => {
     if (sortColumn === column)
@@ -143,7 +110,7 @@ const TaxInvoice = () => {
       toast.promise(apiService.deleteDocument(id), {
         loading: "กำลังลบ...",
         success: () => {
-          setTaxInvoices((prev) => prev.filter((item) => item.id !== id));
+          refresh(); // Refresh data after deletion
           return "ลบใบกำกับภาษีเรียบร้อยแล้ว";
         },
         error: "เกิดข้อผิดพลาดในการลบ",
@@ -229,8 +196,8 @@ const TaxInvoice = () => {
               filters.dateFrom ||
               filters.dateTo ||
               searchText
-                ? `พบ ${filteredAndSortedTaxInvoices.length} ฉบับ จากทั้งหมด ${taxInvoices.length} ฉบับ`
-                : `${taxInvoices.length} ฉบับ`}
+                ? `พบ ${sortedTaxInvoiceItems.length} ฉบับ จากทั้งหมด ${totalCount} ฉบับ`
+                : `${totalCount} ฉบับ`}
             </div>
           </div>
         </CardHeader>
@@ -273,7 +240,7 @@ const TaxInvoice = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {pagedData.length === 0 ? (
+                  {sortedTaxInvoiceItems.length === 0 ? (
                     <tr>
                       <td
                         colSpan={6}
@@ -287,7 +254,7 @@ const TaxInvoice = () => {
                       </td>
                     </tr>
                   ) : (
-                    pagedData.map((item) => (
+                    sortedTaxInvoiceItems.map((item) => (
                       <tr
                         key={item.id}
                         className="border-b border-border/40 hover:bg-muted/30 transition-colors"
@@ -355,33 +322,12 @@ const TaxInvoice = () => {
         />
       )}
 
-      <div className="flex justify-center mt-4 gap-1">
-        <button
-          onClick={() => setPage(page - 1)}
-          disabled={page === 1}
-          className="px-2"
-        >
-          ก่อนหน้า
-        </button>
-        {Array.from({ length: totalPages }, (_, i) => i + 1)
-          .filter((i) => i === 1 || i === totalPages || Math.abs(i - page) <= 2)
-          .map((i) => (
-            <button
-              key={i}
-              onClick={() => setPage(i)}
-              className={`px-2 ${page === i ? "font-bold underline" : ""}`}
-            >
-              {i}
-            </button>
-          ))}
-        <button
-          onClick={() => setPage(page + 1)}
-          disabled={page === totalPages}
-          className="px-2"
-        >
-          ถัดไป
-        </button>
-      </div>
+      <Pagination
+        page={page}
+        totalPages={totalPages}
+        onPageChange={setPage}
+        className="mt-4"
+      />
     </div>
   );
 };
