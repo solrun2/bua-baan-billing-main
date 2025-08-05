@@ -385,7 +385,6 @@ app.get("/api/documents", async (req: Request, res: Response) => {
       ${whereClause}
     `;
     const countResult = await pool.query(countQuery, params);
-    console.log(`[DEBUG] Count result:`, countResult);
 
     // Handle mariadb query result structure - it might return object directly or array
     let totalCount = 0;
@@ -951,24 +950,15 @@ app.post("/api/documents", async (req: Request, res: Response) => {
 app.put("/api/documents/:id/cancel", async (req: Request, res: Response) => {
   let conn;
   const { id } = req.params;
-  console.log(`[DEBUG] Cancel request received for document ID: ${id}`);
 
   try {
     conn = await pool.getConnection();
     await conn.beginTransaction();
 
     // 1. หาเอกสารที่ต้องการยกเลิก
-    console.log(`[DEBUG] Querying document with ID: ${id}`);
     const docResult = await conn.query("SELECT * FROM documents WHERE id = ?", [
       id,
     ]);
-    console.log(`[DEBUG] Query result for ID ${id}:`, docResult);
-    console.log(`[DEBUG] docResult type:`, typeof docResult);
-    console.log(`[DEBUG] docResult is array:`, Array.isArray(docResult));
-    console.log(
-      `[DEBUG] docResult length:`,
-      docResult ? docResult.length : "undefined"
-    );
 
     // Handle mariadb query result structure
     let document = null;
@@ -978,27 +968,16 @@ app.put("/api/documents/:id/cancel", async (req: Request, res: Response) => {
       document = docResult;
     }
 
-    console.log(`[DEBUG] Extracted document:`, document);
     if (!document) {
       await conn.rollback();
-      console.log(`[DEBUG] Document is null/undefined: ${id}`);
       return res.status(404).json({ error: "Document not found." });
     }
-    console.log(`[DEBUG] Found document:`, {
-      id: document.id,
-      document_type: document.document_type,
-      related_document_id: document.related_document_id,
-      status: document.status,
-    });
 
     // 2. ใช้ฟังก์ชัน recursive cancellation
     const { cancelledIds, totalCancelled } = await cancelDocumentRecursive(
       conn,
       Number(id)
     );
-
-    console.log(`[DEBUG] Cancellation completed. Cancelled IDs:`, cancelledIds);
-    console.log(`[DEBUG] Total cancelled: ${totalCancelled}`);
 
     await conn.commit();
     res.status(200).json({
@@ -1026,27 +1005,21 @@ async function cancelDocumentRecursive(
   async function cancelRecursive(id: number): Promise<void> {
     // ป้องกัน infinite loop
     if (processedIds.has(id)) {
-      console.log(`[DEBUG] Skipping already processed document ID: ${id}`);
       return;
     }
     processedIds.add(id);
-
-    console.log(`[DEBUG] Processing document ID: ${id}`);
 
     // ยกเลิกเอกสารปัจจุบัน
     await conn.query("UPDATE documents SET status = 'ยกเลิก' WHERE id = ?", [
       id,
     ]);
     cancelledIds.push(id);
-    console.log(`[DEBUG] Cancelled document ID: ${id}`);
 
     // หาเอกสารแม่ (parent) และยกเลิก
     const parentResult = await conn.query(
       "SELECT related_document_id FROM documents WHERE id = ? AND related_document_id IS NOT NULL",
       [id]
     );
-
-    console.log(`[DEBUG] Parent query for ID ${id}:`, parentResult);
 
     // Handle mariadb query result structure for parent
     let parentId = null;
@@ -1065,12 +1038,7 @@ async function cancelDocumentRecursive(
     }
 
     if (parentId) {
-      console.log(
-        `[DEBUG] Found parent ID: ${parentId}, cancelling recursively`
-      );
       await cancelRecursive(parentId);
-    } else {
-      console.log(`[DEBUG] No parent found for document ID: ${id}`);
     }
 
     // หาเอกสารลูก (children) และยกเลิก
@@ -1078,8 +1046,6 @@ async function cancelDocumentRecursive(
       "SELECT id FROM documents WHERE related_document_id = ?",
       [id]
     );
-
-    console.log(`[DEBUG] Children query for ID ${id}:`, childrenResult);
 
     // Handle mariadb query result structure for children
     let children = [];
@@ -1091,29 +1057,15 @@ async function cancelDocumentRecursive(
     }
 
     if (children.length > 0) {
-      console.log(
-        `[DEBUG] Found ${children.length} children for document ID: ${id}`
-      );
       for (const child of children) {
         if (child && typeof child === "object" && child.id) {
-          console.log(`[DEBUG] Cancelling child ID: ${child.id}`);
           await cancelRecursive(child.id);
-        } else {
-          console.log(`[DEBUG] Skipping invalid child:`, child);
         }
       }
-    } else {
-      console.log(`[DEBUG] No children found for document ID: ${id}`);
     }
   }
 
-  console.log(
-    `[DEBUG] Starting recursive cancellation for document ID: ${documentId}`
-  );
   await cancelRecursive(documentId);
-  console.log(
-    `[DEBUG] Recursive cancellation completed. Total cancelled: ${cancelledIds.length}`
-  );
 
   return {
     cancelledIds,
@@ -1179,9 +1131,6 @@ app.get("/api/documents/:id", async (req, res) => {
           }
           // กรณีอื่นๆ
           else {
-            console.log(
-              "⚠️ [Backend] Unknown payment_channels type, using empty array"
-            );
             parsedChannels = [];
           }
 
@@ -1195,10 +1144,6 @@ app.get("/api/documents/:id", async (req, res) => {
                 bankAccountId: ch.bankAccountId || null,
               }))
             : [];
-        } else {
-          console.log(
-            "⚠️ [Backend] No payment_channels found in receipt_details"
-          );
         }
         if (receipt_details.fees) {
           try {
@@ -1672,12 +1617,7 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
 
     res.status(200).json({ message: "Document updated successfully." });
   } catch (err) {
-    console.error("🔍 [Backend] Error updating document:", err);
-    if (err instanceof Error) {
-      console.error("🔍 [Backend] Error stack:", err.stack);
-    }
     if (conn) {
-      console.log("🔍 [Backend] Rolling back transaction due to error");
       await conn.rollback();
     }
     console.error("Failed to update document:", err);
