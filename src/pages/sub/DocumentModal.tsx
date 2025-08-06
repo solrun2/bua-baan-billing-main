@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { formatCurrency } from "../../lib/utils";
+import { formatCurrency, numberToThaiText } from "../../lib/utils";
 import { calculateSummaryFromItems } from "../../utils/documentUtils";
 
 interface DocumentItem {
@@ -410,46 +410,55 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
   );
 
   // Summary: สรุปยอดแบบกระชับ
-  const renderSummary = () => (
-    <div className="flex justify-end mb-4">
-      <div className="w-48 space-y-1 bg-blue-50 rounded-lg p-3 text-xs">
-        <div className="flex justify-between">
-          <span>รวมเป็นเงิน:</span>
-          <span>
-            {formatCurrency((summary.subtotal || 0) + (summary.discount || 0))}
-          </span>
-        </div>
-        {summary.discount > 0 && (
-          <div className="flex justify-between text-red-600">
-            <span>ส่วนลด:</span>
-            <span>-{formatCurrency(summary.discount || 0)}</span>
-          </div>
-        )}
-        {summary.tax > 0 && (
+  const renderSummary = () => {
+    const netTotal = (summary.total || 0) - (summary.withholdingTax || 0);
+
+    return (
+      <div className="flex justify-end mb-4">
+        <div className="min-w-48 space-y-1 bg-blue-50 rounded-lg p-3 text-xs">
           <div className="flex justify-between">
-            <span>ภาษีมูลค่าเพิ่ม:</span>
-            <span>{formatCurrency(summary.tax || 0)}</span>
-          </div>
-        )}
-        {summary.withholdingTax > 0 && (
-          <div className="flex justify-between text-red-600">
-            <span>หัก ณ ที่จ่าย:</span>
-            <span>-{formatCurrency(summary.withholdingTax || 0)}</span>
-          </div>
-        )}
-        <div className="border-t border-gray-300 pt-1">
-          <div className="flex justify-between font-bold text-base">
-            <span>รวมทั้งสิ้น:</span>
+            <span>รวมเป็นเงิน:</span>
             <span>
               {formatCurrency(
-                (summary.total || 0) - (summary.withholdingTax || 0)
+                (summary.subtotal || 0) + (summary.discount || 0)
               )}
             </span>
           </div>
+          {summary.discount > 0 && (
+            <div className="flex justify-between text-red-600">
+              <span>ส่วนลด:</span>
+              <span>-{formatCurrency(summary.discount || 0)}</span>
+            </div>
+          )}
+          {summary.tax > 0 && (
+            <div className="flex justify-between">
+              <span>ภาษีมูลค่าเพิ่ม:</span>
+              <span>{formatCurrency(summary.tax || 0)}</span>
+            </div>
+          )}
+          {summary.withholdingTax > 0 && (
+            <div className="flex justify-between text-red-600">
+              <span>หัก ณ ที่จ่าย:</span>
+              <span>-{formatCurrency(summary.withholdingTax || 0)}</span>
+            </div>
+          )}
+          <div className="border-t border-gray-300 pt-1">
+            <div className="flex justify-between font-bold text-base">
+              <span>รวมทั้งสิ้น:</span>
+              <span>{formatCurrency(netTotal)}</span>
+            </div>
+            <div className="mt-2 pt-2 border-t border-gray-200">
+              <div className="text-center">
+                <div className="text-sm text-gray-700 font-semibold leading-relaxed">
+                  ({numberToThaiText(netTotal)})
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   const renderFooter = () => {
     switch (type) {
