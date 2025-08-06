@@ -300,29 +300,53 @@ const Invoice = () => {
                           </span>
                         </td>
                         <td className="py-3 px-4 no-print">
-                          <div className="flex items-center gap-2">
+                          <div className="flex gap-2">
                             <Button
-                              variant="outline"
                               size="sm"
+                              variant="outline"
                               onClick={() => handleViewClick(item)}
                             >
                               ดู
                             </Button>
-                            <Button
-                              size="sm"
-                              className="bg-blue-500 hover:bg-blue-600 text-white border-blue-500"
-                              onClick={() => handleEditClick(item.id)}
-                            >
-                              แก้ไข
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="text-red-500 hover:text-red-700"
-                              onClick={() => handleCancelClick(item.id)}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
+                            {item.status !== "ยกเลิก" ? (
+                              <>
+                                <Button
+                                  size="sm"
+                                  className="bg-blue-500 hover:bg-blue-600 text-white border-blue-500"
+                                  onClick={() => handleEditClick(item.id)}
+                                >
+                                  แก้ไข
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="text-red-500 hover:text-red-700"
+                                  onClick={() => handleCancelClick(item.id)}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </>
+                            ) : (
+                              <>
+                                <Button
+                                  size="sm"
+                                  className="bg-blue-500 hover:bg-blue-600 text-white border-blue-500"
+                                  disabled
+                                  title="ไม่สามารถแก้ไขเอกสารที่ยกเลิกแล้วได้"
+                                >
+                                  แก้ไข
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="text-red-500 hover:text-red-700"
+                                  disabled
+                                  title="ไม่สามารถลบเอกสารที่ยกเลิกแล้วได้"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </>
+                            )}
                           </div>
                         </td>
                       </tr>
