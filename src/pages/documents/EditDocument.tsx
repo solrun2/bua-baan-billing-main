@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
-import { DocumentForm } from "../sub/create/DocumentForm";
+import { UnifiedDocumentForm } from "@/components/UnifiedDocumentForm";
 import { apiService } from "../services/apiService";
 import { toast } from "sonner";
 import { DocumentData, DocumentPayload } from "@/types/document";
@@ -128,13 +128,16 @@ const EditDocumentPage: React.FC = () => {
   }
 
   return (
-    <DocumentForm
+    <UnifiedDocumentForm
       initialData={initialData}
       onSave={handleSave}
       onCancel={handleCancel}
       documentType={initialData.documentType!}
       isLoading={loading}
       editMode={true}
+      variant="default"
+      showActions={true}
+      showSummary={true}
     />
   );
 };

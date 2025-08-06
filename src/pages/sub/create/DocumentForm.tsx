@@ -71,6 +71,13 @@ export interface DocumentFormProps {
   editMode?: boolean;
   pageTitle?: string;
   pageSubtitle?: string;
+  // เพิ่ม props ใหม่สำหรับ customization
+  showBackButton?: boolean;
+  showSaveButton?: boolean;
+  customHeader?: React.ReactNode;
+  customFooter?: React.ReactNode;
+  containerClassName?: string;
+  formClassName?: string;
 }
 
 // เพิ่ม related_document_id ใน type DocumentData (workaround)
@@ -134,6 +141,13 @@ export const DocumentForm: FC<DocumentFormProps> = ({
   editMode = false,
   pageTitle,
   pageSubtitle,
+  // เพิ่ม props ใหม่สำหรับ customization
+  showBackButton = true,
+  showSaveButton = true,
+  customHeader,
+  customFooter,
+  containerClassName,
+  formClassName,
 }: DocumentFormProps) => {
   console.log("[DocumentForm] เริ่มต้นฟอร์ม:", {
     documentType,
@@ -1352,18 +1366,24 @@ export const DocumentForm: FC<DocumentFormProps> = ({
   ]);
 
   return (
-    <>
-      <form onSubmit={handleSubmit} className="space-y-6">
+    <div className={containerClassName || "container mx-auto py-6"}>
+      {customHeader}
+      <form
+        onSubmit={handleSubmit}
+        className={`space-y-6 ${formClassName || ""}`}
+      >
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
-            <Button
-              variant="outline"
-              size="icon"
-              type="button"
-              onClick={onCancel}
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
+            {showBackButton && (
+              <Button
+                variant="outline"
+                size="icon"
+                type="button"
+                onClick={onCancel}
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+            )}
             <div>
               <h1 className="text-2xl font-bold text-foreground">
                 {pageTitle ||
@@ -1395,16 +1415,18 @@ export const DocumentForm: FC<DocumentFormProps> = ({
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Button type="submit" disabled={isLoading || isSaving}>
-              {isLoading || isSaving ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Save className="mr-2 h-4 w-4" />
-              )}
-              บันทึก
-            </Button>
-          </div>
+          {showSaveButton && (
+            <div className="flex items-center gap-2">
+              <Button type="submit" disabled={isLoading || isSaving}>
+                {isLoading || isSaving ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Save className="mr-2 h-4 w-4" />
+                )}
+                บันทึก
+              </Button>
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -2819,8 +2841,9 @@ export const DocumentForm: FC<DocumentFormProps> = ({
             </div>
           </CardContent>
         </Card>
+        {customFooter}
       </form>
-    </>
+    </div>
   );
 };
 

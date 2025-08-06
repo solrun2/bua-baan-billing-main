@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { DocumentForm } from "../create/DocumentForm";
+import { UnifiedDocumentForm } from "@/components/UnifiedDocumentForm";
 import { DocumentData, DocumentType } from "@/types/document";
 import { invoiceService } from "../../services/invoiceService";
 import { documentService } from "../../services/documentService";
@@ -17,7 +17,7 @@ type EnsureDocumentType<T> = Omit<T, "documentType"> & {
 interface InvoiceFormProps {
   onSave?: (data: DocumentData) => Promise<void>;
   onCancel?: () => void;
-  initialData?: DocumentData;
+  initialData?: EnsureDocumentType<DocumentData>;
   isLoading?: boolean;
   editMode?: boolean;
 }
@@ -88,18 +88,9 @@ const InvoiceForm = ({
     setIsClient(true);
   }, [externalInitialData]);
 
-  const handleCancel = () => {
-    if (externalOnCancel) {
-      externalOnCancel();
-    } else {
-      navigate(-1);
-    }
-  };
-
-  const handleSave = async (data: DocumentData): Promise<void> => {
+  const handleSave = async (data: DocumentData) => {
+    setIsLoading(true);
     try {
-      setIsLoading(true);
-
       // Ensure document type is set correctly
       const documentToSave: EnsureDocumentType<DocumentData> = {
         ...data,
@@ -127,21 +118,27 @@ const InvoiceForm = ({
         documentDate:
           data.documentDate || new Date().toISOString().split("T")[0],
         reference: data.reference || "",
-        dueDate:
-          data.dueDate ||
-          new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-            .toISOString()
-            .split("T")[0],
       };
 
-      // Save using the invoice service (which will handle both API and localStorage)
+      // Save using the invoice service
       let savedDocument: DocumentData;
 
       if (isEditing && id) {
         savedDocument = await invoiceService.updateInvoice(id, documentToSave);
+        console.log(
+          "[InvoiceForm] อัพเดทเอกสารสำเร็จ:",
+          savedDocument.documentNumber
+        );
       } else {
         savedDocument = await invoiceService.createInvoice(documentToSave);
+        console.log(
+          "[InvoiceForm] สร้างเอกสารใหม่สำเร็จ:",
+          savedDocument.documentNumber
+        );
       }
+
+      // Also save to document service for local storage
+      documentService.save(savedDocument);
 
       // Show success message
       toast.success(
@@ -171,6 +168,14 @@ const InvoiceForm = ({
     }
   };
 
+  const handleCancel = () => {
+    if (externalOnCancel) {
+      externalOnCancel();
+    } else {
+      navigate("/documents/invoice");
+    }
+  };
+
   if (!isClient) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -180,18 +185,19 @@ const InvoiceForm = ({
   }
 
   return (
-    <div className="container mx-auto py-6">
-      <DocumentForm
-        documentType="invoice"
-        onCancel={handleCancel}
-        onSave={async (payload) => {
-          await handleSave(payload as unknown as DocumentData);
-        }}
-        initialData={initialData}
-        isLoading={isLoading}
-        editMode={editMode}
-      />
-    </div>
+    <UnifiedDocumentForm
+      documentType="invoice"
+      onCancel={handleCancel}
+      onSave={async (payload) => {
+        await handleSave(payload as unknown as DocumentData);
+      }}
+      initialData={initialData}
+      isLoading={isLoading}
+      editMode={editMode || isEditing}
+      variant="default"
+      showActions={true}
+      showSummary={true}
+    />
   );
 };
 

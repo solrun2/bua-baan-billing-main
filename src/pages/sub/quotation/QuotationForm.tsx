@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { DocumentForm } from "../create/DocumentForm";
+import { UnifiedDocumentForm } from "@/components/UnifiedDocumentForm";
 import { DocumentData, DocumentType } from "@/types/document";
 import { quotationService } from "@/pages/services/quotationService";
 import { documentService } from "@/pages/services/documentService";
@@ -19,7 +19,7 @@ type EnsureDocumentType<T> = Omit<T, "documentType"> & {
 interface QuotationFormProps {
   onSave?: (data: DocumentData) => Promise<void>;
   onCancel?: () => void;
-  initialData?: DocumentData;
+  initialData?: EnsureDocumentType<DocumentData>;
   isLoading?: boolean;
 }
 
@@ -116,19 +116,9 @@ const QuotationForm = ({
             "[QuotationForm] โหลดเอกสารสำเร็จ:",
             documentData.documentNumber
           );
-        } else if (externalInitialData) {
-          // Use provided initial data
-          setInitialData({
-            ...externalInitialData,
-            documentType: "quotation",
-            status: externalInitialData.status || "รอตอบรับ",
-            priceType: externalInitialData.priceType || "EXCLUDE_VAT",
-          });
-          console.log("[QuotationForm] ใช้ข้อมูลเริ่มต้นจาก props");
         } else {
           // For new document, generate a document number
-          const newNumber =
-            documentService.generateNewDocumentNumber("quotation");
+          const newNumber = documentService.generateNewDocumentNumber("quotation");
           setInitialData((prev) => ({
             ...prev,
             documentNumber: newNumber,
@@ -136,12 +126,10 @@ const QuotationForm = ({
             status: "รอตอบรับ",
             priceType: "EXCLUDE_VAT",
           }));
-          console.log("[QuotationForm] สร้างเอกสารใหม่:", newNumber);
         }
       } catch (error) {
-        console.error("[QuotationForm] Error loading document:", error);
-        toast.error("ไม่สามารถโหลดข้อมูลเอกสารได้");
-        navigate("/documents/quotation");
+        console.error("Error loading document:", error);
+        toast.error("เกิดข้อผิดพลาดในการโหลดเอกสาร");
       } finally {
         setIsLoading(false);
         setIsClient(true);
@@ -149,41 +137,11 @@ const QuotationForm = ({
     };
 
     loadDocument();
-  }, [id, externalInitialData, externalIsLoading, navigate]);
+  }, [id, externalIsLoading, navigate]);
 
-  const handleCancel = () => {
-    if (externalOnCancel) {
-      externalOnCancel();
-    } else {
-      navigate(-1);
-    }
-  };
-
-  const handleSave = async (data: DocumentData): Promise<void> => {
+  const handleSave = async (data: DocumentData) => {
+    setIsLoading(true);
     try {
-      setIsLoading(true);
-      console.log("[QuotationForm] กำลังบันทึกเอกสาร:", data.documentNumber);
-
-      // --- เช็คก่อนตอบรับ/สร้างใบแจ้งหนี้จากใบเสนอราคา ---
-      try {
-        const allDocs = await apiService.getDocuments();
-        const existInvoice = allDocs.find(
-          (doc) =>
-            doc.document_type === "INVOICE" &&
-            doc.document_number === data.documentNumber
-        );
-        if (existInvoice) {
-          toast.error(
-            `มีใบแจ้งหนี้ (เลขที่: ${existInvoice.document_number}) ที่อ้างอิงใบเสนอราคานี้อยู่แล้ว กรุณาลบใบแจ้งหนี้นั้นก่อน`
-          );
-          setIsLoading(false);
-          return;
-        }
-      } catch (err) {
-        toast.error("เกิดข้อผิดพลาดในการตรวจสอบใบแจ้งหนี้ซ้ำ");
-        setIsLoading(false);
-        return;
-      }
       // Ensure document type is set correctly
       const documentToSave: EnsureDocumentType<DocumentData> = {
         ...data,
@@ -254,7 +212,7 @@ const QuotationForm = ({
         await externalOnSave(savedDocument);
       }
     } catch (error) {
-      console.error("[QuotationForm] Error saving quotation:", error);
+      console.error("Error saving quotation:", error);
       toast.error("เกิดข้อผิดพลาดในการบันทึกเอกสาร", {
         description: "กรุณาลองใหม่อีกครั้ง",
       });
@@ -264,37 +222,36 @@ const QuotationForm = ({
     }
   };
 
-  // Loading skeleton for better UX
+  const handleCancel = () => {
+    if (externalOnCancel) {
+      externalOnCancel();
+    } else {
+      navigate("/documents/quotation");
+    }
+  };
+
   if (!isClient) {
     return (
-      <div className="container mx-auto py-6 space-y-6">
-        <div className="flex items-center justify-between">
-          <Skeleton className="h-8 w-48" />
-          <div className="flex gap-2">
-            <Skeleton className="h-10 w-24" />
-            <Skeleton className="h-10 w-24" />
-          </div>
-        </div>
-        <div className="grid gap-6">
-          <Skeleton className="h-64 w-full" />
-          <Skeleton className="h-32 w-full" />
-        </div>
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto py-6">
-      <DocumentForm
-        documentType="quotation"
-        onCancel={handleCancel}
-        onSave={async (payload) => {
-          await handleSave(payload as unknown as DocumentData);
-        }}
-        initialData={initialData}
-        isLoading={isLoading || externalIsLoading}
-      />
-    </div>
+    <UnifiedDocumentForm
+      documentType="quotation"
+      onCancel={handleCancel}
+      onSave={async (payload) => {
+        await handleSave(payload as unknown as DocumentData);
+      }}
+      initialData={initialData}
+      isLoading={isLoading || externalIsLoading}
+      editMode={isEditing}
+      variant="default"
+      showActions={true}
+      showSummary={true}
+    />
   );
 };
 
