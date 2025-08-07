@@ -762,9 +762,6 @@ export const DocumentForm: FC<DocumentFormProps> = ({
             }
           }
 
-          // ลบการ setPaymentChannels ออกจากที่นี่ เพื่อป้องกันการทำงานซ้ำซ้อน
-          // จะใช้ useEffect แยกแทน
-
           // --- โหลด fees ---
           let feesData = receiptDetails.fees;
           if (typeof feesData === "string") {
@@ -847,8 +844,9 @@ export const DocumentForm: FC<DocumentFormProps> = ({
   function getMaxDiscount(item) {
     return item.unitPrice * item.quantity;
   }
+
+  // กรณีหัก ณ ที่จ่ายแบบกำหนดเอง
   function getMaxWithholding(item) {
-    // กรณีหัก ณ ที่จ่ายแบบกำหนดเอง
     return item.unitPrice * item.quantity - getDiscountAmount(item);
   }
 
