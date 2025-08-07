@@ -39,64 +39,89 @@ export function numberToThaiText(amount: number): string {
 
   // แปลงส่วนบาท
   if (baht > 0) {
-    const bahtStr = baht.toString();
-    const bahtLength = bahtStr.length;
-
-    for (let i = 0; i < bahtLength; i++) {
-      const digit = parseInt(bahtStr[i]);
-      const position = bahtLength - i - 1;
-
-      if (digit > 0) {
-        if (position === 1 && digit === 1 && i === 0) {
-          result += "สิบ";
-        } else if (position === 1 && digit === 1) {
-        } else if (position === 1 && digit === 2) {
-          result += "ยี่";
-        } else if (position === 0 && digit === 1 && bahtLength > 1) {
-          result += "เอ็ด";
-        } else {
-          result += numbers[digit];
-        }
-
-        if (position > 0) {
-          result += units[position];
-        }
-      }
-    }
+    result = convertNumberToThaiText(baht);
     result += "บาท";
   }
 
   // แปลงส่วนสตางค์
   if (satang > 0) {
     if (baht > 0) result += " ";
+    result += convertNumberToThaiText(satang);
+    result += "สตางค์";
+  } else {
+    result += "ถ้วน";
+  }
 
-    const satangStr = satang.toString().padStart(2, "0");
-    const satangLength = satangStr.length;
+  return result;
+}
 
-    for (let i = 0; i < satangLength; i++) {
-      const digit = parseInt(satangStr[i]);
-      const position = satangLength - i - 1;
+// ฟังก์ชันช่วยแปลงตัวเลขเป็นข้อความไทย
+function convertNumberToThaiText(num: number): string {
+  const units = ["", "สิบ", "ร้อย", "พัน", "หมื่น", "แสน", "ล้าน"];
+  const numbers = [
+    "",
+    "หนึ่ง",
+    "สอง",
+    "สาม",
+    "สี่",
+    "ห้า",
+    "หก",
+    "เจ็ด",
+    "แปด",
+    "เก้า",
+  ];
 
-      if (digit > 0) {
-        if (position === 1 && digit === 1 && i === 0) {
+  if (num === 0) return "";
+
+  const numStr = num.toString();
+  const length = numStr.length;
+  let result = "";
+
+  // จัดการกับตัวเลขที่มีมากกว่า 6 หลัก (ล้านขึ้นไป)
+  if (length > 6) {
+    const millions = Math.floor(num / 1000000);
+    const remainder = num % 1000000;
+
+    if (millions > 0) {
+      result += convertNumberToThaiText(millions) + "ล้าน";
+    }
+
+    if (remainder > 0) {
+      result += convertNumberToThaiText(remainder);
+    }
+
+    return result;
+  }
+
+  // จัดการกับตัวเลข 6 หลักหรือน้อยกว่า
+  for (let i = 0; i < length; i++) {
+    const digit = parseInt(numStr[i]);
+    const position = length - i - 1;
+
+    if (digit > 0) {
+      // กรณีพิเศษสำหรับหลักสิบ
+      if (position === 1) {
+        if (digit === 1) {
           result += "สิบ";
-        } else if (position === 1 && digit === 1) {
-        } else if (position === 1 && digit === 2) {
-          result += "ยี่";
-        } else if (position === 0 && digit === 1 && satangLength > 1) {
+        } else if (digit === 2) {
+          result += "ยี่สิบ";
+        } else {
+          result += numbers[digit] + "สิบ";
+        }
+      }
+      // กรณีพิเศษสำหรับหลักหน่วย
+      else if (position === 0) {
+        if (digit === 1 && length > 1) {
           result += "เอ็ด";
         } else {
           result += numbers[digit];
         }
-
-        if (position > 0) {
-          result += units[position];
-        }
+      }
+      // กรณีทั่วไป
+      else {
+        result += numbers[digit] + units[position];
       }
     }
-    result += "สตางค์";
-  } else {
-    result += "ถ้วน";
   }
 
   return result;
