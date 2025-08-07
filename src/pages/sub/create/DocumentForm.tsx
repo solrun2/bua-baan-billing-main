@@ -466,6 +466,19 @@ export const DocumentForm: FC<DocumentFormProps> = ({
 
   // handle เพิ่ม/ลบ item
   const addNewItem = () => {
+    // ตรวจสอบว่ามีรายการที่ยังไม่ได้เลือกสินค้าหรือไม่
+    const hasUnselectedItems = form.items.some(
+      (item) => !item.productId && !item.productTitle
+    );
+
+    if (hasUnselectedItems) {
+      toast.error("กรุณาเลือกสินค้าก่อนเพิ่มรายการใหม่", {
+        description:
+          "คุณมีรายการที่ยังไม่ได้เลือกสินค้า กรุณาเลือกสินค้าก่อนเพิ่มรายการใหม่",
+      });
+      return;
+    }
+
     const newItem = createDefaultItem();
     // แปลง priceType ก่อนส่งเข้า updateItemWithCalculations
     const calculatedItem = updateItemWithCalculations({
@@ -892,6 +905,18 @@ export const DocumentForm: FC<DocumentFormProps> = ({
     if (form.items.length === 0) {
       toast.error("ไม่มีรายการสินค้า", {
         description: "คุณต้องเพิ่มสินค้าอย่างน้อย 1 รายการ",
+      });
+      setIsSaving(false);
+      return;
+    }
+
+    // ตรวจสอบว่ามีรายการที่ยังไม่ได้เลือกสินค้าหรือไม่
+    const unselectedItems = form.items.filter(
+      (item) => !item.productId && !item.productTitle
+    );
+    if (unselectedItems.length > 0) {
+      toast.error("มีรายการที่ยังไม่ได้เลือกสินค้า", {
+        description: `กรุณาเลือกสินค้าสำหรับรายการที่ ${unselectedItems.length} รายการที่ยังไม่ได้เลือกสินค้า`,
       });
       setIsSaving(false);
       return;
@@ -1728,286 +1753,329 @@ export const DocumentForm: FC<DocumentFormProps> = ({
         <Card>
           <CardHeader>
             <CardTitle>รายการ</CardTitle>
+            {(() => {
+              const hasUnselectedItems = form.items.some(
+                (item) => !item.productId && !item.productTitle
+              );
+              return hasUnselectedItems ? (
+                <div className="text-sm text-orange-600 bg-orange-50 p-2 rounded-md border border-orange-200">
+                  ⚠️
+                  กรุณาเลือกสินค้าสำหรับรายการที่ยังไม่ได้เลือกสินค้าก่อนเพิ่มรายการใหม่
+                </div>
+              ) : null;
+            })()}
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {form.items.map((item) => (
-                <div
-                  key={item.id}
-                  className="flex flex-col space-y-2 p-4 border rounded-lg relative bg-background"
-                >
-                  <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-[1fr_100px_140px_180px_100px_140px_140px] gap-4 items-start">
-                    <div className="space-y-2">
-                      <Label>สินค้าหรือบริการ</Label>
-                      <ProductAutocomplete
-                        value={
-                          item.productId && item.productTitle
-                            ? {
-                                id: parseInt(item.productId, 10),
-                                title: item.productTitle,
-                                description: item.description,
-                                property_info: item.description, // ใช้ description เป็น property_info
-                              }
-                            : null
-                        }
-                        onChange={(product) =>
-                          handleProductSelect(product, item.id)
-                        }
-                        onAddNew={() => {
-                          const newId = `new-${Date.now()}`;
-                          const newItem: DocumentItem = {
-                            id: newId,
-                            productId: undefined, // เปลี่ยนจาก "" เป็น undefined
-                            isNew: true,
-                            productTitle: "",
-                            quantity: 1,
-                            unitPrice: 0,
-                            priceType: form.priceType,
-                            discount: 0,
-                            discountType: "thb",
-                            tax: 7,
-                            withholdingTax: -1,
-                            description: "",
-                            unit: "",
-                            amountBeforeTax: 0,
-                            amount: 0,
-                            isEditing: true,
-                            withholding_tax_option: "ไม่ระบุ",
-                          };
-                          handleItemChange(newId, "isNew", true);
-                          handleItemChange(newId, "productId", undefined); // เพิ่มการตั้งค่า productId
-                          handleItemChange(newId, "productTitle", "");
-                          handleItemChange(newId, "quantity", 1);
-                          handleItemChange(newId, "unitPrice", 0);
-                          handleItemChange(newId, "priceType", form.priceType);
-                          handleItemChange(newId, "discount", 0);
-                          handleItemChange(newId, "discountType", "thb");
-                          handleItemChange(newId, "tax", 7);
-                          handleItemChange(newId, "withholdingTax", -1);
-                          handleItemChange(newId, "description", "");
-                          handleItemChange(newId, "unit", "");
-                          handleItemChange(newId, "amountBeforeTax", 0);
-                          handleItemChange(newId, "amount", 0);
-                          handleItemChange(newId, "isEditing", true);
-                          handleItemChange(newId, "isNew", true);
-                          handleItemChange(
-                            newId,
-                            "withholding_tax_option",
-                            "ไม่ระบุ"
-                          );
-                        }}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>จำนวน</Label>
-                      <Input
-                        type="number"
-                        value={
-                          typeof item.quantity === "number" ? item.quantity : 0
-                        }
-                        onChange={(e) =>
-                          handleItemChange(
-                            item.id,
-                            "quantity",
-                            Number(e.target.value) || 0
-                          )
-                        }
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>ราคาต่อหน่วย</Label>
-                      <Input
-                        type="number"
-                        value={item.unitPrice?.toFixed(2) ?? "0.00"}
-                        readOnly
-                        placeholder="0.00"
-                        className="bg-yellow-100 font-bold text-yellow-700 text-right"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>ส่วนลดต่อหน่วย</Label>
-                      <div className="flex items-center gap-2">
+              {form.items.map((item) => {
+                const isUnselected = !item.productId && !item.productTitle;
+                return (
+                  <div
+                    key={item.id}
+                    className={`flex flex-col space-y-2 p-4 border rounded-lg relative bg-background ${
+                      isUnselected ? "border-orange-300 bg-orange-50" : ""
+                    }`}
+                  >
+                    {isUnselected && (
+                      <div className="absolute top-2 right-2">
+                        <div className="bg-orange-100 text-orange-800 text-xs px-2 py-1 rounded-full flex items-center gap-1">
+                          <span className="w-2 h-2 bg-orange-500 rounded-full"></span>
+                          ยังไม่ได้เลือกสินค้า
+                        </div>
+                      </div>
+                    )}
+                    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-[1fr_100px_140px_180px_100px_140px_140px] gap-4 items-start">
+                      <div className="space-y-2">
+                        <Label>สินค้าหรือบริการ</Label>
+                        <ProductAutocomplete
+                          value={
+                            item.productId && item.productTitle
+                              ? {
+                                  id: parseInt(item.productId, 10),
+                                  title: item.productTitle,
+                                  description: item.description,
+                                  property_info: item.description, // ใช้ description เป็น property_info
+                                }
+                              : null
+                          }
+                          onChange={(product) =>
+                            handleProductSelect(product, item.id)
+                          }
+                          onAddNew={() => {
+                            const newId = `new-${Date.now()}`;
+                            const newItem: DocumentItem = {
+                              id: newId,
+                              productId: undefined, // เปลี่ยนจาก "" เป็น undefined
+                              isNew: true,
+                              productTitle: "",
+                              quantity: 1,
+                              unitPrice: 0,
+                              priceType: form.priceType,
+                              discount: 0,
+                              discountType: "thb",
+                              tax: 7,
+                              withholdingTax: -1,
+                              description: "",
+                              unit: "",
+                              amountBeforeTax: 0,
+                              amount: 0,
+                              isEditing: true,
+                              withholding_tax_option: "ไม่ระบุ",
+                            };
+                            handleItemChange(newId, "isNew", true);
+                            handleItemChange(newId, "productId", undefined); // เพิ่มการตั้งค่า productId
+                            handleItemChange(newId, "productTitle", "");
+                            handleItemChange(newId, "quantity", 1);
+                            handleItemChange(newId, "unitPrice", 0);
+                            handleItemChange(
+                              newId,
+                              "priceType",
+                              form.priceType
+                            );
+                            handleItemChange(newId, "discount", 0);
+                            handleItemChange(newId, "discountType", "thb");
+                            handleItemChange(newId, "tax", 7);
+                            handleItemChange(newId, "withholdingTax", -1);
+                            handleItemChange(newId, "description", "");
+                            handleItemChange(newId, "unit", "");
+                            handleItemChange(newId, "amountBeforeTax", 0);
+                            handleItemChange(newId, "amount", 0);
+                            handleItemChange(newId, "isEditing", true);
+                            handleItemChange(newId, "isNew", true);
+                            handleItemChange(
+                              newId,
+                              "withholding_tax_option",
+                              "ไม่ระบุ"
+                            );
+                          }}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>จำนวน</Label>
                         <Input
                           type="number"
                           value={
-                            typeof item.discount === "number"
-                              ? item.discount
+                            typeof item.quantity === "number"
+                              ? item.quantity
                               : 0
                           }
-                          min={0}
-                          max={
-                            item.discountType === "percentage"
-                              ? 100
-                              : getMaxDiscount(item)
+                          onChange={(e) =>
+                            handleItemChange(
+                              item.id,
+                              "quantity",
+                              Number(e.target.value) || 0
+                            )
                           }
-                          onChange={(e) => {
-                            let val = Number(e.target.value) || 0;
-                            if (item.discountType === "percentage") {
-                              if (val > 100) val = 100;
-                              if (val < 0) val = 0;
-                            } else {
-                              if (val > getMaxDiscount(item))
-                                val = getMaxDiscount(item);
-                              if (val < 0) val = 0;
-                            }
-                            handleItemChange(item.id, "discount", val);
-                          }}
                         />
-                        {item.discountType === "thb" &&
-                          item.discount > getMaxDiscount(item) && (
-                            <div className="text-xs text-red-500">
-                              ส่วนลดต้องไม่เกินราคารวมสินค้า
-                            </div>
-                          )}
-                        {item.discountType === "percentage" &&
-                          item.discount > 100 && (
-                            <div className="text-xs text-red-500">
-                              ส่วนลดต้องไม่เกิน 100%
-                            </div>
-                          )}
+                      </div>
+                      <div className="space-y-2">
+                        <Label>ราคาต่อหน่วย</Label>
+                        <Input
+                          type="number"
+                          value={item.unitPrice?.toFixed(2) ?? "0.00"}
+                          readOnly
+                          placeholder="0.00"
+                          className="bg-yellow-100 font-bold text-yellow-700 text-right"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>ส่วนลดต่อหน่วย</Label>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            type="number"
+                            value={
+                              typeof item.discount === "number"
+                                ? item.discount
+                                : 0
+                            }
+                            min={0}
+                            max={
+                              item.discountType === "percentage"
+                                ? 100
+                                : getMaxDiscount(item)
+                            }
+                            onChange={(e) => {
+                              let val = Number(e.target.value) || 0;
+                              if (item.discountType === "percentage") {
+                                if (val > 100) val = 100;
+                                if (val < 0) val = 0;
+                              } else {
+                                if (val > getMaxDiscount(item))
+                                  val = getMaxDiscount(item);
+                                if (val < 0) val = 0;
+                              }
+                              handleItemChange(item.id, "discount", val);
+                            }}
+                          />
+                          {item.discountType === "thb" &&
+                            item.discount > getMaxDiscount(item) && (
+                              <div className="text-xs text-red-500">
+                                ส่วนลดต้องไม่เกินราคารวมสินค้า
+                              </div>
+                            )}
+                          {item.discountType === "percentage" &&
+                            item.discount > 100 && (
+                              <div className="text-xs text-red-500">
+                                ส่วนลดต้องไม่เกิน 100%
+                              </div>
+                            )}
+                          <Select
+                            value={item.discountType}
+                            onValueChange={(value) =>
+                              handleItemChange(item.id, "discountType", value)
+                            }
+                          >
+                            <SelectTrigger className="w-[80px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="thb">บาท</SelectItem>
+                              <SelectItem value="percentage">%</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>ภาษี</Label>
                         <Select
-                          value={item.discountType}
+                          value={String(
+                            form.priceType === "NO_VAT" ? 0 : item.tax
+                          )}
                           onValueChange={(value) =>
-                            handleItemChange(item.id, "discountType", value)
+                            handleItemChange(item.id, "tax", parseInt(value))
                           }
+                          disabled={form.priceType === "NO_VAT"}
                         >
-                          <SelectTrigger className="w-[80px]">
+                          <SelectTrigger>
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="thb">บาท</SelectItem>
-                            <SelectItem value="percentage">%</SelectItem>
+                            <SelectItem value="7">7%</SelectItem>
+                            <SelectItem value="0">0%</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
+                      <div className="space-y-2">
+                        <Label>มูลค่าก่อนภาษี</Label>
+                        <Input
+                          type="text"
+                          readOnly
+                          value={getNetUnitPrice(
+                            item,
+                            form.priceType
+                          ).toLocaleString("th-TH", {
+                            minimumFractionDigits: 2,
+                          })}
+                          className="font-semibold bg-muted"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>หัก ณ ที่จ่าย</Label>
+                        <Select
+                          value={
+                            canWithholding(item)
+                              ? item.withholding_tax_option || "ไม่ระบุ"
+                              : "ไม่ระบุ"
+                          }
+                          onValueChange={(value) => {
+                            if (!canWithholding(item)) return;
+                            handleItemChange(
+                              item.id,
+                              "withholding_tax_option",
+                              value as any
+                            );
+                          }}
+                          disabled={!canWithholding(item)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="เลือก" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {WITHHOLDING_TAX_OPTIONS.map((option) => (
+                              <SelectItem
+                                key={option}
+                                value={option}
+                                disabled={
+                                  !canWithholding(item) && option !== "ไม่ระบุ"
+                                }
+                              >
+                                {option}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {!canWithholding(item) &&
+                          item.withholding_tax_option !== "ไม่ระบุ" && (
+                            <div className="text-xs text-red-500">
+                              ยอดหลังหักส่วนลดต้องมากกว่า 0 ถึงจะหัก ณ
+                              ที่จ่ายได้ ระบบจะรีเซ็ตเป็น 'ไม่ระบุ'
+                            </div>
+                          )}
+                        {item.withholding_tax_option === "กำหนดเอง" &&
+                          canWithholding(item) && (
+                            <>
+                              <Input
+                                type="number"
+                                placeholder="ระบุจำนวนเงิน"
+                                min={0}
+                                max={getMaxWithholding(item)}
+                                value={item.customWithholdingTaxAmount ?? ""}
+                                onChange={(e) => {
+                                  let val = Number(e.target.value) || 0;
+                                  if (val > getMaxWithholding(item))
+                                    val = getMaxWithholding(item);
+                                  if (val < 0) val = 0;
+                                  handleItemChange(
+                                    item.id,
+                                    "customWithholdingTaxAmount",
+                                    val
+                                  );
+                                }}
+                                className="mt-2"
+                                disabled={!canWithholding(item)}
+                              />
+                              {item.customWithholdingTaxAmount >
+                                getMaxWithholding(item) && (
+                                <div className="text-xs text-red-500">
+                                  หัก ณ ที่จ่ายต้องไม่เกินยอดหลังหักส่วนลด
+                                </div>
+                              )}
+                            </>
+                          )}
+                      </div>
                     </div>
-                    <div className="space-y-2">
-                      <Label>ภาษี</Label>
-                      <Select
-                        value={String(
-                          form.priceType === "NO_VAT" ? 0 : item.tax
-                        )}
-                        onValueChange={(value) =>
-                          handleItemChange(item.id, "tax", parseInt(value))
-                        }
-                        disabled={form.priceType === "NO_VAT"}
+                    <div className="flex justify-end">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removeItem(item.id)}
+                        className="text-muted-foreground hover:text-destructive"
                       >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="7">7%</SelectItem>
-                          <SelectItem value="0">0%</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>มูลค่าก่อนภาษี</Label>
-                      <Input
-                        type="text"
-                        readOnly
-                        value={getNetUnitPrice(
-                          item,
-                          form.priceType
-                        ).toLocaleString("th-TH", { minimumFractionDigits: 2 })}
-                        className="font-semibold bg-muted"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>หัก ณ ที่จ่าย</Label>
-                      <Select
-                        value={
-                          canWithholding(item)
-                            ? item.withholding_tax_option || "ไม่ระบุ"
-                            : "ไม่ระบุ"
-                        }
-                        onValueChange={(value) => {
-                          if (!canWithholding(item)) return;
-                          handleItemChange(
-                            item.id,
-                            "withholding_tax_option",
-                            value as any
-                          );
-                        }}
-                        disabled={!canWithholding(item)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="เลือก" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {WITHHOLDING_TAX_OPTIONS.map((option) => (
-                            <SelectItem
-                              key={option}
-                              value={option}
-                              disabled={
-                                !canWithholding(item) && option !== "ไม่ระบุ"
-                              }
-                            >
-                              {option}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      {!canWithholding(item) &&
-                        item.withholding_tax_option !== "ไม่ระบุ" && (
-                          <div className="text-xs text-red-500">
-                            ยอดหลังหักส่วนลดต้องมากกว่า 0 ถึงจะหัก ณ ที่จ่ายได้
-                            ระบบจะรีเซ็ตเป็น 'ไม่ระบุ'
-                          </div>
-                        )}
-                      {item.withholding_tax_option === "กำหนดเอง" &&
-                        canWithholding(item) && (
-                          <>
-                            <Input
-                              type="number"
-                              placeholder="ระบุจำนวนเงิน"
-                              min={0}
-                              max={getMaxWithholding(item)}
-                              value={item.customWithholdingTaxAmount ?? ""}
-                              onChange={(e) => {
-                                let val = Number(e.target.value) || 0;
-                                if (val > getMaxWithholding(item))
-                                  val = getMaxWithholding(item);
-                                if (val < 0) val = 0;
-                                handleItemChange(
-                                  item.id,
-                                  "customWithholdingTaxAmount",
-                                  val
-                                );
-                              }}
-                              className="mt-2"
-                              disabled={!canWithholding(item)}
-                            />
-                            {item.customWithholdingTaxAmount >
-                              getMaxWithholding(item) && (
-                              <div className="text-xs text-red-500">
-                                หัก ณ ที่จ่ายต้องไม่เกินยอดหลังหักส่วนลด
-                              </div>
-                            )}
-                          </>
-                        )}
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
                     </div>
                   </div>
-                  <div className="flex justify-end">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => removeItem(item.id)}
-                      className="text-muted-foreground hover:text-destructive"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
-              <Button
-                type="button"
-                variant="outline"
-                onClick={addNewItem}
-                className="w-full"
-              >
-                <Plus className="w-4 h-4 mr-2" /> เพิ่มรายการ
-              </Button>
+                );
+              })}
+              {(() => {
+                const hasUnselectedItems = form.items.some(
+                  (item) => !item.productId && !item.productTitle
+                );
+                return (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={addNewItem}
+                    className={`w-full ${hasUnselectedItems ? "border-orange-300 text-orange-600 hover:bg-orange-50" : ""}`}
+                    disabled={hasUnselectedItems}
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    {hasUnselectedItems
+                      ? "กรุณาเลือกสินค้าก่อนเพิ่มรายการใหม่"
+                      : "เพิ่มรายการ"}
+                  </Button>
+                );
+              })()}
             </div>
           </CardContent>
         </Card>
