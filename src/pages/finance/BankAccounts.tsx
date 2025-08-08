@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Building, Plus, CreditCard, Edit, Trash2 } from "lucide-react";
+import { Building, Plus, CreditCard, Edit, Trash2, Eye } from "lucide-react";
 import { bankAccountService, BankAccount } from "@/services/bankAccountService";
 import { toast } from "sonner";
 import BankAccountModal from "@/pages/sub/bank-account/BankAccountModal";
@@ -56,6 +56,20 @@ const BankAccounts = () => {
       default:
         return "text-gray-600";
     }
+  };
+
+  const getBankIcon = (bankName: string) => {
+    // ใช้ emoji หรือ icon ตามชื่อธนาคาร
+    if (bankName.includes("กรุงเทพ")) return "🏦";
+    if (bankName.includes("กสิกร")) return "🏛️";
+    if (bankName.includes("ไทยพาณิชย์")) return "🏢";
+    if (bankName.includes("กรุงไทย")) return "🏦";
+    if (bankName.includes("ทหารไทย")) return "🎖️";
+    if (bankName.includes("กรุงศรี")) return "🏛️";
+    if (bankName.includes("กรุงนคร")) return "🏦";
+    if (bankName.includes("ยูโอบี")) return "🏦";
+    if (bankName.includes("ซิตี้แบงก์")) return "🏦";
+    return "🏦";
   };
 
   const handleCreateAccount = () => {
@@ -155,6 +169,7 @@ const BankAccounts = () => {
                         navigate(`/finance/bank-accounts/${account.id}`)
                       }
                     >
+                      <Eye className="w-4 h-4 mr-1" />
                       ดูรายละเอียด
                     </Button>
                     <Button
@@ -183,7 +198,7 @@ const BankAccounts = () => {
 
       {!loading && accounts.length === 0 && (
         <div className="text-center py-12">
-          <CreditCard className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+          <Building className="w-16 h-16 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">
             ไม่มีบัญชีธนาคาร
           </h3>

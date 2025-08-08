@@ -88,15 +88,18 @@ CREATE TABLE `cash_flow` (
   `description` varchar(255) NOT NULL,
   `date` date NOT NULL,
   `bank_account_id` int(11) DEFAULT NULL,
+  `ewallet_id` int(11) DEFAULT NULL,
   `document_id` int(11) DEFAULT NULL,
   `category` varchar(100) DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),
   KEY `bank_account_id` (`bank_account_id`),
+  KEY `ewallet_id` (`ewallet_id`),
   KEY `document_id` (`document_id`),
   KEY `date` (`date`),
   CONSTRAINT `cash_flow_ibfk_1` FOREIGN KEY (`bank_account_id`) REFERENCES `bank_accounts` (`id`) ON DELETE SET NULL,
-  CONSTRAINT `cash_flow_ibfk_2` FOREIGN KEY (`document_id`) REFERENCES `documents` (`id`) ON DELETE SET NULL
+  CONSTRAINT `cash_flow_ibfk_2` FOREIGN KEY (`document_id`) REFERENCES `documents` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `cash_flow_ibfk_3` FOREIGN KEY (`ewallet_id`) REFERENCES `ewallets` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB AUTO_INCREMENT=87 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci
 
 CREATE TABLE `bank_accounts` (
@@ -111,4 +114,18 @@ CREATE TABLE `bank_accounts` (
   `updated_at` timestamp NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`id`),
   UNIQUE KEY `account_number` (`account_number`)
-) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci
+) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+
+CREATE TABLE `ewallets` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `wallet_name` varchar(255) NOT NULL,
+  `wallet_type` enum('Shopee','Lazada','Grab','Line','TrueMoney','PromptPay','อื่นๆ') NOT NULL,
+  `account_number` varchar(100) NOT NULL,
+  `current_balance` decimal(15,2) NOT NULL DEFAULT 0.00,
+  `currency` varchar(10) DEFAULT 'THB',
+  `is_active` tinyint(1) DEFAULT 1,
+  `created_at` timestamp NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `account_number` (`account_number`)
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;

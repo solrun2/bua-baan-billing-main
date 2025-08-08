@@ -33,6 +33,8 @@ import ReceiptForm from "./pages/sub/receipt/ReceiptForm";
 // Finance pages
 import BankAccounts from "./pages/finance/BankAccounts";
 import BankAccountDetail from "./pages/finance/BankAccountDetail";
+import Ewallets from "./pages/finance/Ewallets";
+import EwalletDetail from "./pages/finance/EwalletDetail";
 import Cashflow from "./pages/finance/Cashflow";
 
 // Settings pages
@@ -181,6 +183,8 @@ const App = () => {
                 path="/finance/bank-accounts/:id"
                 element={<BankAccountDetail />}
               />
+              <Route path="/finance/ewallets" element={<Ewallets />} />
+              <Route path="/finance/ewallets/:id" element={<EwalletDetail />} />
               <Route path="/finance/cashflow" element={<Cashflow />} />
 
               {/* Settings routes */}

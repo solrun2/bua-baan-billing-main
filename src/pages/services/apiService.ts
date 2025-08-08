@@ -412,6 +412,43 @@ const put = async (endpoint: string, data: any): Promise<any> => {
   }
 };
 
+const del = async (endpoint: string): Promise<any> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+    });
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(
+        errorData.error || `HTTP error! status: ${response.status}`
+      );
+    }
+    return await response.json();
+  } catch (error) {
+    console.error(`Error in DELETE ${endpoint}:`, error);
+    throw error;
+  }
+};
+
+const deleteDocument = async (id: string): Promise<void> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/documents/${id}`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+    });
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(
+        errorData.error || `HTTP error! status: ${response.status}`
+      );
+    }
+  } catch (error) {
+    console.error(`Error in DELETE document ${id}:`, error);
+    throw error;
+  }
+};
+
 export const apiService = {
   getDocuments,
   createDocument,
@@ -424,4 +461,6 @@ export const apiService = {
   get,
   post,
   put,
+  delete: del,
+  deleteDocument,
 };

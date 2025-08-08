@@ -1762,6 +1762,122 @@ app.get("/api/bank-accounts", async (req: Request, res: Response) => {
   }
 });
 
+// ===== API สำหรับ E-Wallet =====
+
+// GET: ดึงข้อมูล e-wallet ทั้งหมด
+app.get("/api/ewallets", async (req: Request, res: Response) => {
+  try {
+    const rows = await pool.query(`
+      SELECT 
+        ew.id, 
+        ew.wallet_name, 
+        ew.wallet_type, 
+        ew.account_number, 
+        ew.current_balance,
+        ew.currency, 
+        ew.is_active, 
+        ew.created_at, 
+        ew.updated_at
+      FROM ewallets ew
+      WHERE ew.is_active = 1
+      ORDER BY ew.wallet_name ASC
+    `);
+    res.json(rows);
+  } catch (err) {
+    console.error("Failed to fetch e-wallets:", err);
+    res.status(500).json({ error: "Failed to fetch e-wallets" });
+  }
+});
+
+// GET: ดึงข้อมูล e-wallet ตาม ID
+app.get("/api/ewallets/:id", async (req: Request, res: Response) => {
+  const { id } = req.params;
+  try {
+    const rows = await pool.query(
+      "SELECT * FROM ewallets WHERE id = ? AND is_active = 1",
+      [id]
+    );
+    if (Array.isArray(rows) && rows.length > 0) {
+      res.json(rows[0]);
+    } else {
+      res.status(404).json({ error: "E-wallet not found" });
+    }
+  } catch (err) {
+    console.error("Failed to fetch e-wallet:", err);
+    res.status(500).json({ error: "Failed to fetch e-wallet" });
+  }
+});
+
+// POST: สร้าง e-wallet ใหม่
+app.post("/api/ewallets", async (req: Request, res: Response) => {
+  const { wallet_name, wallet_type, account_number, current_balance } =
+    req.body;
+
+  if (!wallet_name || !wallet_type || !account_number) {
+    return res.status(400).json({
+      error: "Wallet name, wallet type, and account number are required",
+    });
+  }
+
+  try {
+    const queryResult = await pool.query(
+      "INSERT INTO ewallets (wallet_name, wallet_type, account_number, current_balance) VALUES (?, ?, ?, ?)",
+      [wallet_name, wallet_type, account_number, current_balance || 0]
+    );
+    const result = (queryResult as any)[0];
+    if (!result || !result.insertId) {
+      throw new Error("Failed to get new e-wallet ID after insert.");
+    }
+    res.json({
+      success: true,
+      id: result.insertId,
+    });
+  } catch (err) {
+    console.error("Failed to create e-wallet:", err);
+    if ((err as any).code === "ER_DUP_ENTRY") {
+      return res
+        .status(409)
+        .json({ error: "E-wallet with this account number already exists." });
+    }
+    res.status(500).json({ error: "Failed to create e-wallet" });
+  }
+});
+
+// PUT: อัปเดตข้อมูล e-wallet
+app.put("/api/ewallets/:id", async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const {
+    wallet_name,
+    wallet_type,
+    account_number,
+    current_balance,
+    is_active,
+  } = req.body;
+
+  try {
+    const result = await pool.query(
+      "UPDATE ewallets SET wallet_name = ?, wallet_type = ?, account_number = ?, current_balance = ?, is_active = ? WHERE id = ?",
+      [wallet_name, wallet_type, account_number, current_balance, is_active, id]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Failed to update e-wallet:", err);
+    res.status(500).json({ error: "Failed to update e-wallet" });
+  }
+});
+
+// DELETE: ลบ e-wallet (soft delete)
+app.delete("/api/ewallets/:id", async (req: Request, res: Response) => {
+  const { id } = req.params;
+  try {
+    await pool.query("UPDATE ewallets SET is_active = 0 WHERE id = ?", [id]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Failed to delete e-wallet:", err);
+    res.status(500).json({ error: "Failed to delete e-wallet" });
+  }
+});
+
 // GET: ดึงข้อมูลบัญชีธนาคารตาม ID
 app.get("/api/bank-accounts/:id", async (req: Request, res: Response) => {
   const { id } = req.params;
@@ -1792,16 +1908,25 @@ app.post("/api/bank-accounts", async (req: Request, res: Response) => {
   }
 
   try {
-    const result = await pool.query(
+    const queryResult = await pool.query(
       "INSERT INTO bank_accounts (bank_name, account_type, account_number, current_balance) VALUES (?, ?, ?, ?)",
       [bank_name, account_type, account_number, current_balance || 0]
     );
+    const result = (queryResult as any)[0];
+    if (!result || !result.insertId) {
+      throw new Error("Failed to get new bank account ID after insert.");
+    }
     res.json({
       success: true,
-      id: (result as any)[0].insertId,
+      id: result.insertId,
     });
   } catch (err) {
     console.error("Failed to create bank account:", err);
+    if ((err as any).code === "ER_DUP_ENTRY") {
+      return res.status(409).json({
+        error: "Bank account with this account number already exists.",
+      });
+    }
     res.status(500).json({ error: "Failed to create bank account" });
   }
 });
@@ -1953,7 +2078,7 @@ app.post("/api/cashflow", async (req: Request, res: Response) => {
   }
 
   try {
-    const result = await pool.query(
+    const queryResult = await pool.query(
       "INSERT INTO cash_flow (type, amount, description, date, bank_account_id, document_id, category) VALUES (?, ?, ?, ?, ?, ?, ?)",
       [
         type,
@@ -1965,6 +2090,10 @@ app.post("/api/cashflow", async (req: Request, res: Response) => {
         category || null,
       ]
     );
+    const result = (queryResult as any)[0];
+    if (!result || !result.insertId) {
+      throw new Error("Failed to get new cash flow ID after insert.");
+    }
 
     // อัปเดตยอดบัญชีธนาคารถ้ามี
     if (bank_account_id) {
@@ -1984,7 +2113,7 @@ app.post("/api/cashflow", async (req: Request, res: Response) => {
 
     res.json({
       success: true,
-      id: (result as any)[0].insertId,
+      id: result.insertId,
     });
   } catch (err) {
     console.error("Failed to create cash flow entry:", err);
@@ -2087,6 +2216,39 @@ app.post(
     }
   }
 );
+
+// GET: ดึงข้อมูล cash flow ตาม e-wallet ID
+app.get("/api/cash-flow", async (req: Request, res: Response) => {
+  const { ewallet_id } = req.query;
+
+  if (!ewallet_id) {
+    return res.status(400).json({ error: "ewallet_id is required" });
+  }
+
+  try {
+    const rows = await pool.query(
+      `
+      SELECT 
+        cf.id,
+        cf.date,
+        cf.description,
+        cf.type,
+        cf.amount,
+        cf.category,
+        cf.created_at
+      FROM cash_flow cf
+      WHERE cf.ewallet_id = ?
+      ORDER BY cf.date DESC, cf.created_at DESC
+    `,
+      [ewallet_id]
+    );
+
+    res.json(rows);
+  } catch (err) {
+    console.error("Failed to fetch cash flow:", err);
+    res.status(500).json({ error: "Failed to fetch cash flow" });
+  }
+});
 
 app.listen(port, () => {
   console.log(`Backend server is running on http://localhost:${port}`);

@@ -4,24 +4,24 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
   ArrowLeft,
-  CreditCard,
+  Smartphone,
   TrendingUp,
   TrendingDown,
   Calendar,
   Clock,
-  Building2,
+  CreditCard,
 } from "lucide-react";
-import {
-  bankAccountService,
-  BankAccount,
-  CashFlowEntry,
-} from "@/services/bankAccountService";
 import { toast } from "sonner";
+import {
+  ewalletService,
+  Ewallet,
+  CashFlowEntry,
+} from "../../services/ewalletService";
 
-const BankAccountDetail = () => {
+const EwalletDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [account, setAccount] = useState<BankAccount | null>(null);
+  const [ewallet, setEwallet] = useState<Ewallet | null>(null);
   const [cashFlowEntries, setCashFlowEntries] = useState<CashFlowEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [monthlyIncome, setMonthlyIncome] = useState(0);
@@ -29,20 +29,18 @@ const BankAccountDetail = () => {
 
   useEffect(() => {
     if (id) {
-      loadAccountDetail();
+      loadEwalletDetail();
     }
   }, [id]);
 
-  const loadAccountDetail = async () => {
+  const loadEwalletDetail = async () => {
     try {
       setLoading(true);
-      const accountData = await bankAccountService.getBankAccount(
-        parseInt(id!)
-      );
-      setAccount(accountData);
+      const ewalletData = await ewalletService.getEwallet(parseInt(id!));
+      setEwallet(ewalletData);
 
-      // ดึงรายการ cash flow ของบัญชีนี้
-      const cashFlowData = await bankAccountService.getCashFlowByAccount(
+      // ดึงข้อมูล cash flow
+      const cashFlowData = await ewalletService.getCashFlowByEwallet(
         parseInt(id!)
       );
       setCashFlowEntries(cashFlowData);
@@ -70,8 +68,8 @@ const BankAccountDetail = () => {
       setMonthlyIncome(income);
       setMonthlyExpense(expense);
     } catch (error) {
-      console.error("Failed to load account detail:", error);
-      toast.error("ไม่สามารถโหลดข้อมูลบัญชีธนาคารได้");
+      console.error("Failed to load ewallet detail:", error);
+      toast.error("ไม่สามารถโหลดข้อมูล e-wallet ได้");
     } finally {
       setLoading(false);
     }
@@ -99,50 +97,45 @@ const BankAccountDetail = () => {
     });
   };
 
-  const getAccountTypeColor = (type: string) => {
+  const getWalletIcon = (type: string) => {
     switch (type) {
-      case "ออมทรัพย์":
-        return "text-green-600";
-      case "กระแสรายวัน":
-        return "text-blue-600";
-      case "ประจำ":
-        return "text-purple-600";
+      case "Shopee":
+        return "🛍️";
+      case "Lazada":
+        return "📦";
+      case "Grab":
+        return "🚗";
+      case "Line":
+        return "💬";
+      case "TrueMoney":
+        return "💳";
+      case "PromptPay":
+        return "📱";
       default:
-        return "text-gray-600";
+        return "💳";
     }
-  };
-
-  const getBankIcon = (bankName: string) => {
-    // ใช้ emoji หรือ icon ตามชื่อธนาคาร
-    if (bankName.includes("กรุงเทพ")) return "🏦";
-    if (bankName.includes("กสิกร")) return "🏛️";
-    if (bankName.includes("ไทยพาณิชย์")) return "🏢";
-    if (bankName.includes("กรุงไทย")) return "🏦";
-    if (bankName.includes("ทหารไทย")) return "🎖️";
-    if (bankName.includes("กรุงศรี")) return "🏛️";
-    return "🏦";
   };
 
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="flex items-center gap-2">
-          <div className="w-6 h-6 animate-spin rounded-full border-2 border-blue-600 border-t-transparent"></div>
+          <div className="w-6 h-6 animate-spin rounded-full border-2 border-purple-600 border-t-transparent"></div>
           <span>กำลังโหลดข้อมูล...</span>
         </div>
       </div>
     );
   }
 
-  if (!account) {
+  if (!ewallet) {
     return (
       <div className="text-center py-12">
-        <Building2 className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+        <Smartphone className="w-16 h-16 text-gray-400 mx-auto mb-4" />
         <h3 className="text-lg font-medium text-gray-900 mb-2">
-          ไม่พบข้อมูลบัญชีธนาคาร
+          ไม่พบข้อมูล E-Wallet
         </h3>
-        <Button onClick={() => navigate("/finance/bank-accounts")}>
-          กลับไปหน้าบัญชีธนาคาร
+        <Button onClick={() => navigate("/finance/ewallets")}>
+          กลับไปหน้า E-Wallet
         </Button>
       </div>
     );
@@ -155,20 +148,22 @@ const BankAccountDetail = () => {
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => navigate("/finance/bank-accounts")}
+          onClick={() => navigate("/finance/ewallets")}
         >
           <ArrowLeft className="w-4 h-4" />
         </Button>
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center">
-            <span className="text-2xl">{getBankIcon(account.bank_name)}</span>
+          <div className="w-12 h-12 rounded-xl bg-purple-100 flex items-center justify-center">
+            <span className="text-2xl">
+              {getWalletIcon(ewallet.wallet_type)}
+            </span>
           </div>
           <div>
             <h1 className="text-2xl font-bold text-foreground">
-              {account.bank_name}
+              {ewallet.wallet_name}
             </h1>
             <p className="font-thin text-gray-400">
-              {account.account_type} • {account.account_number}
+              {ewallet.wallet_type} • {ewallet.account_number}
             </p>
           </div>
         </div>
@@ -185,10 +180,10 @@ const BankAccountDetail = () => {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-blue-900">
-              {formatBalance(account.current_balance)}
+              {formatBalance(ewallet.current_balance)}
             </div>
             <p className="text-sm text-blue-600 mt-1">
-              อัปเดตล่าสุด: {formatDate(account.updated_at)}
+              อัปเดตล่าสุด: {formatDate(ewallet.updated_at)}
             </p>
           </CardContent>
         </Card>
@@ -242,38 +237,6 @@ const BankAccountDetail = () => {
         </Card>
       </div>
 
-      {/* Account Info */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Building2 className="w-5 h-5" />
-            ข้อมูลบัญชี
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <p className="text-sm text-muted-foreground">ประเภทบัญชี</p>
-              <p
-                className={`font-medium ${getAccountTypeColor(account.account_type)}`}
-              >
-                {account.account_type}
-              </p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">เลขที่บัญชี</p>
-              <p className="font-medium text-yellow-700">
-                {account.account_number}
-              </p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">สกุลเงิน</p>
-              <p className="font-medium">{account.currency}</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
       {/* Transaction History */}
       <Card>
         <CardHeader>
@@ -285,8 +248,8 @@ const BankAccountDetail = () => {
         <CardContent>
           {cashFlowEntries.length === 0 ? (
             <div className="text-center py-8">
-              <Building2 className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-500">ยังไม่มีประวัติการเคลื่อนไหวเงิน</p>
+              <Smartphone className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-500">ยังไม่มีรายการธุรกรรม</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -319,11 +282,6 @@ const BankAccountDetail = () => {
                         <Clock className="w-3 h-3" />
                         <span>{formatTime(entry.date)}</span>
                       </div>
-                      {entry.category && (
-                        <p className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded-full inline-block mt-1">
-                          {entry.category}
-                        </p>
-                      )}
                     </div>
                   </div>
                   <div className="text-right">
@@ -337,6 +295,9 @@ const BankAccountDetail = () => {
                       {entry.type === "income" ? "+" : "-"}
                       {formatBalance(entry.amount)}
                     </p>
+                    <p className="text-sm text-muted-foreground">
+                      ยอดคงเหลือ: {formatBalance(entry.balance_after)}
+                    </p>
                   </div>
                 </div>
               ))}
@@ -348,4 +309,4 @@ const BankAccountDetail = () => {
   );
 };
 
-export default BankAccountDetail;
+export default EwalletDetail;

@@ -1,9 +1,20 @@
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { bankAccountService, BankAccount } from "@/services/bankAccountService";
 import { toast } from "sonner";
 
@@ -14,7 +25,12 @@ interface BankAccountModalProps {
   onSuccess: () => void;
 }
 
-const BankAccountModal = ({ isOpen, onClose, account, onSuccess }: BankAccountModalProps) => {
+const BankAccountModal = ({
+  isOpen,
+  onClose,
+  account,
+  onSuccess,
+}: BankAccountModalProps) => {
   const [formData, setFormData] = useState({
     bank_name: "",
     account_type: "ออมทรัพย์",
@@ -45,7 +61,7 @@ const BankAccountModal = ({ isOpen, onClose, account, onSuccess }: BankAccountMo
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formData.bank_name || !formData.account_number) {
       toast.error("กรุณากรอกข้อมูลให้ครบถ้วน");
       return;
@@ -53,7 +69,7 @@ const BankAccountModal = ({ isOpen, onClose, account, onSuccess }: BankAccountMo
 
     try {
       setLoading(true);
-      
+
       if (isEditing && account) {
         await bankAccountService.updateBankAccount(account.id, formData);
         toast.success("อัปเดตบัญชีธนาคารสำเร็จ");
@@ -61,19 +77,27 @@ const BankAccountModal = ({ isOpen, onClose, account, onSuccess }: BankAccountMo
         await bankAccountService.createBankAccount(formData);
         toast.success("สร้างบัญชีธนาคารสำเร็จ");
       }
-      
+
       onSuccess();
       onClose();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to save bank account:", error);
-      toast.error(isEditing ? "ไม่สามารถอัปเดตบัญชีธนาคารได้" : "ไม่สามารถสร้างบัญชีธนาคารได้");
+      if (error?.response?.status === 409) {
+        toast.error("เลขที่บัญชีนี้มีอยู่ในระบบแล้ว");
+      } else {
+        toast.error(
+          isEditing
+            ? "ไม่สามารถอัปเดตบัญชีธนาคารได้"
+            : "ไม่สามารถสร้างบัญชีธนาคารได้"
+        );
+      }
     } finally {
       setLoading(false);
     }
   };
 
   const handleInputChange = (field: string, value: string | number) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       [field]: value,
     }));
@@ -87,7 +111,7 @@ const BankAccountModal = ({ isOpen, onClose, account, onSuccess }: BankAccountMo
             {isEditing ? "แก้ไขบัญชีธนาคาร" : "เพิ่มบัญชีธนาคาร"}
           </DialogTitle>
         </DialogHeader>
-        
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="bank_name">ชื่อธนาคาร</Label>
@@ -104,7 +128,9 @@ const BankAccountModal = ({ isOpen, onClose, account, onSuccess }: BankAccountMo
             <Label htmlFor="account_type">ประเภทบัญชี</Label>
             <Select
               value={formData.account_type}
-              onValueChange={(value) => handleInputChange("account_type", value)}
+              onValueChange={(value) =>
+                handleInputChange("account_type", value)
+              }
             >
               <SelectTrigger>
                 <SelectValue />
@@ -122,7 +148,9 @@ const BankAccountModal = ({ isOpen, onClose, account, onSuccess }: BankAccountMo
             <Input
               id="account_number"
               value={formData.account_number}
-              onChange={(e) => handleInputChange("account_number", e.target.value)}
+              onChange={(e) =>
+                handleInputChange("account_number", e.target.value)
+              }
               placeholder="เช่น 123-4-56789-0"
               required
             />
@@ -134,7 +162,12 @@ const BankAccountModal = ({ isOpen, onClose, account, onSuccess }: BankAccountMo
               id="current_balance"
               type="number"
               value={formData.current_balance}
-              onChange={(e) => handleInputChange("current_balance", parseFloat(e.target.value) || 0)}
+              onChange={(e) =>
+                handleInputChange(
+                  "current_balance",
+                  parseFloat(e.target.value) || 0
+                )
+              }
               placeholder="0.00"
               step="0.01"
             />
@@ -150,12 +183,8 @@ const BankAccountModal = ({ isOpen, onClose, account, onSuccess }: BankAccountMo
             >
               ยกเลิก
             </Button>
-            <Button
-              type="submit"
-              disabled={loading}
-              className="flex-1"
-            >
-              {loading ? "กำลังบันทึก..." : (isEditing ? "อัปเดต" : "สร้าง")}
+            <Button type="submit" disabled={loading} className="flex-1">
+              {loading ? "กำลังบันทึก..." : isEditing ? "อัปเดต" : "สร้าง"}
             </Button>
           </div>
         </form>
@@ -164,4 +193,4 @@ const BankAccountModal = ({ isOpen, onClose, account, onSuccess }: BankAccountMo
   );
 };
 
-export default BankAccountModal; 
+export default BankAccountModal;
