@@ -55,6 +55,7 @@ import {
 import { ProductForm } from "./ProductForm";
 import { documentService } from "@/pages/services/documentService";
 import { bankAccountService, BankAccount } from "@/services/bankAccountService";
+import { ewalletService, Ewallet } from "@/services/ewalletService";
 import {
   Accordion,
   AccordionItem,
@@ -933,15 +934,25 @@ export const DocumentForm: FC<DocumentFormProps> = ({
       }
 
       // ตรวจสอบว่าถ้าเป็นโอนเงินหรือบัตรเครดิตแล้วต้องเลือกบัญชีธนาคาร
-      const invalidChannels = validChannels.filter(
+      const invalidBankChannels = validChannels.filter(
         (c) =>
           (c.method === "โอนเงิน" || c.method === "บัตรเครดิต") &&
           !c.bankAccountId
       );
-      if (invalidChannels.length > 0) {
+      if (invalidBankChannels.length > 0) {
         toast.error(
           "กรุณาเลือกบัญชีธนาคารสำหรับการชำระด้วยโอนเงินหรือบัตรเครดิต"
         );
+        setIsSaving(false);
+        return;
+      }
+
+      // ตรวจสอบว่าถ้าเป็น E-Wallet แล้วต้องเลือก E-Wallet
+      const invalidEwalletChannels = validChannels.filter(
+        (c) => c.method === "E-Wallet" && !c.ewalletId
+      );
+      if (invalidEwalletChannels.length > 0) {
+        toast.error("กรุณาเลือก E-Wallet สำหรับการชำระด้วย E-Wallet");
         setIsSaving(false);
         return;
       }
@@ -1044,6 +1055,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
             amount: Number(c.amount),
             note: c.note || "",
             bankAccountId: c.bankAccountId,
+            ewalletId: c.ewalletId,
           })),
         fees: fees
           .filter((f) => f.enabled)
@@ -1082,6 +1094,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
     { enabled: false, docType: "", docNumber: "", amount: 0, note: "" },
   ]);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const [ewallets, setEwallets] = useState<Ewallet[]>([]);
 
   // โหลดข้อมูลบัญชีธนาคาร
   useEffect(() => {
@@ -1096,11 +1109,32 @@ export const DocumentForm: FC<DocumentFormProps> = ({
     loadBankAccounts();
   }, []);
 
+  // โหลดข้อมูล e-wallets
+  useEffect(() => {
+    const loadEwallets = async () => {
+      try {
+        const wallets = await ewalletService.getEwallets();
+        console.log("🔍 [Ewallets] E-wallets loaded:", wallets);
+        setEwallets(wallets);
+      } catch (error) {
+        console.error("Failed to load e-wallets:", error);
+      }
+    };
+    loadEwallets();
+  }, []);
+
   // ฟังก์ชันเพิ่ม/ลบ/แก้ไขแต่ละกลุ่ม
   const addPaymentChannel = () =>
     setPaymentChannels([
       ...paymentChannels,
-      { enabled: true, method: "", amount: 0, note: "", bankAccountId: null },
+      {
+        enabled: true,
+        method: "",
+        amount: 0,
+        note: "",
+        bankAccountId: null,
+        ewalletId: null,
+      },
     ]);
   const removePaymentChannel = (idx: number) =>
     setPaymentChannels(paymentChannels.filter((_, i) => i !== idx));
@@ -1118,20 +1152,26 @@ export const DocumentForm: FC<DocumentFormProps> = ({
       }
     }
 
-    // ถ้าเปลี่ยนวิธีการชำระเงิน ให้รีเซ็ตบัญชีธนาคารตามประเภท
+    // ถ้าเปลี่ยนวิธีการชำระเงิน ให้รีเซ็ตบัญชีธนาคารและ e-wallet ตามประเภท
     if (field === "method") {
       const newChannel = { ...paymentChannels[idx], [field]: value };
 
-      // ถ้าเป็นเงินสด ให้รีเซ็ตบัญชีธนาคารเป็น null
+      // ถ้าเป็นเงินสด ให้รีเซ็ตบัญชีธนาคารและ e-wallet เป็น null
       if (value === "เงินสด") {
         newChannel.bankAccountId = null;
+        newChannel.ewalletId = null;
       }
-      // ถ้าเป็นโอนเงินหรือบัตรเครดิต และยังไม่ได้เลือกบัญชี ให้แสดงข้อความเตือน
-      else if (
-        (value === "โอนเงิน" || value === "บัตรเครดิต") &&
-        !newChannel.bankAccountId
-      ) {
-        toast.warning("กรุณาเลือกบัญชีธนาคารสำหรับการชำระด้วย" + value);
+      // ถ้าเป็น e-wallet ให้รีเซ็ตบัญชีธนาคารเป็น null
+      else if (value === "E-Wallet") {
+        newChannel.bankAccountId = null;
+      }
+      // ถ้าเป็นโอนเงินหรือบัตรเครดิต ให้รีเซ็ต e-wallet เป็น null
+      else if (value === "โอนเงิน" || value === "บัตรเครดิต") {
+        newChannel.ewalletId = null;
+        // ถ้ายังไม่ได้เลือกบัญชี ให้แสดงข้อความเตือน
+        if (!newChannel.bankAccountId) {
+          toast.warning("กรุณาเลือกบัญชีธนาคารสำหรับการชำระด้วย" + value);
+        }
       }
 
       setPaymentChannels(
@@ -1228,7 +1268,8 @@ export const DocumentForm: FC<DocumentFormProps> = ({
       const isValid =
         channel.method === "เงินสด" ||
         ((channel.method === "โอนเงิน" || channel.method === "บัตรเครดิต") &&
-          channel.bankAccountId);
+          channel.bankAccountId) ||
+        (channel.method === "E-Wallet" && channel.ewalletId);
 
       return {
         ...channel,
@@ -1237,7 +1278,9 @@ export const DocumentForm: FC<DocumentFormProps> = ({
           !isValid &&
           (channel.method === "โอนเงิน" || channel.method === "บัตรเครดิต")
             ? `กรุณาเลือกบัญชีธนาคารสำหรับ${channel.method}`
-            : null,
+            : !isValid && channel.method === "E-Wallet"
+              ? `กรุณาเลือก E-Wallet สำหรับการชำระด้วย E-Wallet`
+              : null,
       };
     });
 
@@ -1337,9 +1380,14 @@ export const DocumentForm: FC<DocumentFormProps> = ({
             amount: ch.amount || 0,
             note: ch.note || "",
             bankAccountId: ch.bankAccountId || null,
+            ewalletId: ch.ewalletId || null,
           }));
 
-          console.log("✅ [PaymentChannels] Setting channels:", channels);
+          console.log(
+            "🔍 [InitialData] Processing payment channels from initialData:",
+            paymentChannelsData
+          );
+          console.log("🔍 [InitialData] Payment channels set:", channels);
           setPaymentChannels(channels);
         } else {
           console.log("⚠️ [PaymentChannels] No data found, using default");
@@ -1351,6 +1399,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
               amount: 0,
               note: "",
               bankAccountId: null,
+              ewalletId: null,
             },
           ]);
         }
@@ -1366,6 +1415,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
             amount: 0,
             note: "",
             bankAccountId: null,
+            ewalletId: null,
           },
         ]);
       }
@@ -1379,6 +1429,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
           amount: 0,
           note: "",
           bankAccountId: null,
+          ewalletId: null,
         },
       ]);
     }
@@ -1387,6 +1438,11 @@ export const DocumentForm: FC<DocumentFormProps> = ({
     documentType,
     initialData.receipt_details?.payment_channels?.length,
   ]);
+
+  // Debug: Monitor paymentChannels state changes
+  useEffect(() => {
+    console.log("🔍 [PaymentChannels] State changed:", paymentChannels);
+  }, [paymentChannels]);
 
   return (
     <div className={containerClassName || "container mx-auto py-6"}>
@@ -2217,27 +2273,77 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                           <SelectItem value="บัตรเครดิต">
                             💳 บัตรเครดิต
                           </SelectItem>
+                          <SelectItem value="E-Wallet">📱 E-Wallet</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
-                    <div className="col-span-2">
+                    <div className="col-span-4">
+                      {(() => {
+                        console.log(
+                          "🔍 [Select] Channel:",
+                          channel,
+                          "Value:",
+                          channel.ewalletId
+                            ? `ewallet-${channel.ewalletId}`
+                            : channel.bankAccountId
+                              ? `bank-${channel.bankAccountId}`
+                              : "null"
+                        );
+                        return null;
+                      })()}
                       <Select
-                        value={channel.bankAccountId?.toString() || "null"}
-                        onValueChange={(v) =>
-                          updatePaymentChannel(
-                            idx,
-                            "bankAccountId",
-                            v && v !== "null" ? parseInt(v) : null
-                          )
+                        value={
+                          channel.ewalletId
+                            ? `ewallet-${channel.ewalletId}`
+                            : channel.bankAccountId
+                              ? `bank-${channel.bankAccountId}`
+                              : "null"
                         }
-                        disabled={channel.method === "เงินสด"}
+                        onValueChange={(v) => {
+                          // Update both values in a single state update to avoid conflicts
+                          const updatedChannel = { ...channel };
+
+                          if (v === "null") {
+                            // Reset both values when "ไม่ระบุ" is selected
+                            updatedChannel.bankAccountId = null;
+                            updatedChannel.ewalletId = null;
+                          } else if (v.startsWith("bank-")) {
+                            // Bank account selected
+                            const accountId = parseInt(v.replace("bank-", ""));
+                            updatedChannel.bankAccountId = accountId;
+                            updatedChannel.ewalletId = null;
+                          } else if (v.startsWith("ewallet-")) {
+                            // E-wallet selected
+                            const walletId = parseInt(
+                              v.replace("ewallet-", "")
+                            );
+                            updatedChannel.ewalletId = walletId;
+                            updatedChannel.bankAccountId = null;
+                          }
+
+                          setPaymentChannels(
+                            paymentChannels.map((c, i) =>
+                              i === idx ? updatedChannel : c
+                            )
+                          );
+                        }}
+                        disabled={
+                          channel.method === "เงินสด" ||
+                          (channel.method !== "E-Wallet" &&
+                            channel.method !== "โอนเงิน" &&
+                            channel.method !== "บัตรเครดิต")
+                        }
                       >
                         <SelectTrigger
                           className={`bg-white border-blue-100 ${
-                            channel.method === "เงินสด"
+                            channel.method === "เงินสด" ||
+                            (channel.method !== "E-Wallet" &&
+                              channel.method !== "โอนเงิน" &&
+                              channel.method !== "บัตรเครดิต")
                               ? "opacity-50 cursor-not-allowed bg-gray-50"
                               : channel.method === "โอนเงิน" ||
-                                  channel.method === "บัตรเครดิต"
+                                  channel.method === "บัตรเครดิต" ||
+                                  channel.method === "E-Wallet"
                                 ? "border-blue-300 bg-blue-50"
                                 : ""
                           }`}
@@ -2249,7 +2355,9 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                                 : channel.method === "โอนเงิน" ||
                                     channel.method === "บัตรเครดิต"
                                   ? "เลือกบัญชีธนาคาร *"
-                                  : "เลือกบัญชีธนาคาร"
+                                  : channel.method === "E-Wallet"
+                                    ? "เลือก E-Wallet *"
+                                    : "เลือกบัญชี"
                             }
                           />
                         </SelectTrigger>
@@ -2259,27 +2367,49 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                               ? "ไม่ระบุ (เงินสด)"
                               : "ไม่ระบุ"}
                           </SelectItem>
-                          {bankAccounts.map((account) => (
-                            <SelectItem
-                              key={account.id}
-                              value={account.id.toString()}
-                            >
-                              {account.bank_name} - {account.account_number}
-                            </SelectItem>
-                          ))}
+
+                          {/* Bank Accounts Section - Only show for bank transfer or credit card */}
+                          {(channel.method === "โอนเงิน" ||
+                            channel.method === "บัตรเครดิต") &&
+                            bankAccounts.length > 0 && (
+                              <>
+                                <div className="px-2 py-1.5 text-xs font-semibold text-gray-500 bg-gray-50">
+                                  🏦 บัญชีธนาคาร
+                                </div>
+                                {bankAccounts.map((account) => (
+                                  <SelectItem
+                                    key={`bank-${account.id}`}
+                                    value={`bank-${account.id}`}
+                                  >
+                                    {account.bank_name} -{" "}
+                                    {account.account_number}
+                                  </SelectItem>
+                                ))}
+                              </>
+                            )}
+
+                          {/* E-Wallets Section - Only show for E-Wallet method */}
+                          {channel.method === "E-Wallet" &&
+                            ewallets.length > 0 && (
+                              <>
+                                <div className="px-2 py-1.5 text-xs font-semibold text-gray-500 bg-gray-50">
+                                  📱 E-Wallet
+                                </div>
+                                {ewallets.map((wallet) => (
+                                  <SelectItem
+                                    key={`ewallet-${wallet.id}`}
+                                    value={`ewallet-${wallet.id}`}
+                                  >
+                                    {wallet.wallet_name} -{" "}
+                                    {wallet.account_number}
+                                  </SelectItem>
+                                ))}
+                              </>
+                            )}
                         </SelectContent>
                       </Select>
-                      {channel.method === "โอนเงิน" ||
-                      channel.method === "บัตรเครดิต" ? (
-                        <div className="flex items-center gap-1 mt-1">
-                          <span className="text-blue-500 text-xs">*</span>
-                          <span className="text-blue-600 text-xs">
-                            จำเป็นต้องเลือกบัญชีธนาคาร
-                          </span>
-                        </div>
-                      ) : null}
 
-                      {/* แสดงข้อความเตือนถ้าไม่เลือกบัญชีธนาคาร */}
+                      {/* แสดงข้อความเตือนถ้าไม่เลือกบัญชี */}
                       {channel.enabled &&
                         channel.method &&
                         Number(channel.amount) > 0 &&
@@ -2290,6 +2420,18 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                             <span className="text-red-500 text-xs">⚠️</span>
                             <span className="text-red-600 text-xs">
                               เลือกบัญชีธนาคาร
+                            </span>
+                          </div>
+                        )}
+                      {channel.enabled &&
+                        channel.method &&
+                        Number(channel.amount) > 0 &&
+                        channel.method === "E-Wallet" &&
+                        !channel.ewalletId && (
+                          <div className="flex items-center gap-1 mt-1">
+                            <span className="text-red-500 text-xs">⚠️</span>
+                            <span className="text-red-600 text-xs">
+                              เลือก E-Wallet
                             </span>
                           </div>
                         )}
@@ -2305,7 +2447,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                         }
                       />
                     </div>
-                    <div className="col-span-6">
+                    <div className="col-span-4">
                       <Input
                         className="bg-white border-blue-100"
                         placeholder="หมายเหตุ (ไม่บังคับ)"

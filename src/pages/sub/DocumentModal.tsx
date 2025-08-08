@@ -138,6 +138,8 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
   const [relatedDocument, setRelatedDocument] = useState<any>(null);
   // เพิ่ม state สำหรับข้อมูลธนาคาร
   const [bankAccounts, setBankAccounts] = useState<any[]>([]);
+  // เพิ่ม state สำหรับข้อมูล e-wallet
+  const [ewallets, setEwallets] = useState<any[]>([]);
 
   useEffect(() => {
     if (!open || !document?.items) {
@@ -235,10 +237,35 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
     }
   }, [open]);
 
+  // ดึงข้อมูล e-wallet
+  useEffect(() => {
+    const fetchEwallets = async () => {
+      try {
+        const response = await fetch("http://localhost:3001/api/ewallets");
+        if (response.ok) {
+          const data = await response.json();
+          setEwallets(data);
+        }
+      } catch (error) {
+        console.error("Failed to fetch e-wallets:", error);
+      }
+    };
+
+    if (open) {
+      fetchEwallets();
+    }
+  }, [open]);
+
   // ฟังก์ชันหาชื่อธนาคารจาก ID
   const getBankName = (bankAccountId: number) => {
     const bankAccount = bankAccounts.find((bank) => bank.id === bankAccountId);
     return bankAccount ? bankAccount.bank_name : `ธนาคาร ${bankAccountId}`;
+  };
+
+  // ฟังก์ชันหาชื่อ e-wallet จาก ID
+  const getEwalletName = (ewalletId: number) => {
+    const ewallet = ewallets.find((wallet) => wallet.id === ewalletId);
+    return ewallet ? ewallet.wallet_name : `E-Wallet ${ewalletId}`;
   };
 
   // Log document และ related_document_id ทุกครั้งที่ modal เปิด
@@ -556,6 +583,8 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
                                     "โอนเงิน" && "🏦"}
                                   {(channel?.method || channel?.channel) ===
                                     "บัตรเครดิต" && "💳"}
+                                  {(channel?.method || channel?.channel) ===
+                                    "E-Wallet" && "📱"}
                                   {channel?.method ||
                                     channel?.channel ||
                                     "ไม่ระบุ"}
@@ -574,6 +603,11 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
                                       ({getBankName(channel.bankAccountId)})
                                     </span>
                                   )}
+                                {channel?.ewalletId && (
+                                  <span className="text-purple-600">
+                                    ({getEwalletName(channel.ewalletId)})
+                                  </span>
+                                )}
                               </div>
                               <div className="font-semibold text-green-700">
                                 {formatCurrency(channel?.amount || 0)}

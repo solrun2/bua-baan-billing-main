@@ -722,14 +722,15 @@ async function createDocumentFromServer(data: any, pool: any) {
           if (channel.amount > 0) {
             // เพิ่มรายการรายได้
             await conn.query(
-              `INSERT INTO cash_flow (type, amount, description, date, bank_account_id, document_id, category)
-               VALUES (?, ?, ?, ?, ?, ?, ?)`,
+              `INSERT INTO cash_flow (type, amount, description, date, bank_account_id, ewallet_id, document_id, category)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
               [
                 "income",
                 channel.amount,
                 `รับชำระ ${channel.channel} - ${document_number}`,
                 payment_date || new Date().toISOString().slice(0, 10),
                 channel.bankAccountId || null,
+                channel.ewalletId || null,
                 documentId,
                 "รายได้จากการขาย",
               ]
@@ -748,6 +749,23 @@ async function createDocumentFromServer(data: any, pool: any) {
                 await conn.query(
                   "UPDATE bank_accounts SET current_balance = ? WHERE id = ?",
                   [newBalance, channel.bankAccountId]
+                );
+              }
+            }
+
+            // อัปเดตยอด e-wallet
+            if (channel.ewalletId) {
+              const currentBalance = await conn.query(
+                "SELECT current_balance FROM ewallets WHERE id = ?",
+                [channel.ewalletId]
+              );
+              if (Array.isArray(currentBalance) && currentBalance.length > 0) {
+                const balance = Number(currentBalance[0].current_balance);
+                const newBalance = balance + Number(channel.amount);
+
+                await conn.query(
+                  "UPDATE ewallets SET current_balance = ? WHERE id = ?",
+                  [newBalance, channel.ewalletId]
                 );
               }
             }
@@ -1142,6 +1160,7 @@ app.get("/api/documents/:id", async (req, res) => {
                 amount: Number(ch.amount) || 0,
                 note: ch.note || "",
                 bankAccountId: ch.bankAccountId || null,
+                ewalletId: ch.ewalletId || null,
               }))
             : [];
         }
@@ -1386,6 +1405,32 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
               [newBalance, oldEntry.bank_account_id]
             );
           }
+
+          // หักยอด e-wallet จากรายการเก่า
+          if (oldEntry.ewallet_id && oldEntry.amount > 0) {
+            const currentBalance = await conn.query(
+              "SELECT current_balance FROM ewallets WHERE id = ?",
+              [oldEntry.ewallet_id]
+            );
+
+            // Handle mariadb query result structure
+            let balance = 0;
+            if (Array.isArray(currentBalance) && currentBalance.length > 0) {
+              balance = Number(currentBalance[0].current_balance);
+            } else if (
+              currentBalance &&
+              typeof currentBalance === "object" &&
+              currentBalance.current_balance
+            ) {
+              balance = Number(currentBalance.current_balance);
+            }
+            const newBalance = balance - Number(oldEntry.amount);
+
+            await conn.query(
+              "UPDATE ewallets SET current_balance = ? WHERE id = ?",
+              [newBalance, oldEntry.ewallet_id]
+            );
+          }
         }
       }
 
@@ -1415,14 +1460,15 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
           if (channel.amount > 0) {
             // เพิ่มรายการรายได้
             await conn.query(
-              `INSERT INTO cash_flow (type, amount, description, date, bank_account_id, document_id, category)
-               VALUES (?, ?, ?, ?, ?, ?, ?)`,
+              `INSERT INTO cash_flow (type, amount, description, date, bank_account_id, ewallet_id, document_id, category)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
               [
                 "income",
                 channel.amount,
                 `รับชำระ ${channel.channel} - ${docData.document_number}`,
                 payment_date,
                 channel.bankAccountId || null,
+                channel.ewalletId || null,
                 id,
                 "รายได้จากการขาย",
               ]
@@ -1452,6 +1498,23 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
                 "UPDATE bank_accounts SET current_balance = ? WHERE id = ?",
                 [newBalance, channel.bankAccountId]
               );
+            }
+
+            // อัปเดตยอด e-wallet
+            if (channel.ewalletId) {
+              const currentBalance = await conn.query(
+                "SELECT current_balance FROM ewallets WHERE id = ?",
+                [channel.ewalletId]
+              );
+              if (Array.isArray(currentBalance) && currentBalance.length > 0) {
+                const balance = Number(currentBalance[0].current_balance);
+                const newBalance = balance + Number(channel.amount);
+
+                await conn.query(
+                  "UPDATE ewallets SET current_balance = ? WHERE id = ?",
+                  [newBalance, channel.ewalletId]
+                );
+              }
             }
           }
         }
