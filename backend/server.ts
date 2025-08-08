@@ -1857,11 +1857,23 @@ app.put("/api/ewallets/:id", async (req: Request, res: Response) => {
   try {
     const result = await pool.query(
       "UPDATE ewallets SET wallet_name = ?, wallet_type = ?, account_number = ?, current_balance = ?, is_active = ? WHERE id = ?",
-      [wallet_name, wallet_type, account_number, current_balance, is_active, id]
+      [
+        wallet_name,
+        wallet_type,
+        account_number,
+        current_balance,
+        is_active ?? 1,
+        id,
+      ]
     );
     res.json({ success: true });
   } catch (err) {
     console.error("Failed to update e-wallet:", err);
+    if ((err as any).code === "ER_DUP_ENTRY") {
+      return res.status(409).json({
+        error: "E-wallet with this account number already exists.",
+      });
+    }
     res.status(500).json({ error: "Failed to update e-wallet" });
   }
 });

@@ -21,12 +21,15 @@ import {
 import { Smartphone, Plus, CreditCard, Edit, Trash2, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { ewalletService, Ewallet } from "../../services/ewalletService";
+import EwalletModal from "../sub/ewallet/EwalletModal";
 
 const Ewallets = () => {
   const navigate = useNavigate();
   const [ewallets, setEwallets] = useState<Ewallet[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedEwallet, setSelectedEwallet] = useState<Ewallet | null>(null);
   const [createForm, setCreateForm] = useState({
     wallet_name: "",
     wallet_type: "",
@@ -142,8 +145,8 @@ const Ewallets = () => {
   };
 
   const handleEditEwallet = (ewallet: Ewallet) => {
-    // TODO: เปิด modal แก้ไข e-wallet
-    toast.info("ฟีเจอร์นี้จะเปิดใช้งานเร็วๆ นี้");
+    setSelectedEwallet(ewallet);
+    setShowEditModal(true);
   };
 
   const handleDeleteEwallet = async (ewallet: Ewallet) => {
@@ -367,6 +370,17 @@ const Ewallets = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Edit E-Wallet Modal */}
+      <EwalletModal
+        isOpen={showEditModal}
+        onClose={() => {
+          setShowEditModal(false);
+          setSelectedEwallet(null);
+        }}
+        ewallet={selectedEwallet}
+        onSuccess={loadEwallets}
+      />
     </div>
   );
 };
