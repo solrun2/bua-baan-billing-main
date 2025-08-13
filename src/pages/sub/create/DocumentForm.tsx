@@ -1830,14 +1830,6 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                       isUnselected ? "border-orange-300 bg-orange-50" : ""
                     }`}
                   >
-                    {isUnselected && (
-                      <div className="absolute top-2 right-2">
-                        <div className="bg-orange-100 text-orange-800 text-xs px-2 py-1 rounded-full flex items-center gap-1">
-                          <span className="w-2 h-2 bg-orange-500 rounded-full"></span>
-                          ยังไม่ได้เลือกสินค้า
-                        </div>
-                      </div>
-                    )}
                     <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-[1fr_100px_140px_180px_100px_140px_140px] gap-4 items-start">
                       <div className="space-y-2">
                         <Label>สินค้าหรือบริการ</Label>
