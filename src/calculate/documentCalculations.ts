@@ -99,6 +99,7 @@ export interface DocumentSummary {
 
 /**
  * Calculate document summary including subtotal, discount, tax, and total
+ * แต่ละ item จะคำนวณแยกตาม priceType ของตัวเอง แล้วค่อยรวม
  */
 export const calculateDocumentSummary = <T extends BaseItem>(
   items: T[],
@@ -108,65 +109,30 @@ export const calculateDocumentSummary = <T extends BaseItem>(
   let discountTotal = 0;
   let netAfterDiscount = 0;
   let withholdingTaxTotal = 0;
+  let taxTotal = 0;
 
+  // คำนวณแต่ละ item แยกตาม priceType ของตัวเอง
   for (const item of items) {
-    const quantity = Number(item.quantity ?? 1);
-    const unitPrice = Number(item.unitPrice ?? item.unit_price ?? 0);
-    const discount = Number(item.discount ?? 0);
-    const discountType = item.discountType ?? item.discount_type ?? "thb";
-    const discountAmount =
-      discountType === "percentage"
-        ? unitPrice * quantity * (discount / 100)
-        : discount * quantity;
-
-    subtotal += unitPrice * quantity;
-    discountTotal += discountAmount;
-    netAfterDiscount +=
-      (unitPrice -
-        (discountType === "percentage"
-          ? unitPrice * (discount / 100)
-          : discount)) *
-      quantity;
-
-    // รวม withholdingTaxAmount ของแต่ละรายการ
-    const itemForCalc: BaseItem = {
-      ...item,
-      quantity,
-      unitPrice,
-      discount,
-      discountType,
-    };
-    const calc = calculateItemAmounts(itemForCalc);
-    withholdingTaxTotal += calc.withholdingTaxAmount;
+    const itemCalculations = calculateItemAmounts(item);
+    
+    // รวมผลลัพธ์จากแต่ละ item
+    subtotal += itemCalculations.subtotal;
+    discountTotal += itemCalculations.discountAmount;
+    netAfterDiscount += itemCalculations.amountBeforeTax;
+    withholdingTaxTotal += itemCalculations.withholdingTaxAmount;
+    taxTotal += itemCalculations.taxAmount;
   }
 
-  const firstTaxRate = items.length > 0 ? Number(items[0].tax ?? 0) / 100 : 0;
-
-  let summarySubtotal = subtotal;
-  let tax = 0;
-  let total = 0;
-
-  if (priceType === "inclusive" && firstTaxRate > 0) {
-    summarySubtotal = netAfterDiscount / (1 + firstTaxRate);
-    tax = netAfterDiscount - summarySubtotal;
-    total = netAfterDiscount;
-  } else if (priceType === "exclusive" && firstTaxRate > 0) {
-    summarySubtotal = subtotal;
-    tax = (subtotal - discountTotal) * firstTaxRate;
-    total = subtotal - discountTotal + tax;
-  } else {
-    summarySubtotal = subtotal;
-    tax = 0;
-    total = subtotal - discountTotal;
-  }
+  // คำนวณ total จากผลรวมของแต่ละ item
+  const total = netAfterDiscount + taxTotal;
 
   return {
-    subtotal: summarySubtotal,
+    subtotal,
     discount: discountTotal,
     netAfterDiscount,
-    tax,
+    tax: taxTotal,
     total,
-    withholdingTax: withholdingTaxTotal, // เพิ่ม field นี้
+    withholdingTax: withholdingTaxTotal,
   };
 };
 

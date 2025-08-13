@@ -168,12 +168,6 @@ export const DocumentForm: FC<DocumentFormProps> = ({
   // Restore local state for create customer dialog
   const [isCreateCustomerOpen, setIsCreateCustomerOpen] = useState(false);
 
-  // ใช้ ENUM เดียวกับ backend
-  type PriceTypeEnum = "EXCLUDE_VAT" | "INCLUDE_VAT" | "NO_VAT";
-  const [priceType, setPriceType] = useState<PriceTypeEnum>(
-    (initialData.priceType as PriceTypeEnum) || "EXCLUDE_VAT"
-  );
-
   // 1. เพิ่มตัวเลือก ENUM สำหรับ Withholding Tax Option
   const WITHHOLDING_TAX_OPTIONS = [
     "ไม่ระบุ",
@@ -243,7 +237,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
       unit: "",
       quantity: 1,
       unitPrice: 0,
-      priceType: priceType || "EXCLUDE_VAT",
+      priceType: "EXCLUDE_VAT", // ใช้ค่าเริ่มต้นแทน priceType global
       discount: 0,
       discountType: "thb",
       tax: 7,
@@ -331,18 +325,21 @@ export const DocumentForm: FC<DocumentFormProps> = ({
         netAfterDiscount: 0,
       };
     }
-    // mapping priceType ให้ถูกต้อง
+    // mapping priceType ของแต่ละ item ให้ถูกต้อง (แต่ละ item มี priceType แยกกัน)
     const mappedItems = form.items.map((item) => {
       let mappedPriceType: "inclusive" | "exclusive" | "none" = "exclusive";
       let mappedTax = item.tax;
-      if (form.priceType === "INCLUDE_VAT") {
+
+      // ใช้ priceType ของแต่ละ item แทน form.priceType global
+      if (item.priceType === "INCLUDE_VAT") {
         mappedPriceType = "inclusive";
-      } else if (form.priceType === "NO_VAT") {
+      } else if (item.priceType === "NO_VAT") {
         mappedPriceType = "none";
         mappedTax = 0;
       } else {
         mappedPriceType = "exclusive";
       }
+
       return {
         ...item,
         unitPrice: item.unitPrice, // ราคาตั้งต้นเสมอ
@@ -351,9 +348,10 @@ export const DocumentForm: FC<DocumentFormProps> = ({
         tax: mappedTax,
       };
     });
-    // ส่ง argument ที่สองเป็น mappedItems[0]?.priceType เสมอ
-    return calculateDocumentSummary(mappedItems, mappedItems[0]?.priceType);
-  }, [form.items, form.priceType]);
+
+    // ส่ง items ที่มี priceType แยกกันแล้วไปคำนวณ
+    return calculateDocumentSummary(mappedItems);
+  }, [form.items]);
 
   // Update summary when calculatedSummary changes
   useEffect(() => {
@@ -365,11 +363,11 @@ export const DocumentForm: FC<DocumentFormProps> = ({
     const result = editMode
       ? form.documentNumber
       : currentDocSetting
-        ? previewDocumentNumber(
-            currentDocSetting.pattern,
-            Number(currentDocSetting.current_number)
-          )
-        : "";
+      ? previewDocumentNumber(
+          currentDocSetting.pattern,
+          Number(currentDocSetting.current_number)
+        )
+      : "";
 
     return result;
   }, [editMode, form.documentNumber, currentDocSetting]);
@@ -386,7 +384,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
             ...prev,
             [field]: value,
             summary: prev.summary ?? summary,
-          }) as typeof form
+          } as typeof form)
       );
     },
     [summary, form.documentNumber]
@@ -508,7 +506,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
         ({
           ...prev,
           items: prev.items.filter((item) => item.id !== id),
-        }) as typeof form
+        } as typeof form)
     );
   };
 
@@ -577,10 +575,27 @@ export const DocumentForm: FC<DocumentFormProps> = ({
   // 3. สรุปรายการคำนวณสดจาก form.items
   useEffect(() => {
     // แปลง priceType ของแต่ละ item ก่อนส่งเข้า calculateDocumentSummary
-    const mappedItems = form.items.map((item) => ({
-      ...item,
-      priceType: mapPriceTypeToBaseItem(item.priceType),
-    }));
+    const mappedItems = form.items.map((item) => {
+      let mappedPriceType: "inclusive" | "exclusive" | "none" = "exclusive";
+      let mappedTax = item.tax;
+
+      // ใช้ priceType ของแต่ละ item แทน form.priceType global
+      if (item.priceType === "INCLUDE_VAT") {
+        mappedPriceType = "inclusive";
+      } else if (item.priceType === "NO_VAT") {
+        mappedPriceType = "none";
+        mappedTax = 0;
+      } else {
+        mappedPriceType = "exclusive";
+      }
+
+      return {
+        ...item,
+        priceType: mappedPriceType,
+        tax: mappedTax,
+      };
+    });
+
     const newSummary = calculateDocumentSummary(mappedItems);
     newSummary.netTotalAmount = newSummary.total - newSummary.withholdingTax;
     setSummary(newSummary);
@@ -603,10 +618,10 @@ export const DocumentForm: FC<DocumentFormProps> = ({
             documentType === "quotation"
               ? "QT"
               : documentType === "invoice"
-                ? "IV"
-                : documentType === "receipt"
-                  ? "RC"
-                  : "TAX";
+              ? "IV"
+              : documentType === "receipt"
+              ? "RC"
+              : "TAX";
           const fallbackNumber = `${prefix}-${new Date().getFullYear()}-00001`;
           handleFormChange("documentNumber", fallbackNumber);
         }
@@ -818,7 +833,9 @@ export const DocumentForm: FC<DocumentFormProps> = ({
       (initialData as DocumentDataWithRelated)?.related_document_id
     ) {
       fetch(
-        `http://localhost:3001/api/documents/${(initialData as DocumentDataWithRelated).related_document_id}`
+        `http://localhost:3001/api/documents/${
+          (initialData as DocumentDataWithRelated).related_document_id
+        }`
       )
         .then((res) => (res.ok ? res.json() : null))
         .then((data) => {
@@ -968,7 +985,9 @@ export const DocumentForm: FC<DocumentFormProps> = ({
 
       if (totalReceiptAmount > netTotal) {
         toast.error("ยอดรับชำระเกินยอดที่ต้องชำระ", {
-          description: `ยอดรับชำระรวม: ${totalReceiptAmount.toLocaleString("th-TH")}
+          description: `ยอดรับชำระรวม: ${totalReceiptAmount.toLocaleString(
+            "th-TH"
+          )}
 บาท, ยอดที่ต้องชำระ: ${netTotal.toLocaleString("th-TH")}
 บาท`,
         });
@@ -990,7 +1009,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
       // คำนวณ taxAmount ก่อนส่งไป backend
       const calculatedItem = updateItemWithCalculations({
         ...item,
-        priceType: mapPriceTypeToBaseItem(form.priceType),
+        priceType: mapPriceTypeToBaseItem(item.priceType),
       });
 
       const productId =
@@ -1008,7 +1027,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
         amount_before_tax: calculatedItem.amountBeforeTax ?? 0, // ใช้ค่าที่คำนวณแล้ว
         discount: item.discount ?? 0,
         discount_type: item.discountType ?? "thb",
-        tax: form.priceType === "NO_VAT" ? 0 : Number(item.tax ?? 0),
+        tax: item.priceType === "NO_VAT" ? 0 : Number(item.tax ?? 0),
         tax_amount: calculatedItem.taxAmount ?? 0, // ใช้ค่าที่คำนวณแล้ว
         withholding_tax_option: item.withholding_tax_option || "ไม่ระบุ",
       };
@@ -1036,7 +1055,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
       items: itemsToSave,
       summary: calculatedSummary, // ใช้ค่าจาก useMemo ที่คำนวณสดเสมอ
       notes: form.notes,
-      priceType: mapPriceTypeToEnum(form.priceType),
+      priceType: "EXCLUDE_VAT", // ใช้ค่าเริ่มต้นสำหรับเอกสาร
       status: form.status,
       attachments: attachments,
       // เพิ่มข้อมูลสำหรับ receipt
@@ -1279,8 +1298,8 @@ export const DocumentForm: FC<DocumentFormProps> = ({
           (channel.method === "โอนเงิน" || channel.method === "บัตรเครดิต")
             ? `กรุณาเลือกบัญชีธนาคารสำหรับ${channel.method}`
             : !isValid && channel.method === "E-Wallet"
-              ? `กรุณาเลือก E-Wallet สำหรับการชำระด้วย E-Wallet`
-              : null,
+            ? `กรุณาเลือก E-Wallet สำหรับการชำระด้วย E-Wallet`
+            : null,
       };
     });
 
@@ -1311,17 +1330,6 @@ export const DocumentForm: FC<DocumentFormProps> = ({
       setForm((prev) => ({ ...prev, status: "รอชำระ" }));
     }
   }, [form.dueDate, documentType, form.status]);
-
-  // log debug form.priceType ทุกครั้งที่ render
-  useEffect(() => {}, [form.priceType]);
-
-  // 1. เปลี่ยนการ setState ของ priceType ให้ sync ทั้ง form.priceType และ trigger การคำนวณใหม่ทันที
-  const handlePriceTypeChange = (val: PriceTypeEnum) => {
-    setForm((prev) => ({
-      ...prev,
-      priceType: val,
-    }));
-  };
 
   // เพิ่ม useEffect สำหรับรีเซ็ต withholding_tax_option
   useEffect(() => {
@@ -1470,13 +1478,17 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                     ? documentType === "quotation"
                       ? "แก้ไขใบเสนอราคา"
                       : documentType === "invoice"
-                        ? `แก้ไขใบแจ้งหนี้${form.issueTaxInvoice ? " / ใบกำกับภาษี" : ""}`
-                        : "แก้ไขใบเสร็จ"
+                      ? `แก้ไขใบแจ้งหนี้${
+                          form.issueTaxInvoice ? " / ใบกำกับภาษี" : ""
+                        }`
+                      : "แก้ไขใบเสร็จ"
                     : documentType === "quotation"
-                      ? "สร้างใบเสนอราคา"
-                      : documentType === "invoice"
-                        ? `สร้างใบแจ้งหนี้${form.issueTaxInvoice ? " / ใบกำกับภาษี" : ""}`
-                        : "สร้างใบเสร็จ")}
+                    ? "สร้างใบเสนอราคา"
+                    : documentType === "invoice"
+                    ? `สร้างใบแจ้งหนี้${
+                        form.issueTaxInvoice ? " / ใบกำกับภาษี" : ""
+                      }`
+                    : "สร้างใบเสร็จ")}
               </h1>
               <p className="text-muted-foreground">
                 {pageSubtitle ||
@@ -1484,13 +1496,17 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                     ? documentType === "quotation"
                       ? "แก้ไขข้อมูลใบเสนอราคา"
                       : documentType === "invoice"
-                        ? `แก้ไขข้อมูลใบแจ้งหนี้${form.issueTaxInvoice ? " / ใบกำกับภาษี" : ""}`
-                        : "แก้ไขข้อมูลใบเสร็จ"
+                      ? `แก้ไขข้อมูลใบแจ้งหนี้${
+                          form.issueTaxInvoice ? " / ใบกำกับภาษี" : ""
+                        }`
+                      : "แก้ไขข้อมูลใบเสร็จ"
                     : documentType === "quotation"
-                      ? "กรอกข้อมูลเพื่อสร้างใบเสนอราคาใหม่"
-                      : documentType === "invoice"
-                        ? `กรอกข้อมูลเพื่อสร้างใบแจ้งหนี้ใหม่${form.issueTaxInvoice ? " / ใบกำกับภาษี" : ""}`
-                        : "กรอกข้อมูลเพื่อสร้างใบเสร็จใหม่")}
+                    ? "กรอกข้อมูลเพื่อสร้างใบเสนอราคาใหม่"
+                    : documentType === "invoice"
+                    ? `กรอกข้อมูลเพื่อสร้างใบแจ้งหนี้ใหม่${
+                        form.issueTaxInvoice ? " / ใบกำกับภาษี" : ""
+                      }`
+                    : "กรอกข้อมูลเพื่อสร้างใบเสร็จใหม่")}
               </p>
             </div>
           </div>
@@ -1748,31 +1764,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
             <CardTitle>ข้อมูลราคาและภาษี</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {/* รูปแบบราคา */}
-              <div className="space-y-2">
-                <Label htmlFor="priceType">รูปแบบราคา</Label>
-                <Select
-                  value={form.priceType || "EXCLUDE_VAT"}
-                  onValueChange={handlePriceTypeChange}
-                >
-                  <SelectTrigger className="w-full border-yellow-400 focus:ring-yellow-400 bg-blue-100">
-                    <SelectValue>
-                      {form.priceType === "INCLUDE_VAT"
-                        ? "รวมภาษี"
-                        : form.priceType === "NO_VAT"
-                          ? "ไม่มีภาษี"
-                          : "ไม่รวมภาษี"}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent className="bg-blue-100">
-                    <SelectItem value="EXCLUDE_VAT">ไม่รวมภาษี</SelectItem>
-                    <SelectItem value="INCLUDE_VAT">รวมภาษี</SelectItem>
-                    <SelectItem value="NO_VAT">ไม่มีภาษี</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
+            <div className="space-y-2 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {/* สวิตช์ออกใบกำกับภาษี */}
               {(documentType === "invoice" || documentType === "receipt") && (
                 <div className="space-y-2">
@@ -1830,7 +1822,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                       isUnselected ? "border-orange-300 bg-orange-50" : ""
                     }`}
                   >
-                    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-[1fr_100px_140px_180px_100px_140px_140px] gap-4 items-start">
+                    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-[1fr_100px_140px_180px_100px_140px_140px_140px] gap-4 items-start">
                       <div className="space-y-2">
                         <Label>สินค้าหรือบริการ</Label>
                         <ProductAutocomplete
@@ -1856,7 +1848,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                               productTitle: "",
                               quantity: 1,
                               unitPrice: 0,
-                              priceType: form.priceType,
+                              priceType: "EXCLUDE_VAT",
                               discount: 0,
                               discountType: "thb",
                               tax: 7,
@@ -1873,11 +1865,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                             handleItemChange(newId, "productTitle", "");
                             handleItemChange(newId, "quantity", 1);
                             handleItemChange(newId, "unitPrice", 0);
-                            handleItemChange(
-                              newId,
-                              "priceType",
-                              form.priceType
-                            );
+                            handleItemChange(newId, "priceType", "EXCLUDE_VAT");
                             handleItemChange(newId, "discount", 0);
                             handleItemChange(newId, "discountType", "thb");
                             handleItemChange(newId, "tax", 7);
@@ -1982,15 +1970,35 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                         </div>
                       </div>
                       <div className="space-y-2">
+                        <Label>รูปแบบราคา</Label>
+                        <Select
+                          value={item.priceType || "EXCLUDE_VAT"}
+                          onValueChange={(value) =>
+                            handleItemChange(item.id, "priceType", value)
+                          }
+                        >
+                          <SelectTrigger className="focus:ring-blue-500 focus:border-blue-500">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="EXCLUDE_VAT">
+                              ไม่รวมภาษี
+                            </SelectItem>
+                            <SelectItem value="INCLUDE_VAT">รวมภาษี</SelectItem>
+                            <SelectItem value="NO_VAT">ไม่มีภาษี</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
                         <Label>ภาษี</Label>
                         <Select
                           value={String(
-                            form.priceType === "NO_VAT" ? 0 : item.tax
+                            item.priceType === "NO_VAT" ? 0 : item.tax
                           )}
                           onValueChange={(value) =>
                             handleItemChange(item.id, "tax", parseInt(value))
                           }
-                          disabled={form.priceType === "NO_VAT"}
+                          disabled={item.priceType === "NO_VAT"}
                         >
                           <SelectTrigger>
                             <SelectValue />
@@ -2008,7 +2016,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                           readOnly
                           value={getNetUnitPrice(
                             item,
-                            form.priceType
+                            item.priceType
                           ).toLocaleString("th-TH", {
                             minimumFractionDigits: 2,
                           })}
@@ -2112,7 +2120,11 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                     type="button"
                     variant="outline"
                     onClick={addNewItem}
-                    className={`w-full ${hasUnselectedItems ? "border-orange-300 text-orange-600 hover:bg-orange-50" : ""}`}
+                    className={`w-full ${
+                      hasUnselectedItems
+                        ? "border-orange-300 text-orange-600 hover:bg-orange-50"
+                        : ""
+                    }`}
                     disabled={hasUnselectedItems}
                   >
                     <Plus className="w-4 h-4 mr-2" />
@@ -2278,8 +2290,8 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                           channel.ewalletId
                             ? `ewallet-${channel.ewalletId}`
                             : channel.bankAccountId
-                              ? `bank-${channel.bankAccountId}`
-                              : "null"
+                            ? `bank-${channel.bankAccountId}`
+                            : "null"
                         );
                         return null;
                       })()}
@@ -2288,8 +2300,8 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                           channel.ewalletId
                             ? `ewallet-${channel.ewalletId}`
                             : channel.bankAccountId
-                              ? `bank-${channel.bankAccountId}`
-                              : "null"
+                            ? `bank-${channel.bankAccountId}`
+                            : "null"
                         }
                         onValueChange={(v) => {
                           // Update both values in a single state update to avoid conflicts
@@ -2334,10 +2346,10 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                               channel.method !== "บัตรเครดิต")
                               ? "opacity-50 cursor-not-allowed bg-gray-50"
                               : channel.method === "โอนเงิน" ||
-                                  channel.method === "บัตรเครดิต" ||
-                                  channel.method === "E-Wallet"
-                                ? "border-blue-300 bg-blue-50"
-                                : ""
+                                channel.method === "บัตรเครดิต" ||
+                                channel.method === "E-Wallet"
+                              ? "border-blue-300 bg-blue-50"
+                              : ""
                           }`}
                         >
                           <SelectValue
@@ -2345,11 +2357,11 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                               channel.method === "เงินสด"
                                 ? "ไม่ระบุ (เงินสด)"
                                 : channel.method === "โอนเงิน" ||
-                                    channel.method === "บัตรเครดิต"
-                                  ? "เลือกบัญชีธนาคาร *"
-                                  : channel.method === "E-Wallet"
-                                    ? "เลือก E-Wallet *"
-                                    : "เลือกบัญชี"
+                                  channel.method === "บัตรเครดิต"
+                                ? "เลือกบัญชีธนาคาร *"
+                                : channel.method === "E-Wallet"
+                                ? "เลือก E-Wallet *"
+                                : "เลือกบัญชี"
                             }
                           />
                         </SelectTrigger>
@@ -2629,7 +2641,9 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                             <Input
                               type="number"
                               className="bg-white border-purple-100"
-                              placeholder={`จำนวนเงินที่รับชำระ (สูงสุด ${netTotal.toLocaleString("th-TH")} บาท)`}
+                              placeholder={`จำนวนเงินที่รับชำระ (สูงสุด ${netTotal.toLocaleString(
+                                "th-TH"
+                              )} บาท)`}
                               value={offset.amount}
                               onChange={(e) =>
                                 updateOffsetDoc(idx, "amount", e.target.value)
@@ -2965,11 +2979,11 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                       { minimumFractionDigits: 2 }
                     )
                   : typeof calculatedSummary.subtotal === "number" &&
-                      typeof calculatedSummary.discount === "number"
-                    ? (
-                        calculatedSummary.subtotal - calculatedSummary.discount
-                      ).toLocaleString("th-TH", { minimumFractionDigits: 2 })
-                    : "0"}{" "}
+                    typeof calculatedSummary.discount === "number"
+                  ? (
+                      calculatedSummary.subtotal - calculatedSummary.discount
+                    ).toLocaleString("th-TH", { minimumFractionDigits: 2 })
+                  : "0"}{" "}
                 บาท
               </span>
             </div>
