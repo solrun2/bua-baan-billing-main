@@ -13,7 +13,6 @@ import { apiService } from "@/pages/services/apiService";
 type EnsureDocumentType<T> = Omit<T, "documentType"> & {
   documentType: DocumentType;
   status: string;
-  priceType: "EXCLUDE_VAT" | "INCLUDE_VAT" | "NO_VAT";
 };
 
 interface QuotationFormProps {
@@ -58,7 +57,6 @@ const QuotationForm = ({
       .split("T")[0],
     reference: "",
     status: "รอตอบรับ",
-    priceType: "EXCLUDE_VAT",
   });
 
   const [isEditing, setIsEditing] = useState(false);
@@ -89,7 +87,7 @@ const QuotationForm = ({
             ...doc,
             documentType: "quotation",
             status: doc.status || "รอตอบรับ",
-            priceType: doc.priceType || "EXCLUDE_VAT",
+
             customer: doc.customer || {
               name: "",
               tax_id: "",
@@ -149,7 +147,6 @@ const QuotationForm = ({
         updatedAt: new Date().toISOString(),
         // Ensure required fields are set
         status: data.status || "รอตอบรับ",
-        priceType: data.priceType || "EXCLUDE_VAT",
         customer: data.customer || {
           name: "",
           tax_id: "",

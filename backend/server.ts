@@ -440,7 +440,7 @@ app.get("/api/documents", async (req: Request, res: Response) => {
     const docsWithItems = rows.map((doc: any) => {
       const items = itemsByDoc[doc.id] || [];
       // คำนวณ summary ด้วย calculateDocumentSummary (เหมือน /api/documents/:id)
-      const summary = calculateDocumentSummary(items, doc.price_type);
+      const summary = calculateDocumentSummary(items);
 
       // สร้าง receipt_details สำหรับใบเสร็จ
       let receipt_details = null;
@@ -481,10 +481,7 @@ app.get("/api/documents", async (req: Request, res: Response) => {
   }
 });
 
-function calculateDocumentSummary(
-  items: any[],
-  priceType = "EXCLUDE_VAT" // "INCLUDE_VAT", "EXCLUDE_VAT", "NO_VAT"
-) {
+function calculateDocumentSummary(items: any[]) {
   let subtotal = 0;
   let discountTotal = 0;
   let taxTotal = 0;
@@ -496,6 +493,7 @@ function calculateDocumentSummary(
     const taxRate = Number(item.tax ?? 0) / 100;
     const discount = Number(item.discount ?? 0);
     const discountType = item.discount_type ?? item.discountType ?? "thb";
+    const itemPriceType = item.priceType ?? item.price_type ?? "EXCLUDE_VAT";
 
     // 1. คำนวณส่วนลด
     let discountAmount;
@@ -507,12 +505,12 @@ function calculateDocumentSummary(
 
     let amountBeforeTax, taxAmount, amount;
 
-    if (priceType === "INCLUDE_VAT" && taxRate > 0) {
+    if (itemPriceType === "INCLUDE_VAT" && taxRate > 0) {
       // กรณีราคารวม VAT
       amount = unitPrice * quantity - discountAmount;
       amountBeforeTax = amount / (1 + taxRate);
       taxAmount = amount - amountBeforeTax;
-    } else if (priceType === "EXCLUDE_VAT" && taxRate > 0) {
+    } else if (itemPriceType === "EXCLUDE_VAT" && taxRate > 0) {
       // กรณีราคาไม่รวม VAT
       amountBeforeTax = unitPrice * quantity - discountAmount;
       taxAmount = amountBeforeTax * taxRate;
@@ -571,7 +569,6 @@ async function createDocumentFromServer(data: any, pool: any) {
       customer,
       document_type,
       status,
-      priceType,
       issue_date,
       notes,
       items,
@@ -583,7 +580,7 @@ async function createDocumentFromServer(data: any, pool: any) {
       related_document_id,
     } = data;
 
-    const summaryCalc = calculateDocumentSummary(items, priceType);
+    const summaryCalc = calculateDocumentSummary(items);
     const subtotal = summaryCalc.subtotal;
     const tax_amount = summaryCalc.tax;
     const total_amount = summaryCalc.total;
@@ -656,18 +653,17 @@ async function createDocumentFromServer(data: any, pool: any) {
     );
     const docResult = await conn.query(
       `INSERT INTO documents (
-        customer_id, customer_name, document_number, document_type, status, price_type, issue_date,
+        customer_id, customer_name, document_number, document_type, status, issue_date,
         subtotal, tax_amount, total_amount, notes,
         customer_address, customer_phone, customer_email,
         related_document_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         customer.id,
         customer.name,
         document_number,
         document_type,
         status,
-        priceType,
         issue_date,
         subtotal,
         tax_amount,
@@ -835,12 +831,13 @@ async function createDocumentFromServer(data: any, pool: any) {
         item.discount_type ?? "thb",
         Number(item.tax ?? 0),
         item.tax_amount ?? 0,
+        item.priceType ?? "EXCLUDE_VAT",
       ];
 
       await conn.query(
         `INSERT INTO document_items (
-          document_id, product_id, product_name, unit, quantity, unit_price, amount, description, withholding_tax_amount, withholding_tax_option, amount_before_tax, discount, discount_type, tax, tax_amount
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          document_id, product_id, product_name, unit, quantity, unit_price, amount, description, withholding_tax_amount, withholding_tax_option, amount_before_tax, discount, discount_type, tax, tax_amount, price_type
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         params
       );
     }
@@ -877,7 +874,6 @@ app.post("/api/documents", async (req: Request, res: Response) => {
       items,
       summary,
       notes,
-      priceType,
       status,
       attachments,
       tags,
@@ -948,7 +944,6 @@ app.post("/api/documents", async (req: Request, res: Response) => {
       items,
       summary,
       notes: doc.notes,
-      priceType: doc.price_type,
       status: doc.status,
       attachments,
       tags,
@@ -1196,7 +1191,7 @@ app.get("/api/documents/:id", async (req, res) => {
     }
 
     // สรุป summary จาก document_items ของตัวเองเท่านั้น
-    const summary = calculateDocumentSummary(items, doc.price_type);
+    const summary = calculateDocumentSummary(items);
 
     const documentWithItems = {
       ...(Array.isArray(doc) ? doc[0] : doc),
@@ -1226,7 +1221,6 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
       customer,
       document_type,
       status,
-      priceType,
       issue_date,
       notes,
       items,
@@ -1242,12 +1236,6 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
       offset_docs,
       net_total_receipt,
     } = req.body;
-
-    // เพิ่ม validation สำหรับ priceType
-    const allowedPriceTypes = ["EXCLUDE_VAT", "INCLUDE_VAT", "NO_VAT"];
-    if (!allowedPriceTypes.includes(priceType)) {
-      return res.status(400).json({ error: "Invalid priceType" });
-    }
 
     // ใช้ค่าจาก frontend โดยตรง
     const subtotal = summary.subtotal ?? 0;
@@ -1315,7 +1303,7 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
 
     await conn.query(
       `UPDATE documents SET
-        customer_id = ?, customer_name = ?, document_type = ?, status = ?, price_type = ?, issue_date = ?,
+        customer_id = ?, customer_name = ?, document_type = ?, status = ?, issue_date = ?,
         subtotal = ?, tax_amount = ?, total_amount = ?, notes = ?,
         customer_address = ?, customer_phone = ?, customer_email = ?
       WHERE id = ?`,
@@ -1324,7 +1312,6 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
         customer.name,
         document_type,
         status,
-        priceType,
         issue_date,
         subtotal,
         tax_amount,
@@ -1598,7 +1585,6 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
         },
         document_type: "invoice",
         status: "ร่าง",
-        priceType: quotationDoc.price_type,
         issue_date: new Date().toISOString().slice(0, 10),
         notes: quotationDoc.notes || "",
         items: quotationItems.map((item: any) => ({
@@ -1616,6 +1602,7 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
           discount_type: item.discount_type,
           tax: item.tax,
           tax_amount: item.tax_amount,
+          priceType: item.price_type || "EXCLUDE_VAT",
         })),
         related_document_id: quotationDoc.id,
         due_date: null,
@@ -1651,7 +1638,6 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
         },
         document_type: "receipt",
         status: "ร่าง",
-        priceType: invoiceDoc.price_type,
         issue_date: new Date().toISOString().slice(0, 10),
         notes: invoiceDoc.notes || "",
         items: invoiceItems.map((item: any) => ({
@@ -1669,6 +1655,7 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
           discount_type: item.discount_type,
           tax: item.tax,
           tax_amount: item.tax_amount,
+          priceType: item.price_type || "EXCLUDE_VAT",
         })),
         related_document_id: invoiceDoc.id,
         payment_date: new Date().toISOString().slice(0, 10),

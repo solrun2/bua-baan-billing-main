@@ -65,7 +65,6 @@ export interface DocumentData {
   dueDate?: string; // Optional, for invoices
   reference: string;
   status: string;
-  priceType: "EXCLUDE_VAT" | "INCLUDE_VAT" | "NO_VAT";
   updatedAt?: string;
   tags?: string[];
   issueTaxInvoice?: boolean;
@@ -123,7 +122,6 @@ export interface DocumentPayload {
   dueDate?: string;
   reference: string;
   status: string;
-  priceType: "EXCLUDE_VAT" | "INCLUDE_VAT" | "NO_VAT";
   updatedAt?: string;
   tags?: string[];
   issueTaxInvoice?: boolean;

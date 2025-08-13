@@ -42,7 +42,9 @@ const getDocuments = async (
       if (params.dateTo) queryParams.append("dateTo", params.dateTo);
     }
 
-    const url = `${API_BASE_URL}/documents${queryParams.toString() ? `?${queryParams.toString()}` : ""}`;
+    const url = `${API_BASE_URL}/documents${
+      queryParams.toString() ? `?${queryParams.toString()}` : ""
+    }`;
     const response = await fetch(url);
     if (!response.ok) {
       throw new Error("Failed to fetch documents");
@@ -258,7 +260,10 @@ function mapDocumentFromBackend(doc: any): DocumentData {
     const year = d.getFullYear();
     const month = d.getMonth() + 1;
     const day = d.getDate();
-    return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(
+      2,
+      "0"
+    )}`;
   };
   return {
     id: doc.id?.toString(),
@@ -269,7 +274,6 @@ function mapDocumentFromBackend(doc: any): DocumentData {
     validUntil: formatDate(doc.valid_until),
     reference: doc.reference,
     status: doc.status,
-    priceType: doc.price_type || "exclusive",
     notes: doc.notes,
     tags: doc.tags || [],
     customer: {
@@ -289,7 +293,7 @@ function mapDocumentFromBackend(doc: any): DocumentData {
       unit: item.unit ?? "",
       quantity: Number(item.quantity ?? 1),
       unitPrice: Number(item.unit_price ?? 0),
-      priceType: doc.price_type || "exclusive",
+      priceType: item.price_type || "exclusive",
       discount: Number(item.discount ?? 0),
       discountType: item.discount_type ?? "thb",
       tax: Number(item.tax ?? 0),

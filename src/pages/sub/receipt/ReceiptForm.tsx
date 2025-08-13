@@ -11,7 +11,6 @@ import { apiService } from "@/pages/services/apiService";
 type EnsureDocumentType<T> = Omit<T, "documentType"> & {
   documentType: DocumentType;
   status: string;
-  priceType: "inclusive" | "exclusive" | "none";
 };
 
 interface ReceiptFormProps {
@@ -46,7 +45,6 @@ const ReceiptForm = ({
           ...externalInitialData,
           documentType: "receipt",
           status: externalInitialData.status || "ชำระแล้ว",
-          priceType: externalInitialData.priceType || "exclusive",
         });
         setIsEditing(true);
         setIsClient(true);
@@ -65,7 +63,6 @@ const ReceiptForm = ({
             ...data,
             documentType: "receipt",
             status: data.status || "ร่าง",
-            priceType: data.priceType || "exclusive",
           });
           setIsEditing(true);
         } catch (err) {
@@ -98,7 +95,6 @@ const ReceiptForm = ({
           documentDate: new Date().toISOString().split("T")[0],
           reference: "",
           status: "ร่าง",
-          priceType: "exclusive",
         });
         setIsClient(true);
       }
@@ -118,7 +114,7 @@ const ReceiptForm = ({
         updatedAt: new Date().toISOString(),
         // Ensure required fields are set
         status: data.status || "ชำระแล้ว",
-        priceType: data.priceType || "exclusive",
+
         customer: data.customer || {
           name: "",
           tax_id: "",

@@ -282,7 +282,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
         withholdingTax,
         withholdingTaxAmount: item.withholdingTaxAmount ?? 0,
         customWithholdingTaxAmount: item.customWithholdingTaxAmount ?? 0,
-        priceType: item.priceType || initialData.priceType || "EXCLUDE_VAT",
+        priceType: item.priceType || "EXCLUDE_VAT",
       } as DocumentItem;
     });
 
@@ -296,7 +296,6 @@ export const DocumentForm: FC<DocumentFormProps> = ({
 
     return {
       ...initialData,
-      priceType: initialData.priceType || "EXCLUDE_VAT",
       items,
     };
   });
@@ -1055,7 +1054,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
       items: itemsToSave,
       summary: calculatedSummary, // ใช้ค่าจาก useMemo ที่คำนวณสดเสมอ
       notes: form.notes,
-      priceType: "EXCLUDE_VAT", // ใช้ค่าเริ่มต้นสำหรับเอกสาร
+      // priceType removed - now item-specific
       status: form.status,
       attachments: attachments,
       // เพิ่มข้อมูลสำหรับ receipt
