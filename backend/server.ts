@@ -29,11 +29,19 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // Multer setup for file uploads
 const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
+  destination: function (
+    req: any,
+    file: Express.Multer.File,
+    cb: (error: Error | null, destination: string) => void
+  ) {
     const uploadsDir = path.join(__dirname, "uploads");
     cb(null, uploadsDir);
   },
-  filename: function (req, file, cb) {
+  filename: function (
+    req: any,
+    file: Express.Multer.File,
+    cb: (error: Error | null, filename: string) => void
+  ) {
     cb(null, Date.now() + path.extname(file.originalname)); //Appending extension
   },
 });
@@ -41,22 +49,19 @@ const storage = multer.diskStorage({
 const upload = multer({ storage: storage });
 
 // API route to upload an image
-app.post(
-  "/api/upload",
-  upload.single("image"),
-  (req: Request, res: Response) => {
-    if (!req.file) {
-      return res.status(400).send({ message: "Please upload a file." });
-    }
-    const imageUrl = `${req.protocol}://${req.get("host")}/uploads/${
-      req.file.filename
-    }`;
-    res.status(200).send({
-      message: "File uploaded successfully.",
-      imageUrl: imageUrl,
-    });
+// @ts-ignore
+app.post("/api/upload", upload.single("image"), (req: any, res: Response) => {
+  if (!req.file) {
+    return res.status(400).send({ message: "Please upload a file." });
   }
-);
+  const imageUrl = `${req.protocol}://${req.get("host")}/uploads/${
+    req.file.filename
+  }`;
+  res.status(200).send({
+    message: "File uploaded successfully.",
+    imageUrl: imageUrl,
+  });
+});
 
 // Endpoint to get all customers
 app.get("/api/customers", async (req: Request, res: Response) => {
