@@ -149,6 +149,75 @@
     width: 100% !important;
     font-size: 12pt !important;
   }
+
+  /* การจัดการการแบ่งหน้าสำหรับเอกสาร */
+  .document-header {
+    page-break-after: avoid !important;
+    page-break-inside: avoid !important;
+    display: table-header-group !important;
+  }
+
+  .customer-info {
+    page-break-after: avoid !important;
+    page-break-inside: avoid !important;
+    display: table-header-group !important;
+  }
+
+  /* ตาราง - อนุญาตให้แบ่งหน้าได้ */
+  .document-table {
+    page-break-inside: auto !important;
+  }
+
+  /* หัวตาราง - ต้องแสดงในทุกหน้าที่มีตาราง */
+  .document-table thead {
+    display: table-header-group !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* แถวตาราง - อนุญาตให้แบ่งหน้าได้ */
+  .document-table tbody tr {
+    page-break-inside: avoid !important;
+  }
+
+  /* สรุปยอด - ต้องอยู่หน้าสุดท้ายเสมอ */
+  .document-summary {
+    page-break-before: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* ท้ายกระดาษ - ต้องอยู่หน้าสุดท้ายเสมอ */
+  .document-footer {
+    page-break-before: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* ลายเซ็น - ต้องอยู่หน้าสุดท้ายเสมอ */
+  .document-signature {
+    page-break-before: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* หมายเหตุ - ต้องอยู่หน้าสุดท้ายเสมอ */
+  .document-notes {
+    page-break-before: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* Document Container - ใช้โครงสร้างตารางสำหรับการพิมพ์ */
+  .document-container {
+    display: table !important;
+    width: 100% !important;
+  }
+
+  .document-container > * {
+    display: table-row !important;
+  }
+
+  .document-container > * > * {
+    display: table-cell !important;
+    vertical-align: top !important;
+  }
+
   .container,
   .modal,
   .print-area {

@@ -309,7 +309,7 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
   // --- Section Helper Functions ---
   // Header: โลโก้+ชื่อบริษัท (ซ้าย), Document Title (ขวาบน, บรรทัดเดียว)
   const renderHeader = () => (
-    <div className="flex flex-row justify-between items-start border-b-2 border-blue-200 pb-4 mb-4">
+    <div className="document-header flex flex-row justify-between items-start border-b-2 border-blue-200 pb-4 mb-4">
       <div className="flex flex-row items-center gap-3">
         <div className="w-12 h-12 border-2 border-blue-200 rounded-full flex items-center justify-center text-blue-300 text-sm font-bold">
           LOGO
@@ -344,7 +344,7 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
 
   // Customer Info: ข้อมูลลูกค้าแบบกระชับ
   const renderCustomerInfo = () => (
-    <div className="bg-blue-50 rounded-lg border border-blue-200 px-4 py-3 mb-4">
+    <div className="customer-info bg-blue-50 rounded-lg border border-blue-200 px-4 py-3 mb-4">
       <div className="font-bold text-blue-700 mb-2 text-sm">ข้อมูลลูกค้า</div>
       <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
         <div className="font-semibold">ชื่อ:</div>
@@ -365,7 +365,7 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
 
   // Table: ตารางรายการสินค้าแบบกระชับ
   const renderTable = () => (
-    <div className="mb-4">
+    <div className="document-table mb-4">
       <table className="w-full border border-gray-300 text-xs">
         <thead>
           <tr className="bg-gray-50">
@@ -441,7 +441,7 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
     const netTotal = (summary.total || 0) - (summary.withholdingTax || 0);
 
     return (
-      <div className="flex justify-end mb-4">
+      <div className="document-summary flex justify-end mb-4">
         <div className="min-w-48 space-y-1 bg-blue-50 rounded-lg p-3 text-xs">
           <div className="flex justify-between">
             <span>รวมเป็นเงิน:</span>
@@ -491,7 +491,7 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
     switch (type) {
       case "quotation":
         return (
-          <div className="mt-4 text-xs text-gray-600">
+          <div className="document-footer mt-4 text-xs text-gray-600">
             <b>เงื่อนไขการชำระเงิน:</b> กรุณาชำระเงินภายในวันที่{" "}
             {formatDate(document.validUntil)}
             <br />
@@ -500,7 +500,7 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
         );
       case "invoice":
         return (
-          <div className="mt-4">
+          <div className="document-footer mt-4">
             <b>ชำระเงิน</b>
             <div className="grid grid-cols-2 gap-2 mt-2">
               {SELLER_INFO.bankAccounts.map((acc, i) => (
@@ -521,7 +521,7 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
         );
       case "receipt":
         return (
-          <div className="mt-4">
+          <div className="document-footer mt-4">
             {/* ข้อมูลการรับชำระ */}
             {(document as any).receipt_details && (
               <div className="bg-green-50 rounded-lg border border-green-200 px-4 py-3 mb-3">
@@ -577,14 +577,6 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
                             >
                               <div className="flex items-center gap-1">
                                 <span>
-                                  {(channel?.method || channel?.channel) ===
-                                    "เงินสด" && "💵"}
-                                  {(channel?.method || channel?.channel) ===
-                                    "โอนเงิน" && "🏦"}
-                                  {(channel?.method || channel?.channel) ===
-                                    "บัตรเครดิต" && "💳"}
-                                  {(channel?.method || channel?.channel) ===
-                                    "E-Wallet" && "📱"}
                                   {channel?.method ||
                                     channel?.channel ||
                                     "ไม่ระบุ"}
@@ -721,131 +713,158 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
             /* สำหรับหน้าจอปกติ */
             .print-area {
               width: 100%;
-              max-width: 794px;      /* A4 ที่ 96dpi */
-              margin: 32px auto;     /* ขอบขาวรอบ ๆ */
+              max-width: 794px;
+              margin: 32px auto;
               background: #fff;
               border-radius: 12px;
               box-shadow: 0 4px 32px #0002;
               padding: 32px 24px;
             }
-            .company-title {
-              margin-bottom: 12px;
-            }
-            .document-title {
-              margin-top: 20px;
-            }
+            
             @media print {
               html, body {
                 width: 210mm;
                 height: 297mm;
                 margin: 0;
                 padding: 0;
-                overflow: hidden;
               }
+              
               .no-print {
                 display: none !important;
               }
+              
               .print-area {
                 width: 210mm !important;
-                height: 297mm !important;
                 max-width: 210mm;
-                max-height: 297mm;
-                overflow: hidden !important;
-                transform: scale(0.95);
-                transform-origin: top left;
-                page-break-inside: avoid !important;
-                page-break-before: avoid !important;
-                page-break-after: avoid !important;
                 margin: 0 !important;
                 border-radius: 0 !important;
                 box-shadow: none !important;
                 padding: 15mm 10mm 10mm 10mm !important;
+                page-break-inside: auto !important;
               }
-              .header-row, table, .summary-box, .note-box {
-                width: 100% !important;
-                margin: 0 !important;
-                max-width: 100% !important;
+              
+              /* หัวกระดาษ - ต้องอยู่หน้าแรกเสมอ */
+              .document-header {
+                page-break-after: avoid !important;
+                page-break-inside: avoid !important;
+                margin-bottom: 10mm !important;
               }
-              .company-title {
-                margin-bottom: 10px;
+              
+              /* ข้อมูลลูกค้า - ต้องอยู่หน้าแรกเสมอ */
+              .customer-info {
+                page-break-after: avoid !important;
+                page-break-inside: avoid !important;
+                margin-bottom: 10mm !important;
               }
-              .document-title {
-                margin-left: auto;
-                margin-top: 0;
-                margin-bottom: 0;
-                align-self: flex-start;
-                font-size: 2rem;
-                font-weight: bold;
-                color: #2563eb;
-                text-align: right;
-                white-space: nowrap;
+              
+              /* ตาราง - อนุญาตให้แบ่งหน้าได้ */
+              .document-table {
+                page-break-inside: auto !important;
+                page-break-after: auto !important;
+                margin-bottom: 10mm !important;
               }
-              table, tr, td, th, .summary-box, .note-box {
+              
+              /* หัวตาราง - ต้องแสดงในทุกหน้าที่มีตาราง */
+              .document-table thead {
+                display: table-header-group !important;
                 page-break-inside: avoid !important;
               }
-              /* ปรับขนาดตัวอักษรให้ใหญ่ขึ้น */
+              
+              /* แถวตาราง - อนุญาตให้แบ่งหน้าได้ */
+              .document-table tbody tr {
+                page-break-inside: avoid !important;
+                page-break-after: auto !important;
+              }
+              
+              /* สรุปยอด - ต้องอยู่หน้าสุดท้ายเสมอ */
+              .document-summary {
+                page-break-before: avoid !important;
+                page-break-inside: avoid !important;
+                margin-bottom: 10mm !important;
+              }
+              
+              /* ท้ายกระดาษ - ต้องอยู่หน้าสุดท้ายเสมอ */
+              .document-footer {
+                page-break-before: avoid !important;
+                page-break-inside: avoid !important;
+                margin-bottom: 10mm !important;
+              }
+              
+              /* ลายเซ็น - ต้องอยู่หน้าสุดท้ายเสมอ */
+              .document-signature {
+                page-break-before: avoid !important;
+                page-break-inside: avoid !important;
+              }
+              
+              /* หมายเหตุ - ต้องอยู่หน้าสุดท้ายเสมอ */
+              .document-notes {
+                page-break-before: avoid !important;
+                page-break-inside: avoid !important;
+              }
+              
+              /* ปรับขนาดตัวอักษร */
               .print-area * {
                 font-size: 1em !important;
               }
+              
               .print-area h1, .print-area h2, .print-area h3 {
                 font-size: 1.3em !important;
               }
-              /* ปรับ margin และ padding ให้เหมาะสม */
+              
+              /* ปรับ margin และ padding */
               .print-area > * {
                 margin-bottom: 0.5em !important;
               }
+              
               .print-area table {
                 margin-bottom: 0.5em !important;
               }
+              
               .print-area .bg-green-50 {
                 margin-bottom: 0.5em !important;
                 padding: 0.5em !important;
               }
+              
               .print-area .bg-blue-50 {
                 margin-bottom: 0.5em !important;
                 padding: 0.5em !important;
               }
+              
               /* ปรับขนาดตาราง */
               .print-area table td,
               .print-area table th {
                 padding: 0.4em !important;
               }
+              
               /* ปรับขนาดช่องเซ็น */
               .print-area .flex.justify-end {
                 margin-top: 1em !important;
               }
+              
               .print-area .h-8 {
                 height: 1.5em !important;
               }
+              
               .print-area .w-40 {
                 width: 12em !important;
               }
+              
               /* ปรับขนาดหัวข้อเอกสาร */
               .print-area .font-extrabold.text-lg {
                 font-size: 1.2em !important;
               }
+              
               .print-area .font-extrabold.text-2xl {
                 font-size: 1.8em !important;
               }
-              /* ปรับขนาดข้อความขอบคุณ */
-              .print-area .thankyou {
-                font-size: 1.2em !important;
-              }
-              /* กำจัดหน้า 2 */
+              
+              /* ตั้งค่าหน้า */
               @page {
                 size: A4;
                 margin: 0;
               }
-              /* บังคับให้เนื้อหาอยู่ในหน้าเดียว */
-              .print-area {
-                page-break-after: avoid !important;
-                page-break-inside: avoid !important;
-              }
-              /* ลบส่วนที่อาจทำให้เกิดหน้า 2 */
-              .print-area::after {
-                display: none !important;
-              }
             }
+            
             .modal-scroll {
               max-height: 90vh;
               overflow-y: auto;
@@ -889,7 +908,7 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
             {/* Footer */}
             {renderFooter()}
             {/* Signature */}
-            <div className="flex justify-end mt-6">
+            <div className="document-signature flex justify-end mt-6">
               <div className="text-center">
                 <div className="border-t-2 border-gray-400 w-32 h-8 mb-1"></div>
                 <div className="text-xs text-gray-600">ผู้รับเงิน</div>
@@ -897,13 +916,13 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
             </div>
             {/* กล่องหมายเหตุ (ถ้ามี) */}
             {document.notes && (
-              <div className="mt-2 p-2 bg-yellow-50 rounded text-xs text-yellow-900 border border-yellow-200 max-w-xl mx-auto">
+              <div className="document-notes mt-2 p-2 bg-yellow-50 rounded text-xs text-yellow-900 border border-yellow-200 max-w-xl mx-auto">
                 <span className="font-semibold">หมายเหตุ: </span>
                 {document.notes}
               </div>
             )}
             {/* ช่องเซ็นชื่อ */}
-            <div className="flex justify-end mt-6 print:mt-8">
+            <div className="document-signature flex justify-end mt-6 print:mt-8">
               <div className="text-center">
                 <div className="h-8 border-b border-gray-400 w-40 mx-auto mb-1"></div>
                 <div className="text-xs text-gray-500">(ผู้มีอำนาจลงนาม)</div>
