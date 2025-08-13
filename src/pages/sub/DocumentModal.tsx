@@ -1103,7 +1103,7 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
     const itemsForFirstPage = Math.max(1, maxRowsPerPage);
 
     // สำหรับหน้าถัดไป ใช้ความสูงเต็มหน้า
-    const itemsForNextPages = Math.floor((pageHeight - 200) / rowHeight); // เพิ่ม margin เพื่อรองรับขนาดที่ใหญ่ขึ้น
+    const itemsForNextPages = Math.floor((pageHeight - 200) / rowHeight); 
 
     const pages: DocumentItem[][] = [];
     let currentIndex = 0;
