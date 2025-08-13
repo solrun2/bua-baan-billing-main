@@ -1079,13 +1079,13 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
   const splitItemsByPage = () => {
     const totalItems = items.length;
 
-    // ถ้ามีรายการน้อยกว่า 5 รายการ ให้แสดงในหน้าเดียว
-    if (totalItems <= 5) {
+    // ถ้ามีรายการน้อยกว่า 4 รายการ ให้แสดงในหน้าเดียว
+    if (totalItems <= 4) {
       return [items];
     }
 
     // คำนวณความสูงของเนื้อหาที่ไม่ใช่ตาราง (header, customer info, summary, footer, signature)
-    const fixedContentHeight = 400; // ประมาณความสูงของเนื้อหาคงที่ (px)
+    const fixedContentHeight = 350; // เพิ่มขึ้นเพื่อรองรับขนาดตัวอักษรและช่องว่างที่มากขึ้น
 
     // ความสูงของหน้า A4 (ประมาณ 1123px ที่ 96 DPI)
     const pageHeight = 1123;
@@ -1094,16 +1094,16 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
     const availableTableHeight = pageHeight - fixedContentHeight;
 
     // ประมาณความสูงของแต่ละแถวในตาราง (รวม header)
-    const rowHeight = 60; // ประมาณความสูงของแต่ละแถว
+    const rowHeight = 60; // เพิ่มขึ้นเพื่อรองรับขนาดตัวอักษรที่ใหญ่ขึ้น
 
     // คำนวณจำนวนแถวที่สามารถใส่ได้ในหน้าแรก
     const maxRowsPerPage = Math.floor(availableTableHeight / rowHeight);
 
     // จำนวนรายการที่สามารถใส่ได้ในหน้าแรก (ลบ 1 สำหรับ header ของตาราง)
-    const itemsForFirstPage = Math.max(1, maxRowsPerPage - 1);
+    const itemsForFirstPage = Math.max(1, maxRowsPerPage);
 
     // สำหรับหน้าถัดไป ใช้ความสูงเต็มหน้า
-    const itemsForNextPages = Math.floor((pageHeight - 200) / rowHeight) - 1; // ลบ header และ margin
+    const itemsForNextPages = Math.floor((pageHeight - 200) / rowHeight); // เพิ่ม margin เพื่อรองรับขนาดที่ใหญ่ขึ้น
 
     const pages: DocumentItem[][] = [];
     let currentIndex = 0;
@@ -1189,7 +1189,7 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
                  margin: 0 !important;
                  border-radius: 0 !important;
                  box-shadow: none !important;
-                 padding: 15mm 10mm 10mm 10mm !important;
+                 padding: 12mm 10mm 10mm 10mm !important;
                  page-break-inside: auto !important;
                  min-height: 297mm !important;
                  display: flex !important;
@@ -1206,7 +1206,7 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
                 position: running(header) !important;
                 page-break-after: avoid !important;
                 page-break-inside: avoid !important;
-                margin-bottom: 10mm !important;
+                margin-bottom: 8mm !important;
               }
               
               /* ข้อมูลลูกค้า - แสดงซ้ำในทุกหน้า */
@@ -1214,14 +1214,14 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
                 position: running(customer-info) !important;
                 page-break-after: avoid !important;
                 page-break-inside: avoid !important;
-                margin-bottom: 10mm !important;
+                margin-bottom: 8mm !important;
               }
               
               /* ตาราง - อนุญาตให้แบ่งหน้าได้ */
               .document-table {
                 page-break-inside: auto !important;
                 page-break-after: auto !important;
-                margin-bottom: 10mm !important;
+                margin-bottom: 8mm !important;
               }
               
               /* หัวตาราง - ต้องแสดงในทุกหน้าที่มีตาราง */
@@ -1240,14 +1240,14 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
               .document-summary {
                 page-break-before: avoid !important;
                 page-break-inside: avoid !important;
-                margin-bottom: 10mm !important;
+                margin-bottom: 8mm !important;
               }
               
               /* ท้ายกระดาษ - ต้องอยู่หน้าสุดท้ายเสมอ */
               .document-footer {
                 page-break-before: avoid !important;
                 page-break-inside: avoid !important;
-                margin-bottom: 10mm !important;
+                margin-bottom: 8mm !important;
               }
               
               /* ลายเซ็น - ต้องอยู่หน้าสุดท้ายเสมอ */
@@ -1273,27 +1273,27 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
               
               /* ปรับ margin และ padding */
               .print-area > * {
-                margin-bottom: 0.3em !important;
+                margin-bottom: 0.4em !important;
               }
               
               .print-area table {
-                margin-bottom: 0.3em !important;
+                margin-bottom: 0.4em !important;
               }
               
               .print-area .bg-green-50 {
-                margin-bottom: 0.3em !important;
-                padding: 0.3em !important;
+                margin-bottom: 0.4em !important;
+                padding: 0.4em !important;
               }
               
               .print-area .bg-blue-50 {
-                margin-bottom: 0.3em !important;
-                padding: 0.3em !important;
+                margin-bottom: 0.4em !important;
+                padding: 0.4em !important;
               }
               
               /* ปรับขนาดตาราง */
               .print-area table td,
               .print-area table th {
-                padding: 0.2em !important;
+                padding: 0.3em !important;
               }
               
               /* ปรับขนาดช่องเซ็น */
