@@ -152,15 +152,15 @@
 
   /* การจัดการการแบ่งหน้าสำหรับเอกสาร */
   .document-header {
+    position: running(header) !important;
     page-break-after: avoid !important;
     page-break-inside: avoid !important;
-    display: table-header-group !important;
   }
 
   .customer-info {
+    position: running(customer-info) !important;
     page-break-after: avoid !important;
     page-break-inside: avoid !important;
-    display: table-header-group !important;
   }
 
   /* ตาราง - อนุญาตให้แบ่งหน้าได้ */
@@ -216,6 +216,18 @@
   .document-container > * > * {
     display: table-cell !important;
     vertical-align: top !important;
+  }
+
+  /* ตั้งค่าหน้าและใช้ header/footer ในทุกหน้า */
+  @page {
+    size: A4;
+    margin: 15mm 10mm 10mm 10mm;
+    @top-center {
+      content: element(header);
+    }
+    @top-right {
+      content: element(customer-info);
+    }
   }
 
   .container,

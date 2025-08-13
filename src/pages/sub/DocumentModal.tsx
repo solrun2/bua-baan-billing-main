@@ -697,19 +697,469 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
         return null;
     }
   };
-  // --- End Section Helper Functions ---
+  // ฟังก์ชันสร้าง HTML string สำหรับ header
+  const generateHeaderHTML = () => {
+    return `
+       <div class="document-header flex flex-row justify-between items-start border-b-2 border-blue-200 pb-4 mb-4">
+         <div class="flex flex-row items-center gap-3">
+           <div class="w-12 h-12 border-2 border-blue-200 rounded-full flex items-center justify-center text-blue-300 text-sm font-bold">
+             LOGO
+           </div>
+           <div class="flex flex-col">
+             <span class="font-bold text-lg text-blue-900 leading-tight">
+               ${SELLER_INFO.company}
+             </span>
+             <span class="text-xs text-gray-600 leading-tight">
+               ${SELLER_INFO.address}
+             </span>
+             <span class="text-xs text-gray-600 leading-tight">
+               เลขประจำตัวผู้เสียภาษี ${SELLER_INFO.taxId}
+             </span>
+           </div>
+         </div>
+         <div class="flex flex-col items-end">
+           <span class="font-bold text-2xl text-blue-900 mb-1">
+             ${labels.title}
+           </span>
+           <div class="text-xs text-gray-600">
+             <div>
+               เลขที่: ${document.document_number || document.documentNumber || "-"}
+             </div>
+             <div>
+               วันที่: ${formatDate(document.issue_date || document.documentDate)}
+             </div>
+           </div>
+         </div>
+       </div>
+     `;
+  };
 
-  // เพิ่มฟังก์ชัน handlePrint
+  // ฟังก์ชันสร้าง HTML string สำหรับ customer info
+  const generateCustomerInfoHTML = () => {
+    return `
+       <div class="customer-info bg-blue-50 rounded-lg border border-blue-200 px-4 py-3 mb-4">
+         <div class="font-bold text-blue-700 mb-2 text-sm">ข้อมูลลูกค้า</div>
+         <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+           <div class="font-semibold">ชื่อ:</div>
+           <div>${document.customer_name || document.customer?.name || "-"}</div>
+           <div class="font-semibold">ที่อยู่:</div>
+           <div>${document.customer_address || document.customer?.address || "-"}</div>
+           <div class="font-semibold">โทร:</div>
+           <div>${document.customer_phone || document.customer?.phone || "-"}</div>
+           <div class="font-semibold">เลขประจำตัวผู้เสียภาษี:</div>
+           <div>${document.customer_tax_id || document.customer?.tax_id || "-"}</div>
+         </div>
+       </div>
+     `;
+  };
+
+  // ฟังก์ชันสร้าง HTML string สำหรับ summary
+  const generateSummaryHTML = () => {
+    const netTotal = (summary.total || 0) - (summary.withholdingTax || 0);
+    return `
+        <div class="document-summary flex justify-end mb-4">
+          <div class="min-w-48 space-y-1 bg-blue-50 rounded-lg p-3 text-xs">
+            <div class="flex justify-between">
+              <span>รวมเป็นเงิน:</span>
+              <span>${formatCurrency((summary.subtotal || 0) + (summary.discount || 0))}</span>
+            </div>
+            ${
+              summary.discount > 0
+                ? `
+              <div class="flex justify-between text-red-600">
+                <span>ส่วนลด:</span>
+                <span>-${formatCurrency(summary.discount || 0)}</span>
+              </div>
+            `
+                : ""
+            }
+            ${
+              summary.tax > 0
+                ? `
+              <div class="flex justify-between">
+                <span>ภาษีมูลค่าเพิ่ม:</span>
+                <span>${formatCurrency(summary.tax || 0)}</span>
+              </div>
+            `
+                : ""
+            }
+            ${
+              summary.withholdingTax > 0
+                ? `
+              <div class="flex justify-between text-red-600">
+                <span>หัก ณ ที่จ่าย:</span>
+                <span>-${formatCurrency(summary.withholdingTax || 0)}</span>
+              </div>
+            `
+                : ""
+            }
+            <div class="border-t border-gray-300 pt-1">
+              <div class="flex justify-between font-bold text-base">
+                <span>รวมทั้งสิ้น:</span>
+                <span>${formatCurrency(netTotal)}</span>
+              </div>
+              <div class="mt-2 pt-2 border-t border-gray-200">
+                <div class="text-center">
+                  <div class="text-sm text-gray-700 font-semibold leading-relaxed">
+                    (${numberToThaiText(netTotal)})
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+  };
+
+  // ฟังก์ชันสร้าง HTML string สำหรับ footer
+  const generateFooterHTML = () => {
+    switch (type) {
+      case "quotation":
+        return `
+           <div class="document-footer mt-4 text-xs text-gray-600">
+             <b>เงื่อนไขการชำระเงิน:</b> กรุณาชำระเงินภายในวันที่ ${formatDate(document.validUntil)}
+             <br />
+             <b>หมายเหตุ:</b> ${document.notes || "-"}
+           </div>
+         `;
+      case "invoice":
+        return `
+           <div class="document-footer mt-4">
+             <b>ชำระเงิน</b>
+             <div class="grid grid-cols-2 gap-2 mt-2">
+               ${SELLER_INFO.bankAccounts
+                 .map(
+                   (acc, i) => `
+                 <div class="flex items-center gap-2">
+                   <span class="font-bold">${acc.bank}</span>
+                   <span>${acc.acc}</span>
+                   <span>${acc.branch}</span>
+                 </div>
+               `
+                 )
+                 .join("")}
+             </div>
+             ${
+               document.notes
+                 ? `
+               <div class="mt-4 p-3 bg-yellow-50 rounded text-sm text-yellow-900 border border-yellow-200">
+                 <span class="font-semibold">หมายเหตุ (ใบแจ้งหนี้): </span>${document.notes}
+               </div>
+             `
+                 : ""
+             }
+           </div>
+         `;
+      case "receipt":
+        return `
+           <div class="document-footer mt-4">
+             ${
+               (document as any).receipt_details
+                 ? `
+               <div class="bg-green-50 rounded-lg border border-green-200 px-4 py-3 mb-3">
+                 <div class="font-bold text-green-700 mb-2 text-sm">ข้อมูลการรับชำระ</div>
+                 <div class="grid grid-cols-3 gap-x-4 gap-y-1 text-xs">
+                   <div class="font-semibold">วันที่:</div>
+                   <div>${formatDate((document as any).receipt_details.payment_date)}</div>
+                   <div></div>
+                   <div class="font-semibold">วิธี:</div>
+                   <div>${(document as any).receipt_details.payment_method || "-"}</div>
+                   <div></div>
+                   ${
+                     (document as any).receipt_details.payment_reference
+                       ? `
+                     <div class="font-semibold">อ้างอิง:</div>
+                     <div>${(document as any).receipt_details.payment_reference}</div>
+                     <div></div>
+                   `
+                       : ""
+                   }
+                   <div class="font-semibold">ยอดรับ:</div>
+                   <div class="font-bold text-green-700">${formatCurrency((document as any).receipt_details.net_total_receipt || 0)}</div>
+                   <div></div>
+                 </div>
+                 
+                 ${
+                   (document as any).receipt_details.payment_channels &&
+                   Array.isArray(
+                     (document as any).receipt_details.payment_channels
+                   ) &&
+                   (document as any).receipt_details.payment_channels.length > 0
+                     ? `
+                   <div class="mt-2">
+                     <div class="font-semibold text-green-700 mb-1 text-xs">ช่องทางการชำระ:</div>
+                     <div class="space-y-1">
+                       ${(document as any).receipt_details.payment_channels
+                         .map(
+                           (channel: any, idx: number) => `
+                         <div class="flex justify-between items-center bg-white rounded px-2 py-1 border border-green-100 text-xs">
+                           <div class="flex items-center gap-1">
+                             <span>${channel?.method || channel?.channel || "ไม่ระบุ"}</span>
+                             ${channel?.note ? `<span class="text-gray-500">(${channel.note})</span>` : ""}
+                             ${channel?.bankAccountId && ((channel?.method || channel?.channel) === "โอนเงิน" || (channel?.method || channel?.channel) === "บัตรเครดิต") ? `<span class="text-blue-600">(${getBankName(channel.bankAccountId)})</span>` : ""}
+                             ${channel?.ewalletId ? `<span class="text-purple-600">(${getEwalletName(channel.ewalletId)})</span>` : ""}
+                           </div>
+                           <div class="font-semibold text-green-700">${formatCurrency(channel?.amount || 0)}</div>
+                         </div>
+                       `
+                         )
+                         .join("")}
+                     </div>
+                   </div>
+                 `
+                     : ""
+                 }
+                 
+                 ${
+                   (document as any).receipt_details.fees &&
+                   Array.isArray((document as any).receipt_details.fees) &&
+                   (document as any).receipt_details.fees.length > 0 &&
+                   (document as any).receipt_details.fees.some(
+                     (fee: any) => fee.enabled
+                   )
+                     ? `
+                   <div class="mt-2">
+                     <div class="font-semibold text-green-700 mb-1 text-xs">ค่าธรรมเนียม:</div>
+                     <div class="space-y-1">
+                       ${(document as any).receipt_details.fees
+                         .filter((fee: any) => fee.enabled)
+                         .map(
+                           (fee: any, idx: number) => `
+                         <div class="flex justify-between items-center bg-white rounded px-2 py-1 border border-green-100 text-xs">
+                           <div>${fee.description || `ค่าธรรมเนียม ${idx + 1}`}</div>
+                           <div class="font-semibold text-green-700">${formatCurrency(fee.amount || 0)}</div>
+                         </div>
+                       `
+                         )
+                         .join("")}
+                     </div>
+                   </div>
+                 `
+                     : ""
+                 }
+                 
+                 ${
+                   (document as any).receipt_details.offset_docs &&
+                   Array.isArray(
+                     (document as any).receipt_details.offset_docs
+                   ) &&
+                   (document as any).receipt_details.offset_docs.length > 0 &&
+                   (document as any).receipt_details.offset_docs.some(
+                     (doc: any) => doc.enabled
+                   )
+                     ? `
+                   <div class="mt-2">
+                     <div class="font-semibold text-green-700 mb-1 text-xs">เอกสารออฟเซ็ต:</div>
+                     <div class="space-y-1">
+                       ${(document as any).receipt_details.offset_docs
+                         .filter((doc: any) => doc.enabled)
+                         .map(
+                           (doc: any, idx: number) => `
+                         <div class="flex justify-between items-center bg-white rounded px-2 py-1 border border-green-100 text-xs">
+                           <div class="flex items-center gap-1">
+                             <span>${doc.document_number || `เอกสาร ${idx + 1}`}</span>
+                             ${doc.note ? `<span class="text-gray-500">(${doc.note})</span>` : ""}
+                           </div>
+                           <div class="font-semibold text-green-700">${formatCurrency(doc.amount || 0)}</div>
+                         </div>
+                       `
+                         )
+                         .join("")}
+                     </div>
+                   </div>
+                 `
+                     : ""
+                 }
+               </div>
+             `
+                 : ""
+             }
+             <div class="text-center">
+               <div class="text-green-700 font-bold text-lg mb-2">ขอขอบพระคุณที่ไว้วางใจใช้บริการ</div>
+               <div class="text-xs text-gray-600">กรุณาเก็บใบเสร็จนี้ไว้เป็นหลักฐาน</div>
+             </div>
+           </div>
+         `;
+      default:
+        return "";
+    }
+  };
+
+  // ฟังก์ชันสร้าง HTML สำหรับแต่ละหน้า
+  const generatePageHTML = (
+    pageNumber: number,
+    pageItems: DocumentItem[],
+    totalPages: number
+  ) => {
+    const isLastPage = pageNumber === totalPages;
+
+    return `
+        <div class="print-area pt-6 flex flex-col min-h-full">
+          <!-- Header -->
+          ${generateHeaderHTML()}
+          <!-- Customer Info -->
+          ${generateCustomerInfoHTML()}
+         <!-- Table -->
+         <div class="document-table mb-4 flex-grow">
+           <table class="w-full border border-gray-300 text-xs">
+             <thead>
+               <tr class="bg-gray-50">
+                 <th class="border border-gray-300 px-2 py-1 text-left font-semibold">รายการ</th>
+                 <th class="border border-gray-300 px-2 py-1 text-center font-semibold w-16">จำนวน</th>
+                 <th class="border border-gray-300 px-2 py-1 text-center font-semibold w-20">ส่วนลด</th>
+                 <th class="border border-gray-300 px-2 py-1 text-right font-semibold w-24">ราคา/หน่วย</th>
+                 <th class="border border-gray-300 px-2 py-1 text-right font-semibold w-24">จำนวนเงิน</th>
+               </tr>
+             </thead>
+             <tbody>
+               ${pageItems
+                 .map(
+                   (item, idx) => `
+                 <tr>
+                   <td class="border border-gray-300 px-2 py-1">
+                     <div class="font-medium">${item.product_name || item.productTitle || item.description || "-"}</div>
+                     ${
+                       item.description &&
+                       (item.product_name || item.productTitle) &&
+                       item.description !==
+                         (item.product_name || item.productTitle)
+                         ? `<div class="text-gray-600 text-xs">${item.description}</div>`
+                         : ""
+                     }
+                   </td>
+                   <td class="border border-gray-300 px-2 py-1 text-center">${item.quantity}</td>
+                   <td class="border border-gray-300 px-2 py-1 text-center">
+                     ${item.discountType === "percentage" ? `${item.discount || 0}%` : `${formatCurrency(item.discount || 0)}`}
+                   </td>
+                   <td class="border border-gray-300 px-2 py-1 text-right">${formatCurrency(item.unitPrice || 0)}</td>
+                   <td class="border border-gray-300 px-2 py-1 text-right font-semibold">${formatCurrency(item.amount || 0)}</td>
+                 </tr>
+               `
+                 )
+                 .join("")}
+             </tbody>
+           </table>
+         </div>
+         <!-- Footer Section - ติดท้ายกระดาษ -->
+         <div class="document-footer-section mt-auto">
+           <!-- Summary -->
+           ${generateSummaryHTML()}
+           <!-- Footer -->
+           ${generateFooterHTML()}
+           <!-- Signature -->
+           <div class="document-signature flex justify-end mt-6">
+             <div class="text-center">
+               <div class="border-t-2 border-gray-400 w-32 h-8 mb-1"></div>
+               <div class="text-xs text-gray-600">ผู้รับเงิน</div>
+             </div>
+           </div>
+           <!-- หมายเหตุ -->
+           ${
+             document.notes
+               ? `
+             <div class="document-notes mt-2 p-2 bg-yellow-50 rounded text-xs text-yellow-900 border border-yellow-200 max-w-xl mx-auto">
+               <span class="font-semibold">หมายเหตุ: </span>${document.notes}
+             </div>
+           `
+               : ""
+           }
+           <!-- ช่องเซ็นชื่อ -->
+           <div class="document-signature flex justify-end mt-6 print:mt-8">
+             <div class="text-center">
+               <div class="h-8 border-b border-gray-400 w-40 mx-auto mb-1"></div>
+               <div class="text-xs text-gray-500">(ผู้มีอำนาจลงนาม)</div>
+             </div>
+           </div>
+         </div>
+       </div>
+     `;
+  };
+
+  // ฟังก์ชันแบ่งรายการตามความสูงของเนื้อหา
+  const splitItemsByPage = () => {
+    const totalItems = items.length;
+
+    // ถ้ามีรายการน้อยกว่า 5 รายการ ให้แสดงในหน้าเดียว
+    if (totalItems <= 5) {
+      return [items];
+    }
+
+    // คำนวณความสูงของเนื้อหาที่ไม่ใช่ตาราง (header, customer info, summary, footer, signature)
+    const fixedContentHeight = 400; // ประมาณความสูงของเนื้อหาคงที่ (px)
+
+    // ความสูงของหน้า A4 (ประมาณ 1123px ที่ 96 DPI)
+    const pageHeight = 1123;
+
+    // ความสูงที่เหลือสำหรับตาราง
+    const availableTableHeight = pageHeight - fixedContentHeight;
+
+    // ประมาณความสูงของแต่ละแถวในตาราง (รวม header)
+    const rowHeight = 60; // ประมาณความสูงของแต่ละแถว
+
+    // คำนวณจำนวนแถวที่สามารถใส่ได้ในหน้าแรก
+    const maxRowsPerPage = Math.floor(availableTableHeight / rowHeight);
+
+    // จำนวนรายการที่สามารถใส่ได้ในหน้าแรก (ลบ 1 สำหรับ header ของตาราง)
+    const itemsForFirstPage = Math.max(1, maxRowsPerPage - 1);
+
+    // สำหรับหน้าถัดไป ใช้ความสูงเต็มหน้า
+    const itemsForNextPages = Math.floor((pageHeight - 200) / rowHeight) - 1; // ลบ header และ margin
+
+    const pages: DocumentItem[][] = [];
+    let currentIndex = 0;
+
+    // หน้าแรก
+    if (currentIndex < totalItems) {
+      const firstPageItems = items.slice(
+        currentIndex,
+        currentIndex + itemsForFirstPage
+      );
+      pages.push(firstPageItems);
+      currentIndex += itemsForFirstPage;
+    }
+
+    // หน้าถัดไป
+    while (currentIndex < totalItems) {
+      const nextPageItems = items.slice(
+        currentIndex,
+        currentIndex + itemsForNextPages
+      );
+      pages.push(nextPageItems);
+      currentIndex += itemsForNextPages;
+    }
+
+    return pages;
+  };
+
+  // เพิ่มฟังก์ชัน handlePrint สำหรับการพิมพ์หลายหน้าแบบปรับปรุง
   const handlePrint = () => {
-    const printContent =
-      window.document.querySelector(".print-area")?.innerHTML;
+    // แบ่งรายการตามจำนวนรายการต่อหน้า
+    const pages = splitItemsByPage();
+    const totalPages = pages.length;
+
+    // สร้าง HTML สำหรับแต่ละหน้า
+    let allPagesHTML = "";
+
+    for (let page = 1; page <= totalPages; page++) {
+      const pageItems = pages[page - 1];
+
+      // สร้าง HTML สำหรับหน้านี้
+      const pageHTML = generatePageHTML(page, pageItems, totalPages);
+      allPagesHTML += pageHTML;
+
+      // เพิ่ม page break (ยกเว้นหน้าสุดท้าย)
+      if (page < totalPages) {
+        allPagesHTML += '<div style="page-break-after: always;"></div>';
+      }
+    }
+
     const printWindow = window.open("", "", "width=900,height=1200");
     printWindow.document.write(`
-      <html>
-        <head>
-          <title>พิมพ์เอกสาร</title>
-          <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-          <style>
+       <html>
+         <head>
+           <title>พิมพ์เอกสาร</title>
+           <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+           <style>
             /* สำหรับหน้าจอปกติ */
             .print-area {
               width: 100%;
@@ -721,37 +1171,47 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
               padding: 32px 24px;
             }
             
-            @media print {
-              html, body {
-                width: 210mm;
-                height: 297mm;
-                margin: 0;
-                padding: 0;
-              }
+                         @media print {
+               html, body {
+                 width: 210mm;
+                 height: 297mm;
+                 margin: 0;
+                 padding: 0;
+               }
+               
+               .no-print {
+                 display: none !important;
+               }
+               
+               .print-area {
+                 width: 210mm !important;
+                 max-width: 210mm;
+                 margin: 0 !important;
+                 border-radius: 0 !important;
+                 box-shadow: none !important;
+                 padding: 15mm 10mm 10mm 10mm !important;
+                 page-break-inside: auto !important;
+                 min-height: 297mm !important;
+                 display: flex !important;
+                 flex-direction: column !important;
+               }
+               
+               .document-footer-section {
+                 margin-top: auto !important;
+                 padding-bottom: 5mm !important;
+               }
               
-              .no-print {
-                display: none !important;
-              }
-              
-              .print-area {
-                width: 210mm !important;
-                max-width: 210mm;
-                margin: 0 !important;
-                border-radius: 0 !important;
-                box-shadow: none !important;
-                padding: 15mm 10mm 10mm 10mm !important;
-                page-break-inside: auto !important;
-              }
-              
-              /* หัวกระดาษ - ต้องอยู่หน้าแรกเสมอ */
+              /* หัวเอกสาร - แสดงซ้ำในทุกหน้า */
               .document-header {
+                position: running(header) !important;
                 page-break-after: avoid !important;
                 page-break-inside: avoid !important;
                 margin-bottom: 10mm !important;
               }
               
-              /* ข้อมูลลูกค้า - ต้องอยู่หน้าแรกเสมอ */
+              /* ข้อมูลลูกค้า - แสดงซ้ำในทุกหน้า */
               .customer-info {
+                position: running(customer-info) !important;
                 page-break-after: avoid !important;
                 page-break-inside: avoid !important;
                 margin-bottom: 10mm !important;
@@ -813,27 +1273,27 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
               
               /* ปรับ margin และ padding */
               .print-area > * {
-                margin-bottom: 0.5em !important;
+                margin-bottom: 0.3em !important;
               }
               
               .print-area table {
-                margin-bottom: 0.5em !important;
+                margin-bottom: 0.3em !important;
               }
               
               .print-area .bg-green-50 {
-                margin-bottom: 0.5em !important;
-                padding: 0.5em !important;
+                margin-bottom: 0.3em !important;
+                padding: 0.3em !important;
               }
               
               .print-area .bg-blue-50 {
-                margin-bottom: 0.5em !important;
-                padding: 0.5em !important;
+                margin-bottom: 0.3em !important;
+                padding: 0.3em !important;
               }
               
               /* ปรับขนาดตาราง */
               .print-area table td,
               .print-area table th {
-                padding: 0.4em !important;
+                padding: 0.2em !important;
               }
               
               /* ปรับขนาดช่องเซ็น */
@@ -858,11 +1318,17 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
                 font-size: 1.8em !important;
               }
               
-              /* ตั้งค่าหน้า */
-              @page {
-                size: A4;
-                margin: 0;
-              }
+                             /* ตั้งค่าหน้าและใช้ header/footer ในทุกหน้า */
+               @page {
+                 size: A4;
+                 margin: 15mm 10mm 10mm 10mm;
+                 @top-center {
+                   content: element(header);
+                 }
+                 @top-right {
+                   content: element(customer-info);
+                 }
+               }
             }
             
             .modal-scroll {
@@ -871,11 +1337,9 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
             }
           </style>
         </head>
-        <body onload="window.print();window.close();">
-          <div class="print-area">
-            ${printContent}
-          </div>
-        </body>
+                 <body onload="window.print();window.close();">
+           ${allPagesHTML}
+         </body>
       </html>
     `);
     printWindow.document.close();
