@@ -100,7 +100,7 @@ function prepareDocumentData(document: DocumentPayload): any {
     items: Array.isArray(document.items) ? document.items : [],
     summary: document.summary,
     notes: document.notes,
-    priceType: document.priceType,
+    // priceType ย้ายไปเป็น item-specific แล้ว ไม่ต้องส่งในระดับ document
     status: document.status,
     attachments: document.attachments,
     tags: document.tags,
@@ -293,7 +293,7 @@ function mapDocumentFromBackend(doc: any): DocumentData {
       unit: item.unit ?? "",
       quantity: Number(item.quantity ?? 1),
       unitPrice: Number(item.unit_price ?? 0),
-      priceType: item.price_type || "exclusive",
+      priceType: item.price_type || "EXCLUDE_VAT",
       discount: Number(item.discount ?? 0),
       discountType: item.discount_type ?? "thb",
       tax: Number(item.tax ?? 0),

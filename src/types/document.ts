@@ -106,6 +106,7 @@ export interface DocumentItemPayload {
   tax: number;
   tax_amount: number;
   withholding_tax_option?: WithholdingTaxOption;
+  priceType: "EXCLUDE_VAT" | "INCLUDE_VAT" | "NO_VAT";
 }
 
 export interface DocumentPayload {

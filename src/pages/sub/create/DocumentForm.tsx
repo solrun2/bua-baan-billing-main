@@ -1029,6 +1029,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
         tax: item.priceType === "NO_VAT" ? 0 : Number(item.tax ?? 0),
         tax_amount: calculatedItem.taxAmount ?? 0, // ใช้ค่าที่คำนวณแล้ว
         withholding_tax_option: item.withholding_tax_option || "ไม่ระบุ",
+        priceType: item.priceType || "EXCLUDE_VAT", // เพิ่ม priceType สำหรับแต่ละ item
       };
       return mappedItem;
     });
