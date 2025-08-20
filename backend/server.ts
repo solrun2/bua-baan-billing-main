@@ -488,6 +488,54 @@ app.get("/api/documents", async (req: Request, res: Response) => {
   }
 });
 
+// ฟังก์ชัน helper สำหรับคำนวณ summary จาก items
+function calculateSummaryFromItems(items: any[]) {
+  let subtotal = 0;
+  let taxTotal = 0;
+  let totalAmount = 0;
+
+  for (const item of items) {
+    const quantity = Number(item.quantity || 1);
+    const unitPrice = Number(item.unit_price || item.unitPrice || 0);
+    const discount = Number(item.discount || 0);
+    const discountType = item.discount_type || item.discountType || "thb";
+    const tax = Number(item.tax || 0);
+    const priceType = item.price_type || item.priceType || "EXCLUDE_VAT";
+
+    // คำนวณ subtotal
+    const itemSubtotal = quantity * unitPrice;
+
+    // คำนวณส่วนลด
+    const discountAmount =
+      discountType === "percentage"
+        ? (itemSubtotal * discount) / 100
+        : discount * quantity;
+
+    // คำนวณยอดหลังหักส่วนลด
+    const amountAfterDiscount = itemSubtotal - discountAmount;
+
+    // คำนวณภาษี
+    const taxAmount =
+      priceType === "none" ? 0 : (amountAfterDiscount * tax) / 100;
+
+    // คำนวณยอดรวม
+    const itemTotal = amountAfterDiscount + taxAmount;
+
+    subtotal += itemSubtotal;
+    taxTotal += taxAmount;
+    totalAmount += itemTotal;
+  }
+
+  return {
+    subtotal,
+    tax: taxTotal,
+    total: totalAmount,
+    discount: subtotal - (totalAmount - taxTotal),
+    netAfterDiscount: totalAmount - taxTotal,
+    withholdingTax: 0,
+  };
+}
+
 // ฟังก์ชัน reusable สำหรับสร้างเอกสารใหม่ใน backend (ใช้ใน auto-create invoice/receipt)
 async function createDocumentFromServer(data: any, pool: any) {
   let conn;
@@ -508,10 +556,16 @@ async function createDocumentFromServer(data: any, pool: any) {
       summary,
     } = data;
 
-    // ใช้ค่าจาก frontend ที่คำนวณแล้ว
-    const subtotal = summary?.subtotal ?? 0;
-    const tax_amount = summary?.tax ?? 0;
-    const total_amount = summary?.total ?? 0;
+    // คำนวณ summary ถ้าไม่มีหรือไม่ถูกต้อง
+    let calculatedSummary = summary;
+    if (!summary || summary.total === 0 || summary.total === undefined) {
+      calculatedSummary = calculateSummaryFromItems(items);
+    }
+
+    // ใช้ค่าที่คำนวณแล้ว
+    const subtotal = calculatedSummary.subtotal ?? 0;
+    const tax_amount = calculatedSummary.tax ?? 0;
+    const total_amount = calculatedSummary.total ?? 0;
 
     if (
       !customer ||
@@ -1513,6 +1567,10 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
         "SELECT * FROM document_items WHERE document_id = ?",
         [id]
       );
+
+      // คำนวณ summary สำหรับ invoice
+      const invoiceSummary = calculateSummaryFromItems(quotationItems);
+
       const invoiceData = {
         customer: {
           id: quotationDoc.customer_id,
@@ -1542,6 +1600,7 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
           tax_amount: item.tax_amount,
           priceType: item.priceType || item.price_type || "EXCLUDE_VAT",
         })),
+        summary: invoiceSummary,
         related_document_id: quotationDoc.id,
         due_date: null,
       };
@@ -1565,6 +1624,9 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
         "SELECT * FROM document_items WHERE document_id = ?",
         [id]
       );
+
+      // คำนวณ summary สำหรับ receipt
+      const receiptSummary = calculateSummaryFromItems(invoiceItems);
 
       const receiptData = {
         customer: {
@@ -1595,6 +1657,7 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
           tax_amount: item.tax_amount,
           priceType: item.priceType || item.price_type || "EXCLUDE_VAT",
         })),
+        summary: receiptSummary,
         related_document_id: invoiceDoc.id,
         payment_date: new Date().toISOString().slice(0, 10),
         payment_method: null,
