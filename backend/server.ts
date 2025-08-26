@@ -554,6 +554,7 @@ async function createDocumentFromServer(data: any, pool: any) {
       valid_until,
       related_document_id,
       summary,
+      issueTaxInvoice,
     } = data;
 
     // คำนวณ summary ถ้าไม่มีหรือไม่ถูกต้อง
@@ -638,8 +639,8 @@ async function createDocumentFromServer(data: any, pool: any) {
         customer_id, customer_name, document_number, document_type, status, issue_date,
         subtotal, tax_amount, total_amount, notes,
         customer_address, customer_phone, customer_email,
-        related_document_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        related_document_id, issue_tax_invoice
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         customer.id,
         customer.name,
@@ -655,6 +656,7 @@ async function createDocumentFromServer(data: any, pool: any) {
         customer.phone || "",
         customer.email || "",
         related_document_id || null,
+        issueTaxInvoice || false,
       ]
     );
     const documentId = Number((docResult as any).insertId);
@@ -1220,6 +1222,7 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
       payment_method,
       payment_reference,
       summary = {},
+      issueTaxInvoice,
       // เพิ่ม fields สำหรับ receipt
       payment_channels,
       fees,
@@ -1296,7 +1299,7 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
       `UPDATE documents SET
         customer_id = ?, customer_name = ?, document_type = ?, status = ?, issue_date = ?,
         subtotal = ?, tax_amount = ?, total_amount = ?, notes = ?,
-        customer_address = ?, customer_phone = ?, customer_email = ?
+        customer_address = ?, customer_phone = ?, customer_email = ?, issue_tax_invoice = ?
       WHERE id = ?`,
       [
         customer.id,
@@ -1311,6 +1314,7 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
         customer.address || "",
         customer.phone || "",
         customer.email || "",
+        issueTaxInvoice || false,
         id,
       ]
     );
@@ -1617,7 +1621,7 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
       (status === "ชำระแล้ว" || status === "paid")
     ) {
       const [invoiceDoc] = await pool.query(
-        "SELECT id, customer_id, customer_name, customer_address, customer_phone, customer_email, notes FROM documents WHERE id = ?",
+        "SELECT id, customer_id, customer_name, customer_address, customer_phone, customer_email, notes, issue_tax_invoice FROM documents WHERE id = ?",
         [id]
       );
       const invoiceItems = await pool.query(
@@ -1659,6 +1663,7 @@ app.put("/api/documents/:id", async (req: Request, res: Response) => {
         })),
         summary: receiptSummary,
         related_document_id: invoiceDoc.id,
+        issueTaxInvoice: invoiceDoc.issue_tax_invoice || false,
         payment_date: new Date().toISOString().slice(0, 10),
         payment_method: null,
         payment_reference: null,

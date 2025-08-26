@@ -1058,6 +1058,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
       // priceType removed - now item-specific
       status: form.status,
       attachments: attachments,
+      issueTaxInvoice: form.issueTaxInvoice,
       // เพิ่มข้อมูลสำหรับ receipt
       ...(documentType === "receipt" && {
         payment_date: form.documentDate, // ใช้วันที่เอกสารเป็นวันชำระเงิน
@@ -1459,7 +1460,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
         onSubmit={handleSubmit}
         className={`space-y-6 ${formClassName || ""}`}
       >
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-8 p-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-100">
           <div className="flex items-center gap-4">
             {showBackButton && (
               <Button
@@ -1467,12 +1468,13 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                 size="icon"
                 type="button"
                 onClick={onCancel}
+                className="bg-white border-blue-200 text-blue-700 hover:bg-blue-50"
               >
                 <ArrowLeft className="h-4 w-4" />
               </Button>
             )}
             <div>
-              <h1 className="text-2xl font-bold text-foreground">
+              <h1 className="text-2xl font-bold text-blue-900">
                 {pageTitle ||
                   (editMode
                     ? documentType === "quotation"
@@ -1490,7 +1492,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                       }`
                     : "สร้างใบเสร็จ")}
               </h1>
-              <p className="text-muted-foreground">
+              <p className="text-blue-700 mt-1">
                 {pageSubtitle ||
                   (editMode
                     ? documentType === "quotation"
@@ -1512,7 +1514,11 @@ export const DocumentForm: FC<DocumentFormProps> = ({
           </div>
           {showSaveButton && (
             <div className="flex items-center gap-2">
-              <Button type="submit" disabled={isLoading || isSaving}>
+              <Button
+                type="submit"
+                disabled={isLoading || isSaving}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium"
+              >
                 {isLoading || isSaving ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : (
@@ -1524,15 +1530,26 @@ export const DocumentForm: FC<DocumentFormProps> = ({
           )}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="space-y-2">
-            <Label>
-              <div className="space-y-4">
+        <Card className="border-2 border-orange-300 shadow-lg overflow-hidden">
+          <CardHeader className="bg-gradient-to-r from-orange-50 to-amber-50 border-b-2 border-orange-300">
+            <CardTitle className="text-orange-900 flex items-center gap-2">
+              <span className="text-xl">📄</span>
+              ข้อมูลเอกสาร
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-6 bg-white">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="space-y-3">
                 <div className="flex items-center gap-2">
-                  <Label htmlFor="documentNumber">เลขที่เอกสาร</Label>
+                  <Label
+                    htmlFor="documentNumber"
+                    className="text-sm font-medium text-gray-700"
+                  >
+                    เลขที่เอกสาร
+                  </Label>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Info className="h-4 w-4 text-muted-foreground" />
+                      <Info className="h-4 w-4 text-gray-400" />
                     </TooltipTrigger>
                     <TooltipContent>
                       <p>เลขที่เอกสารจะถูกสร้างโดยอัตโนมัติ</p>
@@ -1559,13 +1576,13 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                         id="documentNumber"
                         value={previewNumber}
                         readOnly
-                        className="font-mono bg-muted"
+                        className="font-mono bg-gray-100 border-gray-200"
                         placeholder=""
                       />
                     ) : documentType === "receipt" &&
                       (!previewNumber ||
                         /RE-\d{4}-0001/.test(previewNumber)) ? (
-                      <div className="text-muted-foreground italic py-2 px-3 bg-muted rounded border border-dashed border-gray-300">
+                      <div className="text-gray-500 italic py-3 px-4 bg-gray-50 rounded-lg border border-dashed border-gray-300">
                         เลขที่ใบเสร็จจะถูกกำหนดหลังบันทึก
                       </div>
                     ) : (
@@ -1573,112 +1590,147 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                         id="documentNumber"
                         value={previewNumber}
                         readOnly
-                        className="font-mono bg-muted"
+                        className="font-mono bg-gray-100 border-gray-200"
                         placeholder=""
                       />
                     );
                   })()}
                 </div>
               </div>
-            </Label>
-          </div>
 
-          <div className="space-y-2">
-            <Label>วันที่</Label>
-            <Input
-              type="date"
-              value={form.documentDate}
-              onChange={(e) => {
-                handleFormChange("documentDate", e.target.value);
-              }}
-            />
-          </div>
+              <div className="space-y-3">
+                <Label className="text-sm font-medium text-gray-700">
+                  วันที่
+                </Label>
+                <Input
+                  type="date"
+                  value={form.documentDate}
+                  onChange={(e) => {
+                    handleFormChange("documentDate", e.target.value);
+                  }}
+                  className="border-gray-200"
+                />
+              </div>
 
-          {documentType === "quotation" ? (
-            <div className="space-y-2">
-              <Label>ยืนราคาถึงวันที่</Label>
-              <Input
-                type="date"
-                value={form.validUntil}
-                onChange={(e) => handleFormChange("validUntil", e.target.value)}
-              />
+              {documentType === "quotation" ? (
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium text-gray-700">
+                    ยืนราคาถึงวันที่
+                  </Label>
+                  <Input
+                    type="date"
+                    value={form.validUntil}
+                    onChange={(e) =>
+                      handleFormChange("validUntil", e.target.value)
+                    }
+                    className="border-gray-200"
+                  />
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium text-gray-700">
+                    วันที่ครบกำหนดชำระ
+                  </Label>
+                  <Input
+                    type="date"
+                    value={form.dueDate}
+                    onChange={(e) => {
+                      handleFormChange("dueDate", e.target.value);
+                      // เปลี่ยนสถานะเป็น "รอชำระ" เมื่อเลือกวันครบกำหนดชำระ
+                      if (documentType === "invoice" && e.target.value) {
+                        handleFormChange("status", "รอชำระ");
+                      }
+                    }}
+                    className="border-gray-200"
+                  />
+                </div>
+              )}
             </div>
-          ) : (
-            <div className="space-y-2">
-              <Label>วันที่ครบกำหนดชำระ</Label>
-              <Input
-                type="date"
-                value={form.dueDate}
-                onChange={(e) => {
-                  handleFormChange("dueDate", e.target.value);
-                  // เปลี่ยนสถานะเป็น "รอชำระ" เมื่อเลือกวันครบกำหนดชำระ
-                  if (documentType === "invoice" && e.target.value) {
-                    handleFormChange("status", "รอชำระ");
-                  }
-                }}
-              />
-            </div>
-          )}
-        </div>
+          </CardContent>
+        </Card>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="space-y-2">
-            <Label>อ้างอิง</Label>
-            <Input
-              value={form.reference}
-              onChange={(e) => handleFormChange("reference", e.target.value)}
-              placeholder="อ้างอิง (ไม่บังคับ)"
-            />
-          </div>
-          {editMode && (
-            <div className="space-y-2">
-              <Label>สถานะเอกสาร</Label>
-              <Select
-                value={form.status || ""}
-                onValueChange={(value) => handleFormChange("status", value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="เลือกสถานะเอกสาร" />
-                </SelectTrigger>
-                <SelectContent>
-                  {documentType === "quotation" ? (
-                    <>
-                      <SelectItem value="ร่าง">ร่าง</SelectItem>
-                      <SelectItem value="รอตอบรับ">รอตอบรับ</SelectItem>
-                      <SelectItem value="ตอบรับแล้ว">ตอบรับแล้ว</SelectItem>
-                      <SelectItem value="พ้นกำหนด">พ้นกำหนด</SelectItem>
-                      <SelectItem value="ยกเลิก">ยกเลิก</SelectItem>
-                    </>
-                  ) : documentType === "receipt" ? (
-                    <>
-                      <SelectItem value="ร่าง">ร่าง</SelectItem>
-                      <SelectItem value="ชำระแล้ว">ชำระแล้ว</SelectItem>
-                      <SelectItem value="ชำระบางส่วน">ชำระบางส่วน</SelectItem>
-                      <SelectItem value="ยกเลิก">ยกเลิก</SelectItem>
-                    </>
-                  ) : (
-                    <>
-                      <SelectItem value="ร่าง">ร่าง</SelectItem>
-                      <SelectItem value="รอชำระ">รอชำระ</SelectItem>
-                      <SelectItem value="ชำระแล้ว">ชำระแล้ว</SelectItem>
-                      <SelectItem value="พ้นกำหนด">พ้นกำหนด</SelectItem>
-                      <SelectItem value="ยกเลิก">ยกเลิก</SelectItem>
-                    </>
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-        </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>ข้อมูลลูกค้า</CardTitle>
+        <Card className="border-2 border-gray-300 shadow-lg overflow-hidden">
+          <CardHeader className="bg-gradient-to-r from-gray-50 to-slate-50 border-b-2 border-gray-300">
+            <CardTitle className="text-gray-900 flex items-center gap-2">
+              <span className="text-xl">⚙️</span>
+              ข้อมูลเพิ่มเติม
+            </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="flex items-end gap-2">
+          <CardContent className="p-6 bg-white">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-3">
+                <Label className="text-sm font-medium text-gray-700">
+                  อ้างอิง
+                </Label>
+                <Input
+                  value={form.reference}
+                  onChange={(e) =>
+                    handleFormChange("reference", e.target.value)
+                  }
+                  placeholder="อ้างอิง (ไม่บังคับ)"
+                  className="border-gray-200"
+                />
+              </div>
+              {editMode && (
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium text-gray-700">
+                    สถานะเอกสาร
+                  </Label>
+                  <Select
+                    value={form.status || ""}
+                    onValueChange={(value) => handleFormChange("status", value)}
+                  >
+                    <SelectTrigger className="border-gray-200">
+                      <SelectValue placeholder="เลือกสถานะเอกสาร" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {documentType === "quotation" ? (
+                        <>
+                          <SelectItem value="ร่าง">ร่าง</SelectItem>
+                          <SelectItem value="รอตอบรับ">รอตอบรับ</SelectItem>
+                          <SelectItem value="ตอบรับแล้ว">ตอบรับแล้ว</SelectItem>
+                          <SelectItem value="พ้นกำหนด">พ้นกำหนด</SelectItem>
+                          <SelectItem value="ยกเลิก">ยกเลิก</SelectItem>
+                        </>
+                      ) : documentType === "receipt" ? (
+                        <>
+                          <SelectItem value="ร่าง">ร่าง</SelectItem>
+                          <SelectItem value="ชำระแล้ว">ชำระแล้ว</SelectItem>
+                          <SelectItem value="ชำระบางส่วน">
+                            ชำระบางส่วน
+                          </SelectItem>
+                          <SelectItem value="ยกเลิก">ยกเลิก</SelectItem>
+                        </>
+                      ) : (
+                        <>
+                          <SelectItem value="ร่าง">ร่าง</SelectItem>
+                          <SelectItem value="รอชำระ">รอชำระ</SelectItem>
+                          <SelectItem value="ชำระแล้ว">ชำระแล้ว</SelectItem>
+                          <SelectItem value="พ้นกำหนด">พ้นกำหนด</SelectItem>
+                          <SelectItem value="ยกเลิก">ยกเลิก</SelectItem>
+                        </>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-2 border-purple-300 shadow-lg overflow-hidden">
+          <CardHeader className="bg-gradient-to-r from-purple-50 to-pink-50 border-b-2 border-purple-300">
+            <CardTitle className="text-purple-900 flex items-center gap-2">
+              <span className="text-xl">👤</span>
+              ข้อมูลลูกค้า
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-6 bg-white">
+            <div className="flex items-end gap-4">
               <div className="flex-grow">
-                <Label>ค้นหาลูกค้า</Label>
+                <Label className="text-sm font-medium text-gray-700 mb-2 block">
+                  ค้นหาลูกค้า
+                </Label>
                 <CustomerAutocomplete
                   value={
                     form.customer
@@ -1692,7 +1744,9 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                 type="button"
                 variant="outline"
                 onClick={() => setIsCreateCustomerOpen(true)}
+                className="px-4 py-2 border-purple-300 text-purple-700 hover:bg-purple-50"
               >
+                <span className="mr-2">➕</span>
                 สร้างใหม่
               </Button>
               <CreateCustomerDialog
@@ -1759,26 +1813,32 @@ export const DocumentForm: FC<DocumentFormProps> = ({
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>ข้อมูลราคาและภาษี</CardTitle>
+        <Card className="border-2 border-green-300 shadow-lg overflow-hidden">
+          <CardHeader className="bg-gradient-to-r from-green-50 to-emerald-50 border-b-2 border-green-300">
+            <CardTitle className="text-green-900 flex items-center gap-2">
+              <span className="text-xl">💰</span>
+              ข้อมูลราคาและภาษี
+            </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-2 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <CardContent className="p-6 bg-white">
+            <div className="space-y-4">
               {/* สวิตช์ออกใบกำกับภาษี */}
               {(documentType === "invoice" || documentType === "receipt") && (
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-1">
-                    การออกใบกำกับภาษี
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Info className="w-4 h-4 text-gray-400" />
-                        </TooltipTrigger>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </Label>
-                  <div className="flex items-center space-x-2">
+                <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                      <span className="text-blue-600 text-sm">📄</span>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium text-blue-900">
+                        การออกใบกำกับภาษี
+                      </Label>
+                      <p className="text-xs text-blue-700">
+                        เลือกเพื่อออกใบกำกับภาษีอย่างย่อ
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-3">
                     <Switch
                       id="tax-invoice"
                       checked={form.issueTaxInvoice}
@@ -1786,7 +1846,10 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                         handleFormChange("issueTaxInvoice", value)
                       }
                     />
-                    <Label htmlFor="tax-invoice" className="text-blue-600">
+                    <Label
+                      htmlFor="tax-invoice"
+                      className="text-blue-600 font-medium"
+                    >
                       ใบกำกับภาษี
                     </Label>
                   </div>
@@ -1796,35 +1859,45 @@ export const DocumentForm: FC<DocumentFormProps> = ({
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>รายการ</CardTitle>
+        <Card className="border-2 border-blue-300 shadow-lg overflow-hidden">
+          <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b-2 border-blue-300">
+            <CardTitle className="text-blue-900 flex items-center gap-2">
+              <span className="text-xl">📋</span>
+              รายการสินค้า
+            </CardTitle>
             {(() => {
               const hasUnselectedItems = form.items.some(
                 (item) => !item.productId && !item.productTitle
               );
               return hasUnselectedItems ? (
-                <div className="text-sm text-orange-600 bg-orange-50 p-2 rounded-md border border-orange-200">
-                  ⚠️
-                  กรุณาเลือกสินค้าสำหรับรายการที่ยังไม่ได้เลือกสินค้าก่อนเพิ่มรายการใหม่
+                <div className="text-sm text-orange-700 bg-orange-100 p-3 rounded-lg border border-orange-300 flex items-center gap-2">
+                  <span className="text-lg">⚠️</span>
+                  <span>
+                    กรุณาเลือกสินค้าสำหรับรายการที่ยังไม่ได้เลือกสินค้าก่อนเพิ่มรายการใหม่
+                  </span>
                 </div>
               ) : null;
             })()}
           </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
+          <CardContent className="p-6 bg-white">
+            <div className="space-y-6">
               {form.items.map((item) => {
                 const isUnselected = !item.productId && !item.productTitle;
                 return (
                   <div
                     key={item.id}
-                    className={`flex flex-col space-y-2 p-4 border rounded-lg relative bg-background ${
-                      isUnselected ? "border-orange-300 bg-orange-50" : ""
+                    className={`flex flex-col space-y-2 p-6 border rounded-xl relative bg-background shadow-sm ${
+                      isUnselected
+                        ? "border-orange-300 bg-orange-50 shadow-orange-100"
+                        : "border-gray-200 hover:border-gray-300 transition-colors"
                     }`}
                   >
-                    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-[1fr_100px_140px_180px_100px_140px_140px_140px] gap-4 items-start">
+                    {/* แถวที่ 1: สินค้าและรายละเอียด */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                       <div className="space-y-2">
-                        <Label>สินค้าหรือบริการ</Label>
+                        <Label className="text-sm font-medium">
+                          สินค้าหรือบริการ
+                        </Label>
                         <ProductAutocomplete
                           value={
                             item.productId && item.productTitle
@@ -1885,7 +1958,28 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label>จำนวน</Label>
+                        <Label className="text-sm font-medium">
+                          รายละเอียดสินค้า
+                        </Label>
+                        <Textarea
+                          placeholder="ใส่รายละเอียดสินค้า..."
+                          value={item.description || ""}
+                          onChange={(e) =>
+                            handleItemChange(
+                              item.id,
+                              "description",
+                              e.target.value
+                            )
+                          }
+                          className="min-h-[80px] resize-none"
+                        />
+                      </div>
+                    </div>
+
+                    {/* แถวที่ 2: จำนวน ราคา และส่วนลด */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium">จำนวน</Label>
                         <Input
                           type="number"
                           value={
@@ -1903,7 +1997,9 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label>ราคาต่อหน่วย</Label>
+                        <Label className="text-sm font-medium">
+                          ราคาต่อหน่วย
+                        </Label>
                         <Input
                           type="number"
                           value={item.unitPrice?.toFixed(2) ?? "0.00"}
@@ -1913,7 +2009,9 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label>ส่วนลดต่อหน่วย</Label>
+                        <Label className="text-sm font-medium">
+                          ส่วนลดต่อหน่วย
+                        </Label>
                         <div className="flex items-center gap-2">
                           <Input
                             type="number"
@@ -1941,18 +2039,6 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                               handleItemChange(item.id, "discount", val);
                             }}
                           />
-                          {item.discountType === "thb" &&
-                            item.discount > getMaxDiscount(item) && (
-                              <div className="text-xs text-red-500">
-                                ส่วนลดต้องไม่เกินราคารวมสินค้า
-                              </div>
-                            )}
-                          {item.discountType === "percentage" &&
-                            item.discount > 100 && (
-                              <div className="text-xs text-red-500">
-                                ส่วนลดต้องไม่เกิน 100%
-                              </div>
-                            )}
                           <Select
                             value={item.discountType}
                             onValueChange={(value) =>
@@ -1968,9 +2054,43 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                             </SelectContent>
                           </Select>
                         </div>
+                        {item.discountType === "thb" &&
+                          item.discount > getMaxDiscount(item) && (
+                            <div className="text-xs text-red-500">
+                              ส่วนลดต้องไม่เกินราคารวมสินค้า
+                            </div>
+                          )}
+                        {item.discountType === "percentage" &&
+                          item.discount > 100 && (
+                            <div className="text-xs text-red-500">
+                              ส่วนลดต้องไม่เกิน 100%
+                            </div>
+                          )}
                       </div>
                       <div className="space-y-2">
-                        <Label>รูปแบบราคา</Label>
+                        <Label className="text-sm font-medium">
+                          มูลค่าก่อนภาษี
+                        </Label>
+                        <Input
+                          type="text"
+                          readOnly
+                          value={getNetUnitPrice(
+                            item,
+                            item.priceType
+                          ).toLocaleString("th-TH", {
+                            minimumFractionDigits: 2,
+                          })}
+                          className="font-semibold bg-muted"
+                        />
+                      </div>
+                    </div>
+
+                    {/* แถวที่ 3: ภาษีและหัก ณ ที่จ่าย */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium">
+                          รูปแบบราคา
+                        </Label>
                         <Select
                           value={item.priceType || "EXCLUDE_VAT"}
                           onValueChange={(value) =>
@@ -1990,7 +2110,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                         </Select>
                       </div>
                       <div className="space-y-2">
-                        <Label>ภาษี</Label>
+                        <Label className="text-sm font-medium">ภาษี</Label>
                         <Select
                           value={String(
                             item.priceType === "NO_VAT" ? 0 : item.tax
@@ -2010,21 +2130,9 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                         </Select>
                       </div>
                       <div className="space-y-2">
-                        <Label>มูลค่าก่อนภาษี</Label>
-                        <Input
-                          type="text"
-                          readOnly
-                          value={getNetUnitPrice(
-                            item,
-                            item.priceType
-                          ).toLocaleString("th-TH", {
-                            minimumFractionDigits: 2,
-                          })}
-                          className="font-semibold bg-muted"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>หัก ณ ที่จ่าย</Label>
+                        <Label className="text-sm font-medium">
+                          หัก ณ ที่จ่าย
+                        </Label>
                         <Select
                           value={
                             canWithholding(item)
@@ -2098,14 +2206,15 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                           )}
                       </div>
                     </div>
-                    <div className="flex justify-end">
+                    <div className="flex justify-end mt-4 pt-4 border-t border-gray-100">
                       <Button
                         variant="ghost"
-                        size="icon"
+                        size="sm"
                         onClick={() => removeItem(item.id)}
-                        className="text-muted-foreground hover:text-destructive"
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50 px-3 py-2"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        ลบรายการ
                       </Button>
                     </div>
                   </div>
@@ -2116,22 +2225,24 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                   (item) => !item.productId && !item.productTitle
                 );
                 return (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={addNewItem}
-                    className={`w-full ${
-                      hasUnselectedItems
-                        ? "border-orange-300 text-orange-600 hover:bg-orange-50"
-                        : ""
-                    }`}
-                    disabled={hasUnselectedItems}
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    {hasUnselectedItems
-                      ? "กรุณาเลือกสินค้าก่อนเพิ่มรายการใหม่"
-                      : "เพิ่มรายการ"}
-                  </Button>
+                  <div className="mt-6 p-4 border-2 border-dashed border-gray-200 rounded-lg bg-gray-50">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={addNewItem}
+                      className={`w-full h-12 text-base ${
+                        hasUnselectedItems
+                          ? "border-orange-300 text-orange-600 hover:bg-orange-50"
+                          : "border-blue-300 text-blue-600 hover:bg-blue-50"
+                      }`}
+                      disabled={hasUnselectedItems}
+                    >
+                      <Plus className="w-5 h-5 mr-3" />
+                      {hasUnselectedItems
+                        ? "กรุณาเลือกสินค้าก่อนเพิ่มรายการใหม่"
+                        : "เพิ่มรายการสินค้า"}
+                    </Button>
+                  </div>
                 );
               })()}
             </div>
@@ -2139,11 +2250,11 @@ export const DocumentForm: FC<DocumentFormProps> = ({
         </Card>
 
         {documentType === "invoice" && (
-          <Card>
-            <CardHeader>
-              <CardTitle>เงินมัดจำ</CardTitle>
+          <Card className="border-2 border-gray-200 shadow-lg overflow-hidden">
+            <CardHeader className="bg-gradient-to-r from-gray-50 to-slate-50 border-b-2 border-gray-200">
+              <CardTitle className="text-gray-900">เงินมัดจำ</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-6 bg-blue-50">
               <Button type="button" variant="outline">
                 <Plus className="w-4 h-4 mr-2" /> เลือกเงินมัดจำ
               </Button>
@@ -2152,8 +2263,8 @@ export const DocumentForm: FC<DocumentFormProps> = ({
         )}
 
         {documentType === "receipt" && (
-          <Card className="mb-6 border border-green-200 bg-green-50">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <Card className="mb-6 border-2 border-green-300 bg-white shadow-lg">
+            <CardHeader className="flex flex-row items-center justify-between pb-2 bg-gradient-to-r from-green-50 to-emerald-50 border-b-2 border-green-300">
               <div className="flex flex-row items-center gap-6">
                 <div className="font-bold text-lg text-green-900">
                   รับชำระเงินครั้งที่ 1
@@ -2942,11 +3053,11 @@ export const DocumentForm: FC<DocumentFormProps> = ({
           <Input placeholder="กรุณาเลือกแท็กที่ต้องการ" />
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>สรุปรายการ</CardTitle>
+        <Card className="border-2 border-blue-300 shadow-lg overflow-hidden">
+          <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b-2 border-blue-300">
+            <CardTitle className="text-blue-900">สรุปรายการ</CardTitle>
           </CardHeader>
-          <CardContent className="p-4 space-y-3">
+          <CardContent className="p-6 bg-white space-y-3">
             <div className="flex justify-between">
               <span>มูลค่าก่อนภาษี</span>
               <span>

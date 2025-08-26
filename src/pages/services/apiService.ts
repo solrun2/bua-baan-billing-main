@@ -106,6 +106,7 @@ function prepareDocumentData(document: DocumentPayload): any {
     tags: document.tags,
     updatedAt: document.updatedAt,
     issueTaxInvoice: document.issueTaxInvoice,
+
     // เพิ่ม fields สำหรับ receipt
     payment_date: document.payment_date,
     payment_method: document.payment_method,

@@ -44,6 +44,7 @@ interface DocumentBase {
     address?: string;
   };
   receipt_details?: any;
+  issueTaxInvoice?: boolean;
 }
 interface Quotation extends DocumentBase {}
 interface Invoice extends DocumentBase {}
@@ -110,6 +111,7 @@ const DocumentHeaderAndCustomer = ({
       <div className="flex flex-col items-end">
         <span className="font-bold text-2xl text-blue-900 mb-1">
           {labels.title}
+          {document.issueTaxInvoice ? " / ใบกำกับภาษี" : ""}
         </span>
         <div className="text-xs text-gray-600">
           <div>
@@ -280,7 +282,7 @@ const DocumentFooter = ({
 // =================================================================
 const PrintableDocument = React.forwardRef<HTMLDivElement, any>(
   ({ document, type, labels, items, summary }, ref) => {
-    const tableColumns = 4; // จำนวนคอลัมน์ของตารางสินค้า
+    const tableColumns = 4; // กลับเป็น 4 คอลัมน์ (รายการ, จำนวน, ราคา/หน่วย, จำนวนเงิน)
     return (
       <div ref={ref}>
         <style>
@@ -335,16 +337,16 @@ const PrintableDocument = React.forwardRef<HTMLDivElement, any>(
               </th>
             </tr>
             <tr className="text-xs bg-gray-50">
-              <th className="border border-gray-300 px-2 py-1 text-left font-semibold">
+              <th className="border border-gray-300 px-3 py-2 text-left font-semibold text-gray-700">
                 รายการ
               </th>
-              <th className="border border-gray-300 px-2 py-1 text-center font-semibold w-20">
+              <th className="border border-gray-300 px-3 py-2 text-center font-semibold text-gray-700 w-24">
                 จำนวน
               </th>
-              <th className="border border-gray-300 px-2 py-1 text-right font-semibold w-28">
+              <th className="border border-gray-300 px-3 py-2 text-right font-semibold text-gray-700 w-32">
                 ราคา/หน่วย
               </th>
-              <th className="border border-gray-300 px-2 py-1 text-right font-semibold w-28">
+              <th className="border border-gray-300 px-3 py-2 text-right font-semibold text-gray-700 w-32">
                 จำนวนเงิน
               </th>
             </tr>
@@ -367,17 +369,30 @@ const PrintableDocument = React.forwardRef<HTMLDivElement, any>(
           <tbody>
             {items.map((item, itemIndex) => (
               <tr key={itemIndex} className="text-xs">
-                <td className="border-x border-b border-gray-300 px-2 py-2 align-top">
-                  {item.product_name || item.productTitle || item.description}
+                <td className="border-x border-b border-gray-300 px-3 py-3 align-top">
+                  <div className="font-medium text-gray-900">
+                    {item.product_name || item.productTitle || "-"}
+                  </div>
+                  {item.description && (
+                    <div className="text-gray-500 text-xs mt-1 italic">
+                      {item.description}
+                    </div>
+                  )}
                 </td>
-                <td className="border-b border-r border-gray-300 px-2 py-2 text-center align-top">
-                  {item.quantity}
+                <td className="border-b border-r border-gray-300 px-3 py-3 text-center align-top">
+                  <span className="font-medium text-gray-900">
+                    {item.quantity}
+                  </span>
                 </td>
-                <td className="border-b border-gray-300 px-2 py-2 text-right align-top">
-                  {formatCurrency(item.unitPrice || 0)}
+                <td className="border-b border-gray-300 px-3 py-3 text-right align-top">
+                  <span className="font-medium text-gray-900">
+                    {formatCurrency(item.unitPrice || 0)}
+                  </span>
                 </td>
-                <td className="border-x border-b border-gray-300 px-2 py-2 text-right font-semibold align-top">
-                  {formatCurrency(item.amount || 0)}
+                <td className="border-x border-b border-gray-300 px-3 py-3 text-right font-semibold align-top">
+                  <span className="font-semibold text-gray-900">
+                    {formatCurrency(item.amount || 0)}
+                  </span>
                 </td>
               </tr>
             ))}
@@ -415,9 +430,9 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
   const componentRef = useRef<HTMLDivElement>(null);
   const handlePrint = useReactToPrint({
     contentRef: componentRef,
-    documentTitle: `${labels.title} - ${
-      document.document_number || document.documentNumber
-    }`,
+    documentTitle: `${labels.title}${
+      document.issueTaxInvoice ? " / ใบกำกับภาษี" : " "
+    } - ${document.document_number || document.documentNumber}`,
   });
 
   if (!open) return null;
@@ -434,46 +449,61 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
         <div style={{ maxHeight: "85vh", overflowY: "auto", padding: "1rem" }}>
           {/* --- ส่วนที่แสดงผลบนหน้าจอ --- */}
           <DocumentHeaderAndCustomer labels={labels} document={document} />
-          <div className="document-table mb-4">
-            <table className="w-full border-collapse text-xs">
-              <thead>
-                <tr className="text-xs bg-gray-50">
-                  <th className="border border-gray-300 px-2 py-1 text-left font-semibold">
-                    รายการ
-                  </th>
-                  <th className="border border-gray-300 px-2 py-1 text-center font-semibold w-20">
-                    จำนวน
-                  </th>
-                  <th className="border border-gray-300 px-2 py-1 text-right font-semibold w-28">
-                    ราคา/หน่วย
-                  </th>
-                  <th className="border border-gray-300 px-2 py-1 text-right font-semibold w-28">
-                    จำนวนเงิน
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((item, idx) => (
-                  <tr key={idx}>
-                    <td className="border-x border-b border-gray-300 px-2 py-2 align-top">
-                      {item.product_name ||
-                        item.productTitle ||
-                        item.description ||
-                        "-"}
-                    </td>
-                    <td className="border-b border-r border-gray-300 px-2 py-2 text-center align-top">
-                      {item.quantity}
-                    </td>
-                    <td className="border-b border-gray-300 px-2 py-2 text-right align-top">
-                      {formatCurrency(item.unitPrice || 0)}
-                    </td>
-                    <td className="border-x border-b border-gray-300 px-2 py-2 text-right font-semibold align-top">
-                      {formatCurrency(item.amount || 0)}
-                    </td>
+          <div className="document-table my-6">
+            <div className="bg-gray-50 rounded-t-lg border border-gray-200">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="bg-gray-100">
+                    <th className="border-b border-gray-200 px-4 py-3 text-left font-semibold text-gray-700">
+                      รายการ
+                    </th>
+                    <th className="border-b border-gray-200 px-4 py-3 text-center font-semibold text-gray-700 w-24">
+                      จำนวน
+                    </th>
+                    <th className="border-b border-gray-200 px-4 py-3 text-right font-semibold text-gray-700 w-32">
+                      ราคา/หน่วย
+                    </th>
+                    <th className="border-b border-gray-200 px-4 py-3 text-right font-semibold text-gray-700 w-32">
+                      จำนวนเงิน
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="bg-white">
+                  {items.map((item, idx) => (
+                    <tr
+                      key={idx}
+                      className="hover:bg-gray-50 transition-colors"
+                    >
+                      <td className="border-b border-gray-100 px-4 py-3 align-top">
+                        <div className="font-medium text-gray-900">
+                          {item.product_name || item.productTitle || "-"}
+                        </div>
+                        {item.description && (
+                          <div className="text-gray-500 text-sm mt-1 italic">
+                            {item.description}
+                          </div>
+                        )}
+                      </td>
+                      <td className="border-b border-gray-100 px-4 py-3 text-center align-top">
+                        <span className="font-medium text-gray-900">
+                          {item.quantity}
+                        </span>
+                      </td>
+                      <td className="border-b border-gray-100 px-4 py-3 text-right align-top">
+                        <span className="font-medium text-gray-900">
+                          {formatCurrency(item.unitPrice || 0)}
+                        </span>
+                      </td>
+                      <td className="border-b border-gray-100 px-4 py-3 text-right align-top">
+                        <span className="font-semibold text-gray-900">
+                          {formatCurrency(item.amount || 0)}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
           <DocumentFooter type={type} document={document} summary={summary} />
         </div>
