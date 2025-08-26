@@ -335,6 +335,9 @@ app.put("/api/products/:id", async (req: Request, res: Response) => {
 // Endpoint to get all documents with pagination
 app.get("/api/documents", async (req: Request, res: Response) => {
   try {
+    // ตรวจสอบและอัปเดตสถานะเอกสารก่อนดึงข้อมูล
+    await checkAndUpdateDocumentStatus(pool);
+
     const {
       page = 1,
       limit = 7,
@@ -1079,6 +1082,9 @@ async function cancelDocumentRecursive(
 app.get("/api/documents/:id", async (req, res) => {
   const { id } = req.params;
   try {
+    // ตรวจสอบและอัปเดตสถานะเอกสารก่อนดึงข้อมูล
+    await checkAndUpdateDocumentStatus(pool);
+
     // JOIN ตาราง quotation_details ด้วย เพื่อให้ได้ valid_until
     const docRows = await pool.query(
       `
@@ -2322,6 +2328,45 @@ app.get("/api/cash-flow", async (req: Request, res: Response) => {
     res.status(500).json({ error: "Failed to fetch cash flow" });
   }
 });
+
+// ฟังก์ชันตรวจสอบและอัปเดตสถานะเอกสารตามวันที่
+async function checkAndUpdateDocumentStatus(pool: any) {
+  const today = new Date().toISOString().slice(0, 10);
+
+  try {
+    // อัปเดตสถานะใบแจ้งหนี้ที่พ้นกำหนดชำระ
+    await pool.query(
+      `
+      UPDATE documents d
+      INNER JOIN invoice_details id ON d.id = id.document_id
+      SET d.status = 'พ้นกำหนด'
+      WHERE d.document_type = 'INVOICE' 
+        AND d.status IN ('รอชำระ', 'ชำระบางส่วน')
+        AND id.due_date < ?
+    `,
+      [today]
+    );
+
+    // อัปเดตสถานะใบเสนอราคาที่พ้นกำหนด
+    await pool.query(
+      `
+      UPDATE documents d
+      INNER JOIN quotation_details qd ON d.id = qd.document_id
+      SET d.status = 'พ้นกำหนด'
+      WHERE d.document_type = 'QUOTATION' 
+        AND d.status = 'รอตอบรับ'
+        AND qd.valid_until < ?
+    `,
+      [today]
+    );
+
+    console.log(
+      `[${new Date().toISOString()}] Document status check completed`
+    );
+  } catch (err) {
+    console.error("Failed to check and update document status:", err);
+  }
+}
 
 app.listen(port, () => {
   console.log(`Backend server is running on http://localhost:${port}`);
