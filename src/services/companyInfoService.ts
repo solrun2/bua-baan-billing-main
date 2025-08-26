@@ -77,4 +77,50 @@ export const companyInfoService = {
       throw error;
     }
   },
+
+  // อัปโหลดโลโก้บริษัท
+  async uploadLogo(file: File): Promise<{ success: boolean; imageUrl?: string }> {
+    try {
+      const formData = new FormData();
+      formData.append("logo", file);
+      
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/upload/logo`, {
+        method: "POST",
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        throw new Error("Upload failed");
+      }
+      
+      const result = await response.json();
+      return { success: true, imageUrl: result.imageUrl };
+    } catch (error) {
+      console.error("Failed to upload logo:", error);
+      return { success: false };
+    }
+  },
+
+  // อัปโหลดลายเซ็นดิจิทัล
+  async uploadSignature(file: File): Promise<{ success: boolean; imageUrl?: string }> {
+    try {
+      const formData = new FormData();
+      formData.append("signature", file);
+      
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/upload/signature`, {
+        method: "POST",
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        throw new Error("Upload failed");
+      }
+      
+      const result = await response.json();
+      return { success: true, imageUrl: result.imageUrl };
+    } catch (error) {
+      console.error("Failed to upload signature:", error);
+      return { success: false };
+    }
+  },
 };

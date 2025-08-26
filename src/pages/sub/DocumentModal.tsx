@@ -175,10 +175,12 @@ const DocumentFooter = ({
   type,
   document,
   summary,
+  companyInfo,
 }: {
   type: string;
   document: any;
   summary: any;
+  companyInfo: CompanyInfo | null;
 }) => {
   const netTotal = (summary.total || 0) - (summary.withholdingTax || 0);
   return (
@@ -276,7 +278,17 @@ const DocumentFooter = ({
           ขอขอบพระคุณที่ไว้วางใจใช้บริการ
         </div>
         <div className="text-center">
-          <div className="h-8"></div>
+          {companyInfo?.digital_signature ? (
+            <div className="mb-2">
+              <img
+                src={companyInfo.digital_signature}
+                alt="Digital Signature"
+                className="h-16 w-auto object-contain"
+              />
+            </div>
+          ) : (
+            <div className="h-8"></div>
+          )}
           <div className="border-t-2 border-gray-400 w-40 mb-1 pt-1 text-xs">
             ผู้รับเงิน
           </div>
@@ -370,6 +382,7 @@ const PrintableDocument = React.forwardRef<HTMLDivElement, any>(
                   type={type}
                   document={document}
                   summary={summary}
+                  companyInfo={companyInfo}
                 />
               </td>
             </tr>
@@ -535,7 +548,12 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
               </table>
             </div>
           </div>
-          <DocumentFooter type={type} document={document} summary={summary} />
+          <DocumentFooter
+            type={type}
+            document={document}
+            summary={summary}
+            companyInfo={companyInfo}
+          />
         </div>
         {/* --- ปุ่มปริ้น --- */}
         <div className="flex justify-end mt-4 pt-4 border-t">
