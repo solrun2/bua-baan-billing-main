@@ -1,6 +1,10 @@
-import React, { useRef } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { useReactToPrint } from "react-to-print";
 import { formatCurrency, numberToThaiText } from "../../lib/utils";
+import {
+  companyInfoService,
+  type CompanyInfo,
+} from "@/services/companyInfoService";
 
 // --- Interfaces and Types (ไม่เปลี่ยนแปลง) ---
 interface DocumentItem {
@@ -61,12 +65,7 @@ const typeLabels = {
   invoice: { title: "ใบแจ้งหนี้" },
   receipt: { title: "ใบเสร็จรับเงิน" },
 };
-const SELLER_INFO = {
-  company: "บริษัท Tomato Ideas COMPANY LIMITED - UAT จำกัด",
-  address:
-    "เลขที่ 21 ซอย สุดสงวนท่าไม้ แขวงท่าข้าม เขตบางขุนเทียน กรุงเทพมหานคร 10130",
-  taxId: "0155562052664 (สำนักงานใหญ่)",
-};
+// ข้อมูลบริษัทจะถูกโหลดจาก API แทนการใช้ค่าคงที่
 
 const formatDate = (dateStr?: string) => {
   if (!dateStr) return "-";
@@ -86,25 +85,35 @@ const formatDate = (dateStr?: string) => {
 const DocumentHeaderAndCustomer = ({
   labels,
   document,
+  companyInfo,
 }: {
   labels: any;
   document: any;
+  companyInfo: CompanyInfo | null;
 }) => (
   <div className="avoid-break">
     <div className="flex flex-row justify-between items-start border-b-2 border-blue-200 pb-4 mb-4">
       <div className="flex flex-row items-center gap-3">
         <div className="w-12 h-12 border-2 border-blue-200 rounded-full flex items-center justify-center text-blue-300 text-sm font-bold">
-          LOGO
+          {companyInfo?.logo ? (
+            <img
+              src={companyInfo.logo}
+              alt="Company Logo"
+              className="w-full h-full object-contain rounded-full"
+            />
+          ) : (
+            "LOGO"
+          )}
         </div>
         <div className="flex flex-col">
           <span className="font-bold text-lg text-blue-900 leading-tight">
-            {SELLER_INFO.company}
+            {companyInfo?.company_name_th || "บริษัท ตัวอย่าง จำกัด"}
           </span>
           <span className="text-xs text-gray-600 leading-tight">
-            {SELLER_INFO.address}
+            {companyInfo?.address || "ที่อยู่บริษัท"}
           </span>
           <span className="text-xs text-gray-600 leading-tight">
-            เลขประจำตัวผู้เสียภาษี {SELLER_INFO.taxId}
+            เลขประจำตัวผู้เสียภาษี {companyInfo?.tax_id || "-"}
           </span>
         </div>
       </div>
@@ -281,7 +290,7 @@ const DocumentFooter = ({
 // START: The Printable Component - Final, Simple & Correct Version
 // =================================================================
 const PrintableDocument = React.forwardRef<HTMLDivElement, any>(
-  ({ document, type, labels, items, summary }, ref) => {
+  ({ document, type, labels, items, summary, companyInfo }, ref) => {
     const tableColumns = 4; // กลับเป็น 4 คอลัมน์ (รายการ, จำนวน, ราคา/หน่วย, จำนวนเงิน)
     return (
       <div ref={ref}>
@@ -333,6 +342,7 @@ const PrintableDocument = React.forwardRef<HTMLDivElement, any>(
                 <DocumentHeaderAndCustomer
                   labels={labels}
                   document={document}
+                  companyInfo={companyInfo}
                 />
               </th>
             </tr>
@@ -410,6 +420,7 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
   open,
   onClose,
 }) => {
+  const [companyInfo, setCompanyInfo] = useState<CompanyInfo | null>(null);
   const labels = typeLabels[type];
   const items: DocumentItem[] = (
     Array.isArray(document.items) && document.items.length > 0
@@ -426,6 +437,21 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
     discount: 0,
     withholdingTax: 0,
   };
+
+  // โหลดข้อมูลบริษัทเมื่อเปิด modal
+  useEffect(() => {
+    if (open) {
+      const fetchCompanyInfo = async () => {
+        try {
+          const data = await companyInfoService.getCompanyInfo();
+          setCompanyInfo(data);
+        } catch (error) {
+          console.error("Failed to fetch company info:", error);
+        }
+      };
+      fetchCompanyInfo();
+    }
+  }, [open]);
 
   const componentRef = useRef<HTMLDivElement>(null);
   const handlePrint = useReactToPrint({
@@ -448,7 +474,11 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
         </button>
         <div style={{ maxHeight: "85vh", overflowY: "auto", padding: "1rem" }}>
           {/* --- ส่วนที่แสดงผลบนหน้าจอ --- */}
-          <DocumentHeaderAndCustomer labels={labels} document={document} />
+          <DocumentHeaderAndCustomer
+            labels={labels}
+            document={document}
+            companyInfo={companyInfo}
+          />
           <div className="document-table my-6">
             <div className="bg-gray-50 rounded-t-lg border border-gray-200">
               <table className="w-full border-collapse">
@@ -526,6 +556,7 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
             labels={labels}
             items={items}
             summary={summary}
+            companyInfo={companyInfo}
           />
         </div>
       </div>

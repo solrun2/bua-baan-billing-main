@@ -2368,6 +2368,138 @@ async function checkAndUpdateDocumentStatus(pool: any) {
   }
 }
 
+// ===== API สำหรับข้อมูลบริษัท =====
+
+// GET: ดึงข้อมูลบริษัท
+app.get("/api/company-info", async (req: Request, res: Response) => {
+  try {
+    const rows = await pool.query(
+      "SELECT * FROM company_info ORDER BY id DESC LIMIT 1"
+    );
+    if (Array.isArray(rows) && rows.length > 0) {
+      res.json(rows[0]);
+    } else {
+      res.json(null);
+    }
+  } catch (err) {
+    console.error("Failed to fetch company info:", err);
+    res.status(500).json({ error: "Failed to fetch company info" });
+  }
+});
+
+// POST: สร้างข้อมูลบริษัทใหม่
+app.post("/api/company-info", async (req: Request, res: Response) => {
+  const {
+    company_name_th,
+    company_name_en,
+    tax_id,
+    business_type,
+    address,
+    phone,
+    email,
+    website,
+    bank_name,
+    bank_branch,
+    bank_account_number,
+    bank_account_name,
+    digital_signature,
+    logo,
+  } = req.body;
+
+  if (!company_name_th) {
+    return res.status(400).json({ error: "Company name (Thai) is required" });
+  }
+
+  try {
+    const queryResult = await pool.query(
+      `INSERT INTO company_info (
+        company_name_th, company_name_en, tax_id, business_type, address, phone, email, website,
+        bank_name, bank_branch, bank_account_number, bank_account_name, digital_signature, logo
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        company_name_th,
+        company_name_en || null,
+        tax_id || null,
+        business_type || null,
+        address || null,
+        phone || null,
+        email || null,
+        website || null,
+        bank_name || null,
+        bank_branch || null,
+        bank_account_number || null,
+        bank_account_name || null,
+        digital_signature || null,
+        logo || null,
+      ]
+    );
+    const result = (queryResult as any)[0];
+    if (!result || !result.insertId) {
+      throw new Error("Failed to get new company info ID after insert.");
+    }
+    res.status(201).json({ success: true, id: result.insertId });
+  } catch (err) {
+    console.error("Failed to create company info:", err);
+    res.status(500).json({ error: "Failed to create company info" });
+  }
+});
+
+// PUT: อัปเดตข้อมูลบริษัท
+app.put("/api/company-info/:id", async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const {
+    company_name_th,
+    company_name_en,
+    tax_id,
+    business_type,
+    address,
+    phone,
+    email,
+    website,
+    bank_name,
+    bank_branch,
+    bank_account_number,
+    bank_account_name,
+    digital_signature,
+    logo,
+  } = req.body;
+
+  if (!company_name_th) {
+    return res.status(400).json({ error: "Company name (Thai) is required" });
+  }
+
+  try {
+    await pool.query(
+      `UPDATE company_info SET
+        company_name_th = ?, company_name_en = ?, tax_id = ?, business_type = ?, address = ?, 
+        phone = ?, email = ?, website = ?, bank_name = ?, bank_branch = ?, 
+        bank_account_number = ?, bank_account_name = ?, digital_signature = ?, logo = ?
+      WHERE id = ?`,
+      [
+        company_name_th,
+        company_name_en || null,
+        tax_id || null,
+        business_type || null,
+        address || null,
+        phone || null,
+        email || null,
+        website || null,
+        bank_name || null,
+        bank_branch || null,
+        bank_account_number || null,
+        bank_account_name || null,
+        digital_signature || null,
+        logo || null,
+        id,
+      ]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Failed to update company info:", err);
+    res.status(500).json({ error: "Failed to update company info" });
+  }
+});
+
 app.listen(port, () => {
   console.log(`Backend server is running on http://localhost:${port}`);
 });

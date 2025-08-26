@@ -130,3 +130,25 @@ CREATE TABLE `ewallets` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `account_number` (`account_number`)
 ) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+
+-- ตารางข้อมูลบริษัท
+CREATE TABLE `company_info` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `company_name_th` varchar(255) NOT NULL,
+  `company_name_en` varchar(255) DEFAULT NULL,
+  `tax_id` varchar(20) DEFAULT NULL,
+  `business_type` varchar(255) DEFAULT NULL,
+  `address` text DEFAULT NULL,
+  `phone` varchar(20) DEFAULT NULL,
+  `email` varchar(255) DEFAULT NULL,
+  `website` varchar(255) DEFAULT NULL,
+  `bank_name` varchar(255) DEFAULT NULL,
+  `bank_branch` varchar(255) DEFAULT NULL,
+  `bank_account_number` varchar(50) DEFAULT NULL,
+  `bank_account_name` varchar(255) DEFAULT NULL,
+  `digital_signature` varchar(255) DEFAULT NULL,
+  `logo` varchar(255) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
