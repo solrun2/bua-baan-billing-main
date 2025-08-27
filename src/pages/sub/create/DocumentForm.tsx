@@ -2263,7 +2263,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
         )}
 
         {documentType === "receipt" && (
-          <Card className="mb-6 border-2 border-green-300 bg-white shadow-lg">
+          <Card className="border-2 border-green-300 bg-white shadow-lg overflow-hidden">
             <CardHeader className="flex flex-row items-center justify-between pb-2 bg-gradient-to-r from-green-50 to-emerald-50 border-b-2 border-green-300">
               <div className="flex flex-row items-center gap-6">
                 <div className="font-bold text-lg text-green-900">
