@@ -106,13 +106,13 @@ const DocumentHeaderAndCustomer = ({
           )}
         </div>
         <div className="flex flex-col">
-          <span className="font-bold text-lg text-blue-900 leading-tight">
+          <span className="font-bold text-lg text-blue-900 leading-tight text-left">
             {companyInfo?.company_name_th || "บริษัท ตัวอย่าง จำกัด"}
           </span>
-          <span className="text-xs text-gray-600 leading-tight">
+          <span className="text-xs text-gray-600 leading-tight text-left">
             {companyInfo?.address || "ที่อยู่บริษัท"}
           </span>
-          <span className="text-xs text-gray-600 leading-tight">
+          <span className="text-xs text-gray-600 leading-tight text-left">
             เลขประจำตัวผู้เสียภาษี {companyInfo?.tax_id || "-"}
           </span>
         </div>
@@ -184,16 +184,16 @@ const DocumentFooter = ({
 }) => {
   const netTotal = (summary.total || 0) - (summary.withholdingTax || 0);
   return (
-    <div className="pt-4 avoid-break">
+    <div className="pt-2 avoid-break">
       <div className="flex items-start justify-between">
         <div className="w-1/2 pr-4 text-xs">
           {/* ---  START: ส่วนที่ปรับปรุง --- */}
           {type === "receipt" && document.receipt_details && (
-            <div className="bg-green-50 rounded-lg border border-green-200 px-4 py-3 mb-3">
-              <div className="font-bold text-green-700 mb-2 text-sm">
+            <div className="bg-green-50 rounded-lg border border-green-200 px-3 py-2 mb-2">
+              <div className="font-bold text-green-700 mb-1 text-xs">
                 ข้อมูลการรับชำระ
               </div>
-              <div className="space-y-2">
+              <div className="space-y-1">
                 <div>
                   <span className="font-semibold">วันที่ชำระ:</span>{" "}
                   {formatDate(document.receipt_details.payment_date)}
@@ -223,7 +223,7 @@ const DocumentFooter = ({
                       </div>
                     </div>
                   )}
-                <div className="border-t border-green-200 mt-2 pt-2">
+                <div className="border-t border-green-200 mt-1 pt-1">
                   <span className="font-semibold">ยอดรวมที่รับชำระ:</span>{" "}
                   {formatCurrency(
                     document.receipt_details.net_total_receipt || 0
@@ -233,12 +233,12 @@ const DocumentFooter = ({
             </div>
           )}
           {/* ---  END: ส่วนที่ปรับปรุง --- */}
-          <div className="text-gray-600 mt-2">
+          <div className="text-gray-600 mt-1">
             <b>หมายเหตุ:</b> {document.notes || "-"}
           </div>
         </div>
         <div className="w-1/2 max-w-xs">
-          <div className="min-w-48 space-y-1 bg-blue-50 rounded-lg p-3 text-xs">
+          <div className="min-w-48 space-y-1 bg-blue-50 rounded-lg p-2 text-xs">
             <div className="flex justify-between">
               <span>รวมเป็นเงิน:</span>
               <span>
@@ -260,12 +260,12 @@ const DocumentFooter = ({
               </div>
             )}
             <div className="border-t border-gray-300 pt-1 mt-1">
-              <div className="flex justify-between font-bold text-base">
+              <div className="flex justify-between font-bold text-sm">
                 <span>รวมทั้งสิ้น:</span>
                 <span>{formatCurrency(netTotal)}</span>
               </div>
-              <div className="mt-2 pt-2 border-t border-gray-200">
-                <div className="text-center font-semibold">
+              <div className="mt-1 pt-1 border-t border-gray-200">
+                <div className="text-center font-semibold text-xs">
                   ({numberToThaiText(netTotal)})
                 </div>
               </div>
@@ -273,23 +273,23 @@ const DocumentFooter = ({
           </div>
         </div>
       </div>
-      <div className="flex justify-between items-end mt-6">
+      <div className="flex justify-between items-end mt-3">
         <div className="text-xs text-gray-500">
           ขอขอบพระคุณที่ไว้วางใจใช้บริการ
         </div>
         <div className="text-center">
           {companyInfo?.digital_signature ? (
-            <div className="mb-2">
+            <div className="mb-1">
               <img
                 src={companyInfo.digital_signature}
                 alt="Digital Signature"
-                className="h-16 w-auto object-contain"
+                className="h-12 w-auto object-contain"
               />
             </div>
           ) : (
-            <div className="h-8"></div>
+            <div className="h-6"></div>
           )}
-          <div className="border-t-2 border-gray-400 w-40 mb-1 pt-1 text-xs">
+          <div className="border-t-2 border-gray-400 w-32 mb-1 pt-1 text-xs">
             ผู้รับเงิน
           </div>
         </div>
@@ -303,47 +303,65 @@ const DocumentFooter = ({
 // =================================================================
 const PrintableDocument = React.forwardRef<HTMLDivElement, any>(
   ({ document, type, labels, items, summary, companyInfo }, ref) => {
-    const tableColumns = 4; // กลับเป็น 4 คอลัมน์ (รายการ, จำนวน, ราคา/หน่วย, จำนวนเงิน)
+    const tableColumns = 4; // 4 คอลัมน์ (รายการ, จำนวน, ราคา/หน่วย, จำนวนเงิน)
+
     return (
       <div ref={ref}>
         <style>
           {`
-                     @media print {
-                         @page {
-                             size: A4;
-                             margin: 15mm;
-                         }
-                         html, body {
-                             -webkit-print-color-adjust: exact !important;
-                             print-color-adjust: exact !important;
-                             font-size: 10pt;
-                         }
-                         /* --- หัวใจของการทำงาน --- */
-                         thead { 
-                             display: table-header-group !important; 
-                             page-break-after: avoid !important;
-                         }
-                         tfoot { 
-                             display: table-footer-group !important; 
-                             page-break-before: avoid !important;
-                         }
-                         tr, td, th { page-break-inside: avoid !important; }
-                         .avoid-break { page-break-inside: avoid !important; }
-                         
-                         /* ทำให้หัวกระดาษแสดงในทุกหน้า */
-                         table thead tr:first-child th {
-                             position: running(header);
-                             page-break-after: avoid !important;
-                         }
-                         
-                         /* กำหนดให้หัวกระดาษแสดงในทุกหน้า */
-                         @page {
-                             @top-center {
-                                 content: element(header);
-                             }
-                         }
-                     }
-                 `}
+            @media print {
+              @page {
+                size: A4;
+                margin: 15mm;
+              }
+              html, body {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+                font-size: 10pt;
+              }
+              
+                                                           /* การจัดการปกติสำหรับเอกสารอื่น */
+               thead { 
+                 display: table-header-group !important; 
+                 page-break-after: avoid !important;
+               }
+               tfoot { 
+                 display: table-footer-group !important; 
+                 page-break-before: avoid !important;
+               }
+               tr, td, th { page-break-inside: avoid !important; }
+               .avoid-break { page-break-inside: avoid !important; }
+               
+               /* ปรับปรุงการแบ่งหน้าของตาราง */
+               table {
+                 page-break-inside: auto !important;
+               }
+               tbody {
+                 page-break-inside: auto !important;
+               }
+               tbody tr {
+                 page-break-inside: avoid !important;
+                 page-break-after: auto !important;
+               }
+               
+               /* ปรับปรุงการแสดงผลของ tfoot ให้เหมือนใบเสนอราคา */
+               tfoot {
+                 display: table-footer-group !important;
+                 page-break-before: avoid !important;
+               }
+               
+                               /* จำกัดความสูงของ header เพื่อให้มีพื้นที่สำหรับ footer */
+                thead th:first-child {
+                  max-height: 150px !important;
+                  overflow: hidden !important;
+                }
+                
+                /* ทำให้ชื่อบริษัทชิดซ้ายตอนปริ้น */
+                .avoid-break .flex.flex-col span {
+                  text-align: left !important;
+                }
+            }
+          `}
         </style>
 
         <table className="w-full">
@@ -374,21 +392,7 @@ const PrintableDocument = React.forwardRef<HTMLDivElement, any>(
             </tr>
           </thead>
 
-          {/* === 2. ส่วนท้ายที่จะแสดงซ้ำทุกหน้า === */}
-          <tfoot>
-            <tr>
-              <td colSpan={tableColumns}>
-                <DocumentFooter
-                  type={type}
-                  document={document}
-                  summary={summary}
-                  companyInfo={companyInfo}
-                />
-              </td>
-            </tr>
-          </tfoot>
-
-          {/* === 3. เนื้อหารายการสินค้าที่จะไหลไปเรื่อยๆ === */}
+          {/* === 2. เนื้อหารายการสินค้าที่จะไหลไปเรื่อยๆ === */}
           <tbody>
             {items.map((item, itemIndex) => (
               <tr key={itemIndex} className="text-xs">
@@ -420,6 +424,20 @@ const PrintableDocument = React.forwardRef<HTMLDivElement, any>(
               </tr>
             ))}
           </tbody>
+
+          {/* === 3. ส่วนท้ายที่จะแสดงในทุกหน้า === */}
+          <tfoot>
+            <tr>
+              <td colSpan={tableColumns}>
+                <DocumentFooter
+                  type={type}
+                  document={document}
+                  summary={summary}
+                  companyInfo={companyInfo}
+                />
+              </td>
+            </tr>
+          </tfoot>
         </table>
       </div>
     );
