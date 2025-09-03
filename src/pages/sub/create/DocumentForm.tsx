@@ -1746,7 +1746,7 @@ export const DocumentForm: FC<DocumentFormProps> = ({
                 onClick={() => setIsCreateCustomerOpen(true)}
                 className="px-4 py-2 border-purple-300 text-purple-700 hover:bg-purple-50"
               >
-                <span className="mr-2">➕</span>
+                <span className="mr-2">+</span>
                 สร้างใหม่
               </Button>
               <CreateCustomerDialog
