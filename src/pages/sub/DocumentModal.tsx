@@ -241,18 +241,12 @@ const DocumentFooter = ({
           <div className="min-w-48 space-y-1 bg-blue-50 rounded-lg p-2 text-xs">
             <div className="flex justify-between">
               <span>รวมเป็นเงิน:</span>
-              <span>
-                {formatCurrency(
-                  (summary.subtotal || 0) + (summary.discount || 0)
-                )}
-              </span>
+              <span>{formatCurrency(summary.subtotal || 0)}</span>
             </div>
-            {summary.discount > 0 && (
-              <div className="flex justify-between text-red-600">
-                <span>ส่วนลด:</span>
-                <span>-{formatCurrency(summary.discount || 0)}</span>
-              </div>
-            )}
+            <div className="flex justify-between text-red-600">
+              <span>ส่วนลด:</span>
+              <span>-{formatCurrency(summary.discount || 0)}</span>
+            </div>
             {summary.tax > 0 && (
               <div className="flex justify-between">
                 <span>ภาษีมูลค่าเพิ่ม:</span>
@@ -303,7 +297,7 @@ const DocumentFooter = ({
 // =================================================================
 const PrintableDocument = React.forwardRef<HTMLDivElement, any>(
   ({ document, type, labels, items, summary, companyInfo }, ref) => {
-    const tableColumns = 4; // 4 คอลัมน์ (รายการ, จำนวน, ราคา/หน่วย, จำนวนเงิน)
+    const tableColumns = 5; // 5 คอลัมน์ (รายการ, จำนวน, ราคา/หน่วย, ส่วนลด, จำนวนเงิน)
 
     return (
       <div ref={ref}>
@@ -386,6 +380,9 @@ const PrintableDocument = React.forwardRef<HTMLDivElement, any>(
               <th className="border border-gray-300 px-3 py-2 text-right font-semibold text-gray-700 w-32">
                 ราคา/หน่วย
               </th>
+              <th className="border border-gray-300 px-3 py-2 text-right font-semibold text-gray-700 w-28">
+                ส่วนลด
+              </th>
               <th className="border border-gray-300 px-3 py-2 text-right font-semibold text-gray-700 w-32">
                 จำนวนเงิน
               </th>
@@ -414,6 +411,24 @@ const PrintableDocument = React.forwardRef<HTMLDivElement, any>(
                 <td className="border-b border-gray-300 px-3 py-3 text-right align-top">
                   <span className="font-medium text-gray-900">
                     {formatCurrency(item.unitPrice || 0)}
+                  </span>
+                </td>
+                <td className="border-b border-gray-300 px-3 py-3 text-right align-top">
+                  <span className="font-medium text-gray-900">
+                    {(() => {
+                      const discountValue = item.discount ?? 0;
+                      const discountType =
+                        item.discountType ?? item.discount_type;
+                      const quantity = item.quantity ?? 0;
+                      const unitPrice = item.unitPrice ?? 0;
+                      if (!discountValue || discountValue <= 0) return "-";
+                      const amount =
+                        discountType === "percentage"
+                          ? unitPrice * quantity * (discountValue / 100)
+                          : discountValue * quantity;
+                      if (!amount || amount <= 0) return "-";
+                      return formatCurrency(amount);
+                    })()}
                   </span>
                 </td>
                 <td className="border-x border-b border-gray-300 px-3 py-3 text-right font-semibold align-top">
@@ -524,6 +539,9 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
                     <th className="border-b border-gray-200 px-4 py-3 text-right font-semibold text-gray-700 w-32">
                       ราคา/หน่วย
                     </th>
+                    <th className="border-b border-gray-200 px-4 py-3 text-right font-semibold text-gray-700 w-28">
+                      ส่วนลด
+                    </th>
                     <th className="border-b border-gray-200 px-4 py-3 text-right font-semibold text-gray-700 w-32">
                       จำนวนเงิน
                     </th>
@@ -553,6 +571,25 @@ const DocumentModal: React.FC<DocumentModalProps> = ({
                       <td className="border-b border-gray-100 px-4 py-3 text-right align-top">
                         <span className="font-medium text-gray-900">
                           {formatCurrency(item.unitPrice || 0)}
+                        </span>
+                      </td>
+                      <td className="border-b border-gray-100 px-4 py-3 text-right align-top">
+                        <span className="font-medium text-gray-900">
+                          {(() => {
+                            const discountValue = item.discount ?? 0;
+                            const discountType =
+                              item.discountType ?? item.discount_type;
+                            const quantity = item.quantity ?? 0;
+                            const unitPrice = item.unitPrice ?? 0;
+                            if (!discountValue || discountValue <= 0)
+                              return "-";
+                            const amount =
+                              discountType === "percentage"
+                                ? unitPrice * quantity * (discountValue / 100)
+                                : discountValue * quantity;
+                            if (!amount || amount <= 0) return "-";
+                            return formatCurrency(amount);
+                          })()}
                         </span>
                       </td>
                       <td className="border-b border-gray-100 px-4 py-3 text-right align-top">

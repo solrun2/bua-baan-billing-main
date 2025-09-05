@@ -501,14 +501,17 @@ app.get("/api/documents", async (req: Request, res: Response) => {
 
     const docsWithItems = rows.map((doc: any) => {
       const items = itemsByDoc[doc.id] || [];
-      // ใช้ข้อมูล summary จาก database แทนการคำนวณใหม่
+      // คำนวณ summary จากรายการ เพื่อให้ได้ discount ที่ถูกต้อง
+      const calculated = calculateSummaryFromItems(items);
       const summary = {
-        subtotal: doc.subtotal || 0,
-        discount: 0, // ไม่มีใน database
-        tax: doc.tax_amount || 0,
-        total: doc.total_amount || 0,
-        withholdingTax: 0, // ไม่มีใน database
-        netTotalAmount: doc.total_amount || 0,
+        subtotal: doc.subtotal ?? calculated.subtotal ?? 0,
+        discount: calculated.discount ?? 0,
+        tax: doc.tax_amount ?? calculated.tax ?? 0,
+        total: doc.total_amount ?? calculated.total ?? 0,
+        withholdingTax: calculated.withholdingTax ?? 0,
+        netTotalAmount:
+          (doc.total_amount ?? calculated.total ?? 0) -
+          (doc.tax_amount ?? calculated.tax ?? 0),
       };
 
       // สร้าง receipt_details สำหรับใบเสร็จ
@@ -1240,14 +1243,19 @@ app.get("/api/documents/:id", async (req, res) => {
       }));
     }
 
-    // ใช้ข้อมูล summary จาก database แทนการคำนวณใหม่
+    // คำนวณ summary จาก items เพื่อให้ได้ discount ที่ถูกต้อง
+    const calculated = calculateSummaryFromItems(
+      Array.isArray(items) ? items : []
+    );
     const summary = {
-      subtotal: doc.subtotal || 0,
-      discount: 0, // ไม่มีใน database
-      tax: doc.tax_amount || 0,
-      total: doc.total_amount || 0,
-      withholdingTax: 0, // ไม่มีใน database
-      netTotalAmount: doc.total_amount || 0,
+      subtotal: doc.subtotal ?? calculated.subtotal ?? 0,
+      discount: calculated.discount ?? 0,
+      tax: doc.tax_amount ?? calculated.tax ?? 0,
+      total: doc.total_amount ?? calculated.total ?? 0,
+      withholdingTax: calculated.withholdingTax ?? 0,
+      netTotalAmount:
+        (doc.total_amount ?? calculated.total ?? 0) -
+        (doc.tax_amount ?? calculated.tax ?? 0),
     };
 
     const documentWithItems = {

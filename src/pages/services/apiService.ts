@@ -314,13 +314,21 @@ function mapDocumentFromBackend(doc: any): DocumentData {
       withholding_tax_option: item.withholding_tax_option ?? "ไม่ระบุ",
     })),
     items_recursive: doc.items_recursive || [],
-    summary: doc.summary || {
-      subtotal: Number(doc.subtotal ?? 0),
-      discount: 0,
-      tax: Number(doc.tax_amount ?? 0),
-      total: Number(doc.total_amount ?? 0),
-      withholdingTax: 0,
-    },
+    summary: doc.summary
+      ? {
+          subtotal: Number(doc.summary.subtotal ?? doc.subtotal ?? 0),
+          discount: Number(doc.summary.discount ?? 0),
+          tax: Number(doc.summary.tax ?? doc.tax_amount ?? 0),
+          total: Number(doc.summary.total ?? doc.total_amount ?? 0),
+          withholdingTax: Number(doc.summary.withholdingTax ?? 0),
+        }
+      : {
+          subtotal: Number(doc.subtotal ?? 0),
+          discount: Number(doc.discount ?? 0),
+          tax: Number(doc.tax_amount ?? 0),
+          total: Number(doc.total_amount ?? 0),
+          withholdingTax: Number(doc.withholding_tax_amount ?? 0),
+        },
     attachments: doc.attachments || [],
     issueTaxInvoice: doc.issue_tax_invoice ?? false,
     updatedAt: doc.updated_at,
